@@ -268,25 +268,27 @@ export function Library({ documents, loading, onOpenDoc }: LibraryProps) {
                     {selectedDoc.uploaded_by ? 'Community member' : 'Curated content'} · {new Date(selectedDoc.created_at).toLocaleDateString([], { year: 'numeric', month: 'long', day: 'numeric' })}
                   </p>
                 </div>
-                {selectedDoc.file_url && (
-                  <a
-                    href={selectedDoc.file_url}
-                    download={selectedDoc.file_name || undefined}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-stone-700 bg-stone-100 hover:bg-stone-200 border border-stone-200 rounded-lg transition-all mb-4"
+                <div className="flex items-center gap-3 flex-wrap">
+                  {selectedDoc.file_url && (
+                    <a
+                      href={selectedDoc.file_url}
+                      download={selectedDoc.file_name || undefined}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-stone-700 bg-stone-100 hover:bg-stone-200 border border-stone-200 rounded-lg transition-all"
+                    >
+                      <Download className="w-4 h-4 text-stone-500" />
+                      Download original {(selectedDoc.file_format || 'file').toUpperCase()}
+                    </a>
+                  )}
+                  <button
+                    onClick={() => { onOpenDoc(selectedDoc); setSelectedDoc(null); }}
+                    className="inline-flex items-center gap-2 px-5 py-2.5 bg-amber-600 hover:bg-amber-500 text-white text-sm font-medium rounded-lg transition-all shadow-lg shadow-amber-600/20"
                   >
-                    <Download className="w-4 h-4 text-stone-500" />
-                    Download original {(selectedDoc.file_format || 'file').toUpperCase()}
-                  </a>
-                )}
-                <button
-                  onClick={() => { onOpenDoc(selectedDoc); setSelectedDoc(null); }}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-amber-600 hover:bg-amber-500 text-white text-sm font-medium rounded-lg transition-all shadow-lg shadow-amber-600/20"
-                >
-                  <Play className="w-4 h-4" />
-                  Start Reading
-                </button>
+                    <Play className="w-4 h-4" />
+                    Start Reading
+                  </button>
+                </div>
               </div>
             </div>
           </div>

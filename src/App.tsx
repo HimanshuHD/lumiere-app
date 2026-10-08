@@ -7,10 +7,13 @@ import { Library } from '@/components/Library';
 import { BookmarksView } from '@/components/BookmarksView';
 import { Reader } from '@/components/Reader';
 import { UploadPanel } from '@/components/UploadPanel';
+import { Profile } from '@/components/Profile';
+import { MyUploads } from '@/components/MyUploads';
+import { UserMenu } from '@/components/UserMenu';
 import { useDocuments } from '@/hooks/useData';
 import { Document } from '@/lib/supabase';
 
-type View = 'library' | 'bookmarks' | 'upload';
+type View = 'library' | 'bookmarks' | 'upload' | 'profile' | 'my-uploads';
 
 function AppContent() {
   const { user, loading, signOut } = useAuth();
@@ -77,19 +80,11 @@ function AppContent() {
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <div className="hidden sm:block text-right">
-              <p className="text-xs text-stone-500">Signed in as</p>
-              <p className="text-sm font-medium text-stone-700">{user.email}</p>
-            </div>
-            <button
-              onClick={signOut}
-              className="p-2 rounded-lg text-stone-500 hover:text-stone-800 hover:bg-stone-100 transition-colors"
-              title="Sign out"
-            >
-              <LogOut className="w-4 h-4" />
-            </button>
-          </div>
+          <UserMenu
+            onProfile={() => setView('profile')}
+            onMyUploads={() => setView('my-uploads')}
+            onSignOut={signOut}
+          />
         </div>
 
         {/* Mobile nav */}
@@ -120,6 +115,8 @@ function AppContent() {
         )}
         {view === 'bookmarks' && <BookmarksView onOpenDoc={setActiveDoc} />}
         {view === 'upload' && <UploadPanel onUploaded={handleUploaded} />}
+        {view === 'profile' && <Profile />}
+        {view === 'my-uploads' && <MyUploads />}
       </main>
 
       {/* Footer */}

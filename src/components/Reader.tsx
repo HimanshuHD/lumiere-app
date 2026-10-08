@@ -323,11 +323,17 @@ export function Reader({ document: doc, onBack }: ReaderProps) {
       {/* PDF Reader (native browser embed) */}
       {!textMode && doc.file_format === 'pdf' && doc.file_url && (
         <div className="pt-14 h-screen">
-          <iframe
-            src={`${doc.file_url}#view=FitH&toolbar=1`}
-            title={doc.title}
+          <object
+            data={doc.file_url}
+            type="application/pdf"
             className="w-full h-[calc(100vh-3.5rem)] border-0"
-          />
+          >
+            <iframe
+              src={doc.file_url}
+              title={doc.title}
+              className="w-full h-[calc(100vh-3.5rem)] border-0"
+            />
+          </object>
         </div>
       )}
 
