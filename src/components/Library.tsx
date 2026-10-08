@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Search, Clock, BookMarked, Play, Star, Sparkles, User, FileText, Hash, X, Download } from 'lucide-react';
+import { Search, Clock, BookMarked, Play, Star, Sparkles, User, FileText, Hash, X, Download, ChevronRight } from 'lucide-react';
 import { Document } from '@/lib/supabase';
 import { useBookmarks, useReadingProgress } from '@/hooks/useData';
 
@@ -7,11 +7,12 @@ interface LibraryProps {
   documents: Document[];
   loading: boolean;
   onOpenDoc: (doc: Document) => void;
+  onViewAll: () => void;
 }
 
 const categories = ['All', 'Fiction', 'Non-Fiction', 'Science', 'History', 'Technology', 'Philosophy', 'Adventure'];
 
-export function Library({ documents, loading, onOpenDoc }: LibraryProps) {
+export function Library({ documents, loading, onOpenDoc, onViewAll }: LibraryProps) {
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState('All');
   const [selectedDoc, setSelectedDoc] = useState<Document | null>(null);
@@ -33,7 +34,7 @@ export function Library({ documents, loading, onOpenDoc }: LibraryProps) {
   const recentAdditions = useMemo(() => {
     return [...documents]
       .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-      .slice(0, 8);
+      .slice(0, 5);
   }, [documents]);
 
   const isRecentlyUploaded = (doc: Document) => {
@@ -137,9 +138,18 @@ export function Library({ documents, loading, onOpenDoc }: LibraryProps) {
       {/* Recent Additions */}
       {recentAdditions.length > 0 && (
         <div className="mb-10">
-          <div className="flex items-center gap-2 mb-4">
-            <Sparkles className="w-5 h-5 text-amber-600" />
-            <h2 className="text-lg font-serif font-bold text-stone-800">Recent Additions</h2>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-amber-600" />
+              <h2 className="text-lg font-serif font-bold text-stone-800">Recent Additions</h2>
+            </div>
+            <button
+              onClick={onViewAll}
+              className="inline-flex items-center gap-1 text-xs font-medium text-amber-600 hover:text-amber-700 transition-colors"
+            >
+              View All
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
           </div>
           <div className="overflow-hidden rounded-xl border border-stone-200 bg-white">
             <table className="w-full">

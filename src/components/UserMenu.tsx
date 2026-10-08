@@ -1,6 +1,5 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { User, FileEdit, LogOut, ChevronDown } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
 
 interface UserMenuProps {
@@ -10,28 +9,9 @@ interface UserMenuProps {
 }
 
 export function UserMenu({ onProfile, onMyUploads, onSignOut }: UserMenuProps) {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [open, setOpen] = useState(false);
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
-  const [fullName, setFullName] = useState('');
   const menuRef = useRef<HTMLDivElement>(null);
-
-  const fetchProfile = useCallback(async () => {
-    if (!user) return;
-    const { data } = await supabase
-      .from('profiles')
-      .select('full_name, avatar_url')
-      .eq('id', user.id)
-      .maybeSingle();
-    if (data) {
-      setFullName(data.full_name || '');
-      setAvatarUrl(data.avatar_url || null);
-    }
-  }, [user]);
-
-  useEffect(() => {
-    fetchProfile();
-  }, [fetchProfile]);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -43,7 +23,7 @@ export function UserMenu({ onProfile, onMyUploads, onSignOut }: UserMenuProps) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const displayName = fullName || user?.email?.split('@')[0] || 'User';
+  const displayName = profile.fullName || user?.email?.split('@')[0] || 'User';
 
   return (
     <div className="relative" ref={menuRef}>
@@ -52,8 +32,8 @@ export function UserMenu({ onProfile, onMyUploads, onSignOut }: UserMenuProps) {
         className="flex items-center gap-2 p-1 pr-2 rounded-full hover:bg-stone-100 transition-colors"
       >
         <div className="w-8 h-8 rounded-full overflow-hidden bg-stone-200 flex items-center justify-center flex-shrink-0">
-          {avatarUrl ? (
-            <img src={avatarUrl} alt="" className="w-full h-full object-cover" />
+          {profile.avatarUrl ? (
+            <img src={profile.avatarUrl} alt="" className="w-full h-full object-cover" />
           ) : (
             <User className="w-4 h-4 text-stone-500" />
           )}

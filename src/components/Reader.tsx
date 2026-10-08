@@ -26,6 +26,7 @@ import {
   lineHeightMap,
   themeMap,
 } from '@/lib/settings';
+import { PdfViewer } from '@/components/PdfViewer';
 
 interface ReaderProps {
   document: Document;
@@ -139,29 +140,21 @@ export function Reader({ document: doc, onBack }: ReaderProps) {
   const totalProgress = ((chapterIndex + scrollPercent) / doc.chapters.length) * 100;
 
   return (
-    <div className={`min-h-screen ${theme.bg} transition-colors duration-300`}>
-      {/* Progress Bar */}
-      <div className="fixed top-0 left-0 right-0 h-1 bg-stone-200/50 z-50">
-        <div
-          className="h-full bg-amber-600 transition-all duration-150"
-          style={{ width: textMode ? `${totalProgress}%` : '100%' }}
-        />
-      </div>
-
-      {/* Header */}
-      <header className={`fixed top-0 left-0 right-0 ${theme.headerBg} backdrop-blur-md border-b ${theme.border} z-40 transition-colors duration-300`}>
-        <div className="max-w-4xl mx-auto px-4 h-14 flex items-center justify-between">
+    <div className={`${theme.bg} transition-colors duration-300 min-h-screen`}>
+      {/* Reader toolbar (sits below main app nav) */}
+      <div className={`sticky top-16 z-30 ${theme.headerBg} backdrop-blur-md border-b ${theme.border} transition-colors duration-300`}>
+        <div className="max-w-4xl mx-auto px-4 h-12 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <button
               onClick={onBack}
-              className={`p-2 rounded-lg hover:bg-stone-200/50 ${theme.text} transition-colors`}
+              className={`p-1.5 rounded-lg hover:bg-stone-200/50 ${theme.text} transition-colors`}
             >
               <ArrowLeft className="w-4 h-4" />
             </button>
             {textMode && (
               <button
                 onClick={() => setShowToc(true)}
-                className={`p-2 rounded-lg hover:bg-stone-200/50 ${theme.text} transition-colors`}
+                className={`p-1.5 rounded-lg hover:bg-stone-200/50 ${theme.text} transition-colors`}
               >
                 <List className="w-4 h-4" />
               </button>
@@ -175,7 +168,7 @@ export function Reader({ document: doc, onBack }: ReaderProps) {
           <div className="flex items-center gap-1">
             <button
               onClick={handleBookmark}
-              className={`p-2 rounded-lg hover:bg-stone-200/50 ${theme.text} transition-colors`}
+              className={`p-1.5 rounded-lg hover:bg-stone-200/50 ${theme.text} transition-colors`}
             >
               {localBookmarked ? (
                 <BookmarkCheck className="w-4 h-4 text-amber-600" />
@@ -186,14 +179,21 @@ export function Reader({ document: doc, onBack }: ReaderProps) {
             {textMode && (
               <button
                 onClick={() => setShowSettings(!showSettings)}
-                className={`p-2 rounded-lg hover:bg-stone-200/50 ${theme.text} transition-colors`}
+                className={`p-1.5 rounded-lg hover:bg-stone-200/50 ${theme.text} transition-colors`}
               >
                 <Settings className="w-4 h-4" />
               </button>
             )}
           </div>
         </div>
-      </header>
+        {/* Progress Bar */}
+        <div className={`h-0.5 ${theme.border} border-t`}>
+          <div
+            className="h-full bg-amber-600 transition-all duration-150"
+            style={{ width: textMode ? `${totalProgress}%` : '100%' }}
+          />
+        </div>
+      </div>
 
       {/* Settings Panel (text mode only) */}
       {textMode && showSettings && (
@@ -201,7 +201,7 @@ export function Reader({ document: doc, onBack }: ReaderProps) {
           className="fixed inset-0 z-50"
           onClick={() => setShowSettings(false)}
         >
-          <div className={`absolute top-14 right-4 w-72 ${theme.cardBg} border ${theme.border} rounded-xl shadow-2xl p-5 z-50`} onClick={(e) => e.stopPropagation()}>
+          <div className={`absolute top-28 right-4 w-72 ${theme.cardBg} border ${theme.border} rounded-xl shadow-2xl p-5 z-50`} onClick={(e) => e.stopPropagation()}>
             <div className="space-y-5">
               {/* Font Size */}
               <div>
@@ -320,33 +320,23 @@ export function Reader({ document: doc, onBack }: ReaderProps) {
         </div>
       )}
 
-      {/* PDF Reader (native browser embed) */}
+      {/* PDF Reader (pdfjs-dist canvas) */}
       {!textMode && doc.file_format === 'pdf' && doc.file_url && (
-        <div className="pt-14 h-screen">
-          <object
-            data={doc.file_url}
-            type="application/pdf"
-            className="w-full h-[calc(100vh-3.5rem)] border-0"
-          >
-            <iframe
-              src={doc.file_url}
-              title={doc.title}
-              className="w-full h-[calc(100vh-3.5rem)] border-0"
-            />
-          </object>
+        <div className="max-w-5xl mx-auto px-4 sm:px-6">
+          <PdfViewer url={doc.file_url} title={doc.title} />
         </div>
       )}
 
       {/* EPUB Reader (epub.js) */}
       {!textMode && doc.file_format === 'epub' && doc.file_url && (
-        <div className="pt-14 h-screen">
-          <div ref={epubViewerRef} className="w-full h-[calc(100vh-3.5rem)]" />
+        <div className="h-[calc(100vh-7rem)]">
+          <div ref={epubViewerRef} className="w-full h-full" />
         </div>
       )}
 
       {/* Text Content (TXT files) */}
       {textMode && (
-        <div ref={contentRef} className={`pt-20 pb-24 ${theme.bg} transition-colors duration-300`}>
+        <div ref={contentRef} className={`pt-8 pb-24 ${theme.bg} transition-colors duration-300`}>
           <div className="max-w-2xl mx-auto px-6 sm:px-8">
             {/* Title section (only on first chapter) */}
             {chapterIndex === 0 && (

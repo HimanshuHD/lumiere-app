@@ -94,26 +94,26 @@ export function MyUploads() {
           <p className="text-stone-400 text-xs">Documents you upload will appear here.</p>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-xl border border-stone-200 bg-white">
-          <table className="w-full">
+        <div className="overflow-x-auto rounded-xl border border-stone-200 bg-white">
+          <table className="w-full min-w-[600px]">
             <thead>
               <tr className="border-b border-stone-200 bg-stone-50">
-                <th className="text-left px-4 py-3 text-xs font-medium text-stone-500 uppercase tracking-wider">Document</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-stone-500 uppercase tracking-wider w-[40%]">Document</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-stone-500 uppercase tracking-wider hidden sm:table-cell">Category</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-stone-500 uppercase tracking-wider hidden md:table-cell">Format</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-stone-500 uppercase tracking-wider hidden lg:table-cell">Uploaded</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-stone-500 uppercase tracking-wider">Actions</th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-stone-500 uppercase tracking-wider w-24">Actions</th>
               </tr>
             </thead>
             <tbody>
               {docs.map((doc) => (
                 <tr key={doc.id} className="border-b border-stone-100 last:border-0 hover:bg-stone-50/50 transition-colors">
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-3 max-w-xs">
                     <div className="flex items-center gap-3">
                       <img src={doc.cover_url} alt="" className="w-8 h-11 object-cover rounded flex-shrink-0" />
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-stone-800 truncate">{doc.title}</p>
-                        <p className="text-xs text-stone-400">{doc.author}</p>
+                      <div className="min-w-0 overflow-hidden">
+                        <p className="text-sm font-medium text-stone-800 truncate max-w-[180px]">{doc.title}</p>
+                        <p className="text-xs text-stone-400 truncate max-w-[180px]">{doc.author}</p>
                       </div>
                     </div>
                   </td>
@@ -126,7 +126,7 @@ export function MyUploads() {
                   <td className="px-4 py-3 text-sm text-stone-500 hidden lg:table-cell">
                     {new Date(doc.created_at).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-3 w-24">
                     <div className="flex items-center justify-end gap-1">
                       <button
                         onClick={() => setEditDoc(doc)}

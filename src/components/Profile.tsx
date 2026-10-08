@@ -1,11 +1,11 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { User, Camera, Loader2, Save, Lock, Mail, CheckCircle2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 
 export function Profile() {
-  const { user } = useAuth();
+  const { user, profile, refreshProfile } = useAuth();
   const { showToast } = useToast();
   const [fullName, setFullName] = useState('');
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
@@ -22,24 +22,11 @@ export function Profile() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [changingPassword, setChangingPassword] = useState(false);
 
-  const fetchProfile = useCallback(async () => {
-    if (!user) return;
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('full_name, avatar_url')
-      .eq('id', user.id)
-      .maybeSingle();
-
-    if (!error && data) {
-      setFullName(data.full_name || '');
-      setAvatarUrl(data.avatar_url || null);
-    }
-    setLoading(false);
-  }, [user]);
-
   useEffect(() => {
-    fetchProfile();
-  }, [fetchProfile]);
+    setFullName(profile.fullName || '');
+    setAvatarUrl(profile.avatarUrl || null);
+    setLoading(false);
+  }, [profile.fullName, profile.avatarUrl]);
 
   const handleAvatarSelect = (file: File) => {
     setAvatarFile(file);
@@ -54,6 +41,7 @@ export function Profile() {
         .from('profiles')
         .upsert({ id: user.id, full_name: fullName.trim() }, { onConflict: 'id' });
       if (error) throw new Error(error.message);
+      await refreshProfile();
       showToast('Profile name updated successfully.');
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Failed to update name.', 'error');
@@ -84,6 +72,7 @@ export function Profile() {
       setAvatarUrl(urlData.publicUrl);
       setAvatarFile(null);
       setAvatarPreview(null);
+      await refreshProfile();
       showToast('Profile picture updated successfully.');
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Failed to upload picture.', 'error');
