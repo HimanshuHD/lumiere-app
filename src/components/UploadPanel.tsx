@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { supabase, Document } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
+import { useToast } from '@/context/ToastContext';
 
 interface UploadPanelProps {
   onUploaded: (doc: Document) => void;
@@ -81,6 +82,7 @@ function textToChapters(text: string, title: string): { title: string; content: 
 
 export function UploadPanel({ onUploaded }: UploadPanelProps) {
   const { user } = useAuth();
+  const { showToast } = useToast();
   const [title, setTitle] = useState('');
   const [author, setAuthor] = useState('');
   const [category, setCategory] = useState('Fiction');
@@ -205,9 +207,12 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
       if (insertData) {
         onUploaded(insertData as Document);
       }
+      showToast('Document uploaded successfully! It is now available in the library.');
       setTimeout(() => setSuccess(false), 4000);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An unexpected error occurred during upload.');
+      const msg = err instanceof Error ? err.message : 'An unexpected error occurred during upload.';
+      setError(msg);
+      showToast(msg, 'error');
     } finally {
       setUploading(false);
     }
@@ -278,7 +283,7 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
                   <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-green-100 mb-2">
                     <FileCheck2 className="w-6 h-6 text-green-600" />
                   </div>
-                  <p className="text-sm font-medium text-stone-700">{docFile.name}</p>
+                  <p className="text-sm font-medium text-stone-700 break-all line-clamp-2">{docFile.name}</p>
                   <p className="text-xs text-stone-500">
                     {(docFile.size / 1024 / 1024).toFixed(2)} MB
                     {pageCount !== null && pageCount > 0 && ` · ${pageCount} pages`}

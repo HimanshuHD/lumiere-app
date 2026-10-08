@@ -32,6 +32,10 @@ interface ReaderProps {
   onBack: () => void;
 }
 
+function isTextDoc(doc: Document): boolean {
+  return doc.file_format === 'txt' || (!doc.file_url && doc.chapters.length > 0 && doc.chapters[0]?.content.length > 200);
+}
+
 export function Reader({ document: doc, onBack }: ReaderProps) {
   const [settings, setSettings] = useState<ReaderSettings>(() => loadSettings());
   const [chapterIndex, setChapterIndex] = useState(0);
@@ -40,12 +44,14 @@ export function Reader({ document: doc, onBack }: ReaderProps) {
   const [showToc, setShowToc] = useState(false);
   const [localBookmarked, setLocalBookmarked] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
+  const epubViewerRef = useRef<HTMLDivElement>(null);
   const scrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { toggleBookmark, isBookmarked } = useBookmarks();
   const { saveProgress, getProgress } = useReadingProgress();
 
   const theme = themeMap[settings.theme];
+  const textMode = isTextDoc(doc);
 
   // Load saved progress on mount
   useEffect(() => {
@@ -62,8 +68,32 @@ export function Reader({ document: doc, onBack }: ReaderProps) {
     saveSettings(settings);
   }, [settings]);
 
-  // Scroll tracking + progress saving
+  // EPUB rendering
   useEffect(() => {
+    if (textMode || doc.file_format !== 'epub' || !doc.file_url || !epubViewerRef.current) return;
+
+    let rendition: any = null;
+    let book: any = null;
+
+    (async () => {
+      const ePub = (await import('epubjs')).default;
+      book = ePub(doc.file_url!);
+      rendition = book.renderTo(epubViewerRef.current!, {
+        width: '100%',
+        height: '100%',
+      });
+      rendition.display();
+    })();
+
+    return () => {
+      if (rendition) rendition.destroy();
+      if (book) book.destroy();
+    };
+  }, [doc.file_url, doc.file_format, textMode]);
+
+  // Scroll tracking + progress saving (text mode only)
+  useEffect(() => {
+    if (!textMode) return;
     const handleScroll = () => {
       const el = contentRef.current;
       if (!el) return;
@@ -83,7 +113,7 @@ export function Reader({ document: doc, onBack }: ReaderProps) {
       window.removeEventListener('scroll', handleScroll);
       if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current);
     };
-  }, [doc.id, chapterIndex, saveProgress]);
+  }, [doc.id, chapterIndex, saveProgress, textMode]);
 
   const handleBookmark = async () => {
     const result = await toggleBookmark(doc.id);
@@ -114,7 +144,7 @@ export function Reader({ document: doc, onBack }: ReaderProps) {
       <div className="fixed top-0 left-0 right-0 h-1 bg-stone-200/50 z-50">
         <div
           className="h-full bg-amber-600 transition-all duration-150"
-          style={{ width: `${totalProgress}%` }}
+          style={{ width: textMode ? `${totalProgress}%` : '100%' }}
         />
       </div>
 
@@ -128,12 +158,14 @@ export function Reader({ document: doc, onBack }: ReaderProps) {
             >
               <ArrowLeft className="w-4 h-4" />
             </button>
-            <button
-              onClick={() => setShowToc(true)}
-              className={`p-2 rounded-lg hover:bg-stone-200/50 ${theme.text} transition-colors`}
-            >
-              <List className="w-4 h-4" />
-            </button>
+            {textMode && (
+              <button
+                onClick={() => setShowToc(true)}
+                className={`p-2 rounded-lg hover:bg-stone-200/50 ${theme.text} transition-colors`}
+              >
+                <List className="w-4 h-4" />
+              </button>
+            )}
           </div>
 
           <div className={`text-sm font-medium ${theme.subText} truncate max-w-[200px]`}>
@@ -151,18 +183,20 @@ export function Reader({ document: doc, onBack }: ReaderProps) {
                 <Bookmark className="w-4 h-4" />
               )}
             </button>
-            <button
-              onClick={() => setShowSettings(!showSettings)}
-              className={`p-2 rounded-lg hover:bg-stone-200/50 ${theme.text} transition-colors`}
-            >
-              <Settings className="w-4 h-4" />
-            </button>
+            {textMode && (
+              <button
+                onClick={() => setShowSettings(!showSettings)}
+                className={`p-2 rounded-lg hover:bg-stone-200/50 ${theme.text} transition-colors`}
+              >
+                <Settings className="w-4 h-4" />
+              </button>
+            )}
           </div>
         </div>
       </header>
 
-      {/* Settings Panel */}
-      {showSettings && (
+      {/* Settings Panel (text mode only) */}
+      {textMode && showSettings && (
         <div
           className="fixed inset-0 z-50"
           onClick={() => setShowSettings(false)}
@@ -245,8 +279,8 @@ export function Reader({ document: doc, onBack }: ReaderProps) {
         </div>
       )}
 
-      {/* TOC Drawer */}
-      {showToc && (
+      {/* TOC Drawer (text mode only) */}
+      {textMode && showToc && (
         <div className="fixed inset-0 z-50" onClick={() => setShowToc(false)}>
           <div className="absolute inset-0 bg-black/30" />
           <div
@@ -286,84 +320,104 @@ export function Reader({ document: doc, onBack }: ReaderProps) {
         </div>
       )}
 
-      {/* Content */}
-      <div ref={contentRef} className={`pt-20 pb-24 ${theme.bg} transition-colors duration-300`}>
-        <div className="max-w-2xl mx-auto px-6 sm:px-8">
-          {/* Title section (only on first chapter) */}
-          {chapterIndex === 0 && (
-            <div className="mb-12 text-center pt-4">
-              <p className={`text-xs uppercase tracking-widest ${theme.accent} font-medium mb-3`}>
-                {doc.category}
-              </p>
-              <h1 className={`font-serif font-bold ${theme.text} text-3xl sm:text-4xl tracking-tight mb-3`}>
-                {doc.title}
-              </h1>
-              <p className={`${theme.subText} text-sm`}>by {doc.author}</p>
-              <div className={`w-12 h-px ${theme.border} border-t mx-auto mt-6`} />
-            </div>
-          )}
-
-          {/* Chapter header */}
-          <div className="mb-8">
-            <p className={`text-xs uppercase tracking-widest ${theme.subText} font-medium mb-2`}>
-              Chapter {chapterIndex + 1} of {doc.chapters.length}
-            </p>
-            <h2 className={`font-serif font-bold ${theme.text} text-2xl sm:text-3xl tracking-tight`}>
-              {chapter.title}
-            </h2>
-          </div>
-
-          {/* Chapter content */}
-          <div
-            className={`${theme.text} ${fontSizeMap[settings.fontSize]} ${lineHeightMap[settings.lineSpacing]} transition-all duration-300`}
-          >
-            {chapter.content.split('\n\n').map((paragraph, i) => (
-              <p key={i} className="mb-6 whitespace-pre-line">
-                {paragraph}
-              </p>
-            ))}
-          </div>
-
-          {/* Chapter Navigation */}
-          <div className={`mt-16 pt-8 border-t ${theme.border} flex items-center justify-between`}>
-            <button
-              onClick={prevChapter}
-              disabled={chapterIndex === 0}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                chapterIndex === 0
-                  ? `opacity-40 cursor-not-allowed ${theme.text}`
-                  : `${theme.text} hover:bg-stone-200/50 border ${theme.border}`
-              }`}
-            >
-              <ChevronLeft className="w-4 h-4" />
-              Previous
-            </button>
-            <span className={`text-xs ${theme.subText}`}>
-              {chapterIndex + 1} / {doc.chapters.length}
-            </span>
-            <button
-              onClick={nextChapter}
-              disabled={chapterIndex === doc.chapters.length - 1}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                chapterIndex === doc.chapters.length - 1
-                  ? `opacity-40 cursor-not-allowed ${theme.text}`
-                  : `${theme.text} hover:bg-stone-200/50 border ${theme.border}`
-              }`}
-            >
-              Next
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-
-          {/* End of book */}
-          {chapterIndex === doc.chapters.length - 1 && (
-            <div className="mt-12 text-center">
-              <div className={`w-12 h-px ${theme.border} border-t mx-auto mb-4`} />
-              <p className={`text-sm ${theme.subText} italic`}>The End</p>
-            </div>
-          )}
+      {/* PDF Reader (native browser embed) */}
+      {!textMode && doc.file_format === 'pdf' && doc.file_url && (
+        <div className="pt-14 h-screen">
+          <iframe
+            src={`${doc.file_url}#view=FitH&toolbar=1`}
+            title={doc.title}
+            className="w-full h-[calc(100vh-3.5rem)] border-0"
+          />
         </div>
-      </div>
+      )}
+
+      {/* EPUB Reader (epub.js) */}
+      {!textMode && doc.file_format === 'epub' && doc.file_url && (
+        <div className="pt-14 h-screen">
+          <div ref={epubViewerRef} className="w-full h-[calc(100vh-3.5rem)]" />
+        </div>
+      )}
+
+      {/* Text Content (TXT files) */}
+      {textMode && (
+        <div ref={contentRef} className={`pt-20 pb-24 ${theme.bg} transition-colors duration-300`}>
+          <div className="max-w-2xl mx-auto px-6 sm:px-8">
+            {/* Title section (only on first chapter) */}
+            {chapterIndex === 0 && (
+              <div className="mb-12 text-center pt-4">
+                <p className={`text-xs uppercase tracking-widest ${theme.accent} font-medium mb-3`}>
+                  {doc.category}
+                </p>
+                <h1 className={`font-serif font-bold ${theme.text} text-3xl sm:text-4xl tracking-tight mb-3`}>
+                  {doc.title}
+                </h1>
+                <p className={`${theme.subText} text-sm`}>by {doc.author}</p>
+                <div className={`w-12 h-px ${theme.border} border-t mx-auto mt-6`} />
+              </div>
+            )}
+
+            {/* Chapter header */}
+            <div className="mb-8">
+              <p className={`text-xs uppercase tracking-widest ${theme.subText} font-medium mb-2`}>
+                Chapter {chapterIndex + 1} of {doc.chapters.length}
+              </p>
+              <h2 className={`font-serif font-bold ${theme.text} text-2xl sm:text-3xl tracking-tight`}>
+                {chapter.title}
+              </h2>
+            </div>
+
+            {/* Chapter content */}
+            <div
+              className={`${theme.text} ${fontSizeMap[settings.fontSize]} ${lineHeightMap[settings.lineSpacing]} transition-all duration-300`}
+            >
+              {chapter.content.split('\n\n').map((paragraph, i) => (
+                <p key={i} className="mb-6 whitespace-pre-line">
+                  {paragraph}
+                </p>
+              ))}
+            </div>
+
+            {/* Chapter Navigation */}
+            <div className={`mt-16 pt-8 border-t ${theme.border} flex items-center justify-between`}>
+              <button
+                onClick={prevChapter}
+                disabled={chapterIndex === 0}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                  chapterIndex === 0
+                    ? `opacity-40 cursor-not-allowed ${theme.text}`
+                    : `${theme.text} hover:bg-stone-200/50 border ${theme.border}`
+                }`}
+              >
+                <ChevronLeft className="w-4 h-4" />
+                Previous
+              </button>
+              <span className={`text-xs ${theme.subText}`}>
+                {chapterIndex + 1} / {doc.chapters.length}
+              </span>
+              <button
+                onClick={nextChapter}
+                disabled={chapterIndex === doc.chapters.length - 1}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                  chapterIndex === doc.chapters.length - 1
+                    ? `opacity-40 cursor-not-allowed ${theme.text}`
+                    : `${theme.text} hover:bg-stone-200/50 border ${theme.border}`
+                }`}
+              >
+                Next
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* End of book */}
+            {chapterIndex === doc.chapters.length - 1 && (
+              <div className="mt-12 text-center">
+                <div className={`w-12 h-px ${theme.border} border-t mx-auto mb-4`} />
+                <p className={`text-sm ${theme.subText} italic`}>The End</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

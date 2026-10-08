@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { BookOpen, BookMarked, Library as LibraryIcon, LogOut, Loader2, Upload } from 'lucide-react';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
+import { ToastProvider } from '@/context/ToastContext';
 import { AuthScreen } from '@/components/AuthScreen';
 import { Library } from '@/components/Library';
 import { BookmarksView } from '@/components/BookmarksView';
@@ -137,7 +138,9 @@ function AppContent() {
 export default function App() {
   return (
     <AuthProvider>
-      <AppContent />
+      <ToastProvider>
+        <AppContent />
+      </ToastProvider>
     </AuthProvider>
   );
 }

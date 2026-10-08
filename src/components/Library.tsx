@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Search, Clock, BookMarked, Play, Star, Sparkles, User, FileText, Hash, X } from 'lucide-react';
+import { Search, Clock, BookMarked, Play, Star, Sparkles, User, FileText, Hash, X, Download } from 'lucide-react';
 import { Document } from '@/lib/supabase';
 import { useBookmarks, useReadingProgress } from '@/hooks/useData';
 
@@ -271,12 +271,13 @@ export function Library({ documents, loading, onOpenDoc }: LibraryProps) {
                 {selectedDoc.file_url && (
                   <a
                     href={selectedDoc.file_url}
+                    download={selectedDoc.file_name || undefined}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 text-xs text-amber-600 hover:text-amber-700 font-medium mb-3"
+                    className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-stone-700 bg-stone-100 hover:bg-stone-200 border border-stone-200 rounded-lg transition-all mb-4"
                   >
-                    <FileText className="w-3.5 h-3.5" />
-                    Download original file ({(selectedDoc.file_format || 'file').toUpperCase()})
+                    <Download className="w-4 h-4 text-stone-500" />
+                    Download original {(selectedDoc.file_format || 'file').toUpperCase()}
                   </a>
                 )}
                 <button
