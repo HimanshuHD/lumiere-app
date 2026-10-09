@@ -34,11 +34,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .select('full_name, avatar_url')
       .eq('id', user.id)
       .maybeSingle();
-    if (data) {
-      setProfile({ fullName: data.full_name || '', avatarUrl: data.avatar_url || null });
-    } else {
-      setProfile({ fullName: '', avatarUrl: null });
-    }
+    const googleName = [user.user_metadata.full_name, user.user_metadata.name]
+      .find((value): value is string => typeof value === 'string' && value.trim().length > 0)
+      ?.trim() ?? '';
+    setProfile({
+      fullName: data?.full_name?.trim() || googleName,
+      avatarUrl: data?.avatar_url || null,
+    });
   }, [user]);
 
   useEffect(() => {
