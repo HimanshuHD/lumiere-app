@@ -45,6 +45,23 @@ The migrations create the database schema, row-level security policies, and stor
 
 New local databases have no documents, bookmarks, or reading progress until you add them through the app. The `supabase/snippets/` directory is for manual SQL queries and is not automatically run as seed data.
 
+### Local Google sign-in
+
+Google sign-in requires OAuth credentials from a Google Cloud OAuth client; Supabase migrations do not create these credentials. Create a **Web application** OAuth client in Google Cloud Console and add this authorized redirect URI:
+
+```text
+http://127.0.0.1:54321/auth/v1/callback
+```
+
+Create `supabase/.env` with the client ID and client secret:
+
+```dotenv
+SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID=your-google-client-id
+SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET=your-google-client-secret
+```
+
+The local Supabase config reads these server-side credentials to enable the Google provider. `supabase/.env` is ignored by Git; do not put either credential in `.env.local`, a `VITE_` variable, or committed files. Restart the local stack after changing provider credentials with `npm run supabase:stop` followed by `npm run supabase:start`. Open the app using a Vite URL on `localhost` or `127.0.0.1` at port `5173` or `5174` so its OAuth return URL is allowed.
+
 ### Local Supabase services
 
 Supabase Studio is available at `http://127.0.0.1:54323`; the local PostgreSQL server listens on port `54322`. Use `npm run supabase:status` to view service status and local connection details, and `npm run supabase:stop` to stop the stack.
