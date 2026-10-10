@@ -1,5 +1,5 @@
 import { useState, FormEvent } from 'react';
-import { BookOpen, Loader2, Mail, Lock, User as UserIcon } from 'lucide-react';
+import { BookOpen, Eye, EyeOff, Loader2, Mail, Lock, User as UserIcon } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 
 function GoogleIcon({ className }: { className?: string }) {
@@ -16,8 +16,11 @@ function GoogleIcon({ className }: { className?: string }) {
 export function AuthScreen() {
   const { signIn, signUp, signInWithGoogle } = useAuth();
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [formValues, setFormValues] = useState({
+    signin: { email: '', password: '' },
+    signup: { email: '', password: '' },
+  });
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
@@ -27,6 +30,7 @@ export function AuthScreen() {
     setError(null);
     setLoading(true);
     const fn = mode === 'signin' ? signIn : signUp;
+    const { email, password } = formValues[mode];
     const { error } = await fn(email, password);
     setLoading(false);
     if (error) {
@@ -117,8 +121,11 @@ export function AuthScreen() {
                 <input
                   type="email"
                   required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  value={formValues[mode].email}
+                  onChange={(e) => setFormValues((values) => ({
+                    ...values,
+                    [mode]: { ...values[mode], email: e.target.value },
+                  }))}
                   placeholder="you@example.com"
                   className="w-full pl-10 pr-4 py-3 bg-stone-800/60 border border-stone-700 rounded-lg text-stone-100 placeholder-stone-500 text-sm focus:outline-none focus:ring-2 focus:ring-amber-600/50 focus:border-amber-600/50 transition-all"
                 />
@@ -132,14 +139,28 @@ export function AuthScreen() {
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-500" />
                 <input
-                  type="password"
+                  type={showPassword ? 'text' : 'password'}
                   required
                   minLength={6}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  value={formValues[mode].password}
+                  onChange={(e) => setFormValues((values) => ({
+                    ...values,
+                    [mode]: { ...values[mode], password: e.target.value },
+                  }))}
                   placeholder="At least 6 characters"
-                  className="w-full pl-10 pr-4 py-3 bg-stone-800/60 border border-stone-700 rounded-lg text-stone-100 placeholder-stone-500 text-sm focus:outline-none focus:ring-2 focus:ring-amber-600/50 focus:border-amber-600/50 transition-all"
+                  className="w-full pl-10 pr-11 py-3 bg-stone-800/60 border border-stone-700 rounded-lg text-stone-100 placeholder-stone-500 text-sm focus:outline-none focus:ring-2 focus:ring-amber-600/50 focus:border-amber-600/50 transition-all"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((shown) => !shown)}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  aria-pressed={showPassword}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-500 hover:text-stone-300 transition-colors"
+                >
+                  {showPassword
+                    ? <EyeOff className="w-4 h-4" aria-hidden="true" />
+                    : <Eye className="w-4 h-4" aria-hidden="true" />}
+                </button>
               </div>
             </div>
 

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { User, Camera, Loader2, Save, Lock, Mail, CheckCircle2 } from 'lucide-react';
+import { User, Camera, Loader2, Save, Lock, Mail, CheckCircle2, Eye, EyeOff } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
@@ -17,9 +17,10 @@ export function Profile() {
   const avatarInputRef = useRef<HTMLInputElement>(null);
 
   // Password change state
-  const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
 
   useEffect(() => {
@@ -97,7 +98,6 @@ export function Profile() {
         password: newPassword,
       });
       if (updateError) throw new Error(updateError.message);
-      setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
       showToast('Password changed successfully.');
@@ -226,23 +226,49 @@ export function Profile() {
         <div className="space-y-4">
           <div>
             <label className="block text-xs font-medium text-stone-500 mb-1.5">New Password</label>
-            <input
-              type="password"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              placeholder="Enter new password"
-              className="w-full px-4 py-2.5 bg-white border border-stone-200 rounded-lg text-sm text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-600/30 focus:border-amber-600/40 transition-all"
-            />
+            <div className="relative">
+              <input
+                type={showNewPassword ? 'text' : 'password'}
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="Enter new password"
+                className="w-full px-4 pr-11 py-2.5 bg-white border border-stone-200 rounded-lg text-sm text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-600/30 focus:border-amber-600/40 transition-all"
+              />
+              <button
+                type="button"
+                onClick={() => setShowNewPassword((shown) => !shown)}
+                aria-label={showNewPassword ? 'Hide new password' : 'Show new password'}
+                aria-pressed={showNewPassword}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600 transition-colors"
+              >
+                {showNewPassword
+                  ? <EyeOff className="w-4 h-4" aria-hidden="true" />
+                  : <Eye className="w-4 h-4" aria-hidden="true" />}
+              </button>
+            </div>
           </div>
           <div>
             <label className="block text-xs font-medium text-stone-500 mb-1.5">Confirm New Password</label>
-            <input
-              type="password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              placeholder="Confirm new password"
-              className="w-full px-4 py-2.5 bg-white border border-stone-200 rounded-lg text-sm text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-600/30 focus:border-amber-600/40 transition-all"
-            />
+            <div className="relative">
+              <input
+                type={showConfirmPassword ? 'text' : 'password'}
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="Confirm new password"
+                className="w-full px-4 pr-11 py-2.5 bg-white border border-stone-200 rounded-lg text-sm text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-600/30 focus:border-amber-600/40 transition-all"
+              />
+              <button
+                type="button"
+                onClick={() => setShowConfirmPassword((shown) => !shown)}
+                aria-label={showConfirmPassword ? 'Hide confirmation password' : 'Show confirmation password'}
+                aria-pressed={showConfirmPassword}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600 transition-colors"
+              >
+                {showConfirmPassword
+                  ? <EyeOff className="w-4 h-4" aria-hidden="true" />
+                  : <Eye className="w-4 h-4" aria-hidden="true" />}
+              </button>
+            </div>
           </div>
           <button
             onClick={handleChangePassword}

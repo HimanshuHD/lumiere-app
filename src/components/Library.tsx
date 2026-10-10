@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { Search, Clock, BookMarked, Play, Star, Sparkles, User, FileText, Hash, X, Download, ChevronRight } from 'lucide-react';
-import { Document } from '@/lib/supabase';
+import { Document, ReadingProgress } from '@/lib/supabase';
 import { useBookmarks, useReadingProgress } from '@/hooks/useData';
 
 interface LibraryProps {
@@ -12,12 +12,20 @@ interface LibraryProps {
 
 const categories = ['All', 'Fiction', 'Non-Fiction', 'Science', 'History', 'Technology', 'Philosophy', 'Adventure'];
 
+function getProgressPercent(doc: Document, progress?: ReadingProgress): number {
+  if (!progress) return 0;
+  const chapterCount = Math.max(1, doc.chapters.length);
+  return Math.min(100, Math.max(0, Math.round(
+    ((progress.chapter_index + progress.scroll_percent) / chapterCount) * 100
+  )));
+}
+
 export function Library({ documents, loading, onOpenDoc, onViewAll }: LibraryProps) {
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState('All');
   const [selectedDoc, setSelectedDoc] = useState<Document | null>(null);
   const { isBookmarked } = useBookmarks();
-  const { getProgress } = useReadingProgress();
+  const { progress, loading: progressLoading, getProgress } = useReadingProgress();
 
   const filtered = useMemo(() => {
     return documents.filter((doc) => {
@@ -37,23 +45,25 @@ export function Library({ documents, loading, onOpenDoc, onViewAll }: LibraryPro
       .slice(0, 5);
   }, [documents]);
 
-  const isRecentlyUploaded = (doc: Document) => {
-    return recentAdditions.some((r) => r.id === doc.id);
-  };
   const continueReading = useMemo(() => {
-    const docs = documents
-      .map((doc) => {
-        const p = getProgress(doc.id);
-        if (!p) return null;
-      return { doc, progress: p };
-    })
-    .filter(Boolean) as { doc: Document; progress: { chapter_index: number; scroll_percent: number } }[];
-    return docs.sort((a, b) => {
-      const aPercent = a.progress.chapter_index / a.doc.chapters.length + a.progress.scroll_percent / a.doc.chapters.length;
-      const bPercent = b.progress.chapter_index / b.doc.chapters.length + b.progress.scroll_percent / b.doc.chapters.length;
-      return bPercent - aPercent;
-    }).slice(0, 3);
-  }, [documents, getProgress]);
+    return progress
+      .map((readingProgress) => {
+        const doc = documents.find((item) => item.id === readingProgress.document_id);
+        return doc ? { doc, progress: readingProgress } : null;
+      })
+      .filter((item): item is { doc: Document; progress: ReadingProgress } =>
+        item !== null && getProgressPercent(item.doc, item.progress) < 100
+      )
+      .sort((a, b) =>
+        new Date(b.progress.updated_at).getTime() - new Date(a.progress.updated_at).getTime()
+      )
+      .slice(0, 3);
+  }, [documents, progress]);
+
+  const selectedProgress = selectedDoc ? getProgress(selectedDoc.id) : undefined;
+  const selectedProgressPercent = selectedDoc
+    ? getProgressPercent(selectedDoc, selectedProgress)
+    : 0;
 
   if (loading) {
     return (
@@ -103,14 +113,14 @@ export function Library({ documents, loading, onOpenDoc, onViewAll }: LibraryPro
       )}
 
       {/* Continue Reading */}
-      {continueReading.length > 0 && (
-        <div className="mb-10">
-          <h2 className="text-lg font-serif font-bold text-stone-800 mb-4">Continue Reading</h2>
+      <div className="mb-10">
+        <h2 className="text-lg font-serif font-bold text-stone-800 mb-4">Continue Reading</h2>
+        {progressLoading ? (
+          <p className="text-sm text-stone-500">Loading your reading progress...</p>
+        ) : continueReading.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {continueReading.map(({ doc, progress }) => {
-              const totalPercent = Math.round(
-                ((progress.chapter_index + progress.scroll_percent) / doc.chapters.length) * 100
-              );
+              const totalPercent = getProgressPercent(doc, progress);
               return (
                 <div
                   key={doc.id}
@@ -132,8 +142,10 @@ export function Library({ documents, loading, onOpenDoc, onViewAll }: LibraryPro
               );
             })}
           </div>
-        </div>
-      )}
+        ) : (
+          <p className="text-sm text-stone-500">Books you start reading will appear here with your progress.</p>
+        )}
+      </div>
 
       {/* Recent Additions */}
       {recentAdditions.length > 0 && (
@@ -296,7 +308,11 @@ export function Library({ documents, loading, onOpenDoc, onViewAll }: LibraryPro
                     className="inline-flex items-center gap-2 px-5 py-2.5 bg-amber-600 hover:bg-amber-500 text-white text-sm font-medium rounded-lg transition-all shadow-lg shadow-amber-600/20"
                   >
                     <Play className="w-4 h-4" />
-                    Start Reading
+                    {!selectedProgress
+                      ? 'Start Reading'
+                      : selectedDoc.page_count == null
+                        ? 'Continue Reading'
+                        : `Continue Reading (${Math.ceil(selectedDoc.page_count * (1 - selectedProgressPercent / 100))} pages remaining)`}
                   </button>
                 </div>
               </div>
@@ -340,9 +356,7 @@ export function Library({ documents, loading, onOpenDoc, onViewAll }: LibraryPro
         {filtered.map((doc) => {
           const bookmarked = isBookmarked(doc.id);
           const prog = getProgress(doc.id);
-          const totalPercent = prog
-            ? Math.round(((prog.chapter_index + prog.scroll_percent) / doc.chapters.length) * 100)
-            : 0;
+          const totalPercent = getProgressPercent(doc, prog);
           return (
             <div
               key={doc.id}

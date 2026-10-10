@@ -49,20 +49,30 @@ export function Reader({ document: doc, onBack }: ReaderProps) {
   const scrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { toggleBookmark, isBookmarked } = useBookmarks();
-  const { saveProgress, getProgress } = useReadingProgress();
+  const { saveProgress, getProgress, loading: progressLoading } = useReadingProgress();
 
   const theme = themeMap[settings.theme];
   const textMode = isTextDoc(doc);
 
   // Load saved progress on mount
   useEffect(() => {
+    if (progressLoading) return;
+
     const prog = getProgress(doc.id);
     if (prog) {
       setChapterIndex(prog.chapter_index);
       setScrollPercent(prog.scroll_percent);
+    } else {
+      setChapterIndex(0);
+      setScrollPercent(0);
+      void saveProgress(doc.id, 0, 0);
     }
     setLocalBookmarked(isBookmarked(doc.id));
-  }, [doc.id]);
+  }, [doc.id, getProgress, progressLoading, saveProgress]);
+
+  useEffect(() => {
+    setLocalBookmarked(isBookmarked(doc.id));
+  }, [doc.id, isBookmarked]);
 
   // Persist settings
   useEffect(() => {
@@ -321,9 +331,14 @@ export function Reader({ document: doc, onBack }: ReaderProps) {
       )}
 
       {/* PDF Reader (pdfjs-dist canvas) */}
-      {!textMode && doc.file_format === 'pdf' && doc.file_url && (
+      {!textMode && doc.file_format === 'pdf' && doc.file_url && !progressLoading && (
         <div className="max-w-5xl mx-auto px-4 sm:px-6">
-          <PdfViewer url={doc.file_url} title={doc.title} />
+          <PdfViewer
+            url={doc.file_url}
+            title={doc.title}
+            initialProgress={getProgress(doc.id)?.scroll_percent ?? 0}
+            onProgress={(percent) => saveProgress(doc.id, 0, percent)}
+          />
         </div>
       )}
 
