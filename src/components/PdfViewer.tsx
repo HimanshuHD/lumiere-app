@@ -4,18 +4,26 @@ import { ChevronLeft, ChevronRight, Loader2, ZoomIn, ZoomOut } from 'lucide-reac
 interface PdfViewerProps {
   url: string;
   title: string;
+  initialProgress?: number;
+  onProgress?: (percent: number) => void;
 }
 
-export function PdfViewer({ url, title }: PdfViewerProps) {
+export function PdfViewer({ url, title, initialProgress = 0, onProgress }: PdfViewerProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const pdfDocRef = useRef<any>(null);
+  const onProgressRef = useRef(onProgress);
+  const initialProgressRef = useRef(initialProgress);
   const [pageNum, setPageNum] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
   const [scale, setScale] = useState(1.2);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [rendering, setRendering] = useState(false);
+
+  useEffect(() => {
+    onProgressRef.current = onProgress;
+  }, [onProgress]);
 
   // Load PDF document
   useEffect(() => {
@@ -37,7 +45,11 @@ export function PdfViewer({ url, title }: PdfViewerProps) {
         if (cancelled) return;
         pdfDocRef.current = pdf;
         setTotalPages(pdf.numPages);
-        setPageNum(1);
+        const boundedProgress = Math.min(1, Math.max(0, initialProgressRef.current));
+        const restoredPage = pdf.numPages === 1
+          ? 1
+          : Math.round(boundedProgress * (pdf.numPages - 1)) + 1;
+        setPageNum(restoredPage);
         setLoading(false);
       } catch (err) {
         if (cancelled) return;
@@ -54,6 +66,12 @@ export function PdfViewer({ url, title }: PdfViewerProps) {
       }
     };
   }, [url]);
+
+  useEffect(() => {
+    if (totalPages === 0) return;
+    const percent = totalPages === 1 ? 1 : (pageNum - 1) / (totalPages - 1);
+    onProgressRef.current?.(percent);
+  }, [pageNum, totalPages]);
 
   // Render current page
   const renderPage = useCallback(async (num: number, currentScale: number) => {
@@ -133,7 +151,12 @@ export function PdfViewer({ url, title }: PdfViewerProps) {
   }
 
   return (
-    <div className="flex flex-col h-[calc(100vh-7rem)]" ref={containerRef}>
+    <div
+      className="flex flex-col h-[calc(100vh-7rem)]"
+      ref={containerRef}
+      role="region"
+      aria-label={`${title} PDF reader`}
+    >
       {/* PDF controls bar */}
       <div className="flex items-center justify-center gap-4 py-2 bg-white border-b border-stone-200 flex-shrink-0">
         <button
