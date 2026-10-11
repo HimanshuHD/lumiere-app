@@ -7,6 +7,7 @@ interface ReadLaterButtonProps {
   doc: Document;
   variant?: 'compact' | 'full';
   className?: string;
+  hasProgress?: boolean;
 }
 
 function ReadLaterIcon({ filled, className }: { filled: boolean; className?: string }) {
@@ -31,7 +32,8 @@ function ReadLaterIcon({ filled, className }: { filled: boolean; className?: str
   );
 }
 
-export function ReadLaterButton({ doc, variant = 'full', className = '' }: ReadLaterButtonProps) {
+export function ReadLaterButton({ doc, variant = 'full', className = '', hasProgress = false }: ReadLaterButtonProps) {
+  if (hasProgress) return null;
   const { toggleReadingList, isInReadingList } = useReadingList();
   const { showToast } = useToast();
   const [busy, setBusy] = useState(false);

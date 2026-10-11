@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { ArrowLeft, ChevronLeft, ChevronRight, Clock, User, Hash, Search } from 'lucide-react';
 import { Document } from '@/lib/supabase';
 import { ReadLaterButton } from '@/components/ReadLaterButton';
+import { useReadingProgress } from '@/hooks/useData';
 
 interface AllDocumentsProps {
   documents: Document[];
@@ -15,6 +16,7 @@ const PAGE_SIZE = 10;
 export function AllDocuments({ documents, loading, onOpenDoc, onBack }: AllDocumentsProps) {
   const [page, setPage] = useState(0);
   const [search, setSearch] = useState('');
+  const { getProgress } = useReadingProgress();
 
   const sorted = useMemo(() => {
     return [...documents]
@@ -139,7 +141,7 @@ export function AllDocuments({ documents, loading, onOpenDoc, onBack }: AllDocum
                     </td>
                     <td className="px-4 py-3 text-right">
                       <div className="flex items-center justify-end gap-1">
-                        <ReadLaterButton doc={doc} variant="compact" />
+                        <ReadLaterButton doc={doc} variant="compact" hasProgress={!!getProgress(doc.id)} />
                         <span className="text-xs text-amber-600 font-medium opacity-0 group-hover:opacity-100 transition-opacity">
                           Read
                         </span>
