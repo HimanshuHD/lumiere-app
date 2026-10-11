@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { BookOpen, BookMarked, Library as LibraryIcon, Loader2, Upload } from 'lucide-react';
+import { BookOpen, BookMarked, Library as LibraryIcon, Loader2, Upload, ListTodo } from 'lucide-react';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { ToastProvider } from '@/context/ToastContext';
 import { AuthScreen } from '@/components/AuthScreen';
@@ -11,10 +11,11 @@ import { Profile } from '@/components/Profile';
 import { MyUploads } from '@/components/MyUploads';
 import { UserMenu } from '@/components/UserMenu';
 import { AllDocuments } from '@/components/AllDocuments';
+import { ReadingListView } from '@/components/ReadingListView';
 import { useDocuments } from '@/hooks/useData';
 import { Document } from '@/lib/supabase';
 
-type View = 'library' | 'bookmarks' | 'upload' | 'profile' | 'my-uploads' | 'all-documents';
+type View = 'library' | 'bookmarks' | 'reading-list' | 'upload' | 'profile' | 'my-uploads' | 'all-documents';
 
 function AppContent() {
   const { user, loading, signOut } = useAuth();
@@ -42,6 +43,7 @@ function AppContent() {
   const navItems: { key: View; label: string; icon: typeof LibraryIcon }[] = [
     { key: 'library', label: 'Library', icon: LibraryIcon },
     { key: 'bookmarks', label: 'Bookmarks', icon: BookMarked },
+    { key: 'reading-list', label: 'Reading List', icon: ListTodo },
     { key: 'upload', label: 'Upload', icon: Upload },
   ];
 
@@ -118,6 +120,7 @@ function AppContent() {
               />
             )}
             {view === 'bookmarks' && <BookmarksView onOpenDoc={setActiveDoc} />}
+            {view === 'reading-list' && <ReadingListView onOpenDoc={setActiveDoc} />}
             {view === 'upload' && <UploadPanel onUploaded={handleUploaded} />}
             {view === 'profile' && <Profile />}
             {view === 'my-uploads' && <MyUploads />}

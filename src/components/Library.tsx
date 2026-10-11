@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { Search, Clock, BookMarked, Play, Star, Sparkles, User, FileText, Hash, X, Download, ChevronRight } from 'lucide-react';
 import { Document, ReadingProgress } from '@/lib/supabase';
 import { useBookmarks, useReadingProgress } from '@/hooks/useData';
+import { ReadLaterButton } from '@/components/ReadLaterButton';
 
 interface LibraryProps {
   documents: Document[];
@@ -303,6 +304,7 @@ export function Library({ documents, loading, onOpenDoc, onViewAll }: LibraryPro
                       Download original {(selectedDoc.file_format || 'file').toUpperCase()}
                     </a>
                   )}
+                  <ReadLaterButton doc={selectedDoc} />
                   <button
                     onClick={() => { onOpenDoc(selectedDoc); setSelectedDoc(null); }}
                     className="inline-flex items-center gap-2 px-5 py-2.5 bg-amber-600 hover:bg-amber-500 text-white text-sm font-medium rounded-lg transition-all shadow-lg shadow-amber-600/20"

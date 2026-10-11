@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { ArrowLeft, ChevronLeft, ChevronRight, Clock, User, Hash, Search } from 'lucide-react';
 import { Document } from '@/lib/supabase';
+import { ReadLaterButton } from '@/components/ReadLaterButton';
 
 interface AllDocumentsProps {
   documents: Document[];
@@ -137,9 +138,12 @@ export function AllDocuments({ documents, loading, onOpenDoc, onBack }: AllDocum
                       </span>
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <span className="text-xs text-amber-600 font-medium opacity-0 group-hover:opacity-100 transition-opacity">
-                        Read
-                      </span>
+                      <div className="flex items-center justify-end gap-1">
+                        <ReadLaterButton doc={doc} variant="compact" />
+                        <span className="text-xs text-amber-600 font-medium opacity-0 group-hover:opacity-100 transition-opacity">
+                          Read
+                        </span>
+                      </div>
                     </td>
                   </tr>
                 );

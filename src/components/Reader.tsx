@@ -14,7 +14,7 @@ import {
   ScrollText,
 } from 'lucide-react';
 import { Document } from '@/lib/supabase';
-import { useBookmarks, useReadingProgress } from '@/hooks/useData';
+import { useBookmarks, useReadingProgress, useReadingList } from '@/hooks/useData';
 import {
   ReaderSettings,
   FontSize,
@@ -50,6 +50,7 @@ export function Reader({ document: doc, onBack }: ReaderProps) {
 
   const { toggleBookmark, isBookmarked } = useBookmarks();
   const { saveProgress, getProgress, loading: progressLoading } = useReadingProgress();
+  const { removeFromReadingList } = useReadingList();
 
   const theme = themeMap[settings.theme];
   const textMode = isTextDoc(doc);
@@ -66,9 +67,10 @@ export function Reader({ document: doc, onBack }: ReaderProps) {
       setChapterIndex(0);
       setScrollPercent(0);
       void saveProgress(doc.id, 0, 0);
+      void removeFromReadingList(doc.id);
     }
     setLocalBookmarked(isBookmarked(doc.id));
-  }, [doc.id, getProgress, progressLoading, saveProgress]);
+  }, [doc.id, getProgress, progressLoading, saveProgress, removeFromReadingList]);
 
   useEffect(() => {
     setLocalBookmarked(isBookmarked(doc.id));

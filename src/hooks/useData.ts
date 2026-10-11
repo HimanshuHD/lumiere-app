@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { supabase, Document, Bookmark, ReadingProgress } from '@/lib/supabase';
+import { supabase, Document, Bookmark, ReadingProgress, ReadingListItem } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
 
 export function useBookmarks() {
@@ -131,6 +131,78 @@ export function useReadingProgress() {
   );
 
   return { progress, loading, saveProgress, getProgress, refetch: fetchProgress };
+}
+
+export function useReadingList() {
+  const { user } = useAuth();
+  const [readingList, setReadingList] = useState<ReadingListItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchReadingList = useCallback(async () => {
+    if (!user) return;
+    const { data, error } = await supabase
+      .from('reading_list')
+      .select('id, user_id, document_id, created_at, document:documents(*)')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false });
+    if (!error && data) {
+      setReadingList(data as unknown as ReadingListItem[]);
+    }
+    setLoading(false);
+  }, [user]);
+
+  useEffect(() => {
+    fetchReadingList();
+  }, [fetchReadingList]);
+
+  const toggleReadingList = useCallback(
+    async (documentId: string): Promise<boolean> => {
+      if (!user) return false;
+      const existing = readingList.find((r) => r.document_id === documentId);
+      if (existing) {
+        await supabase.from('reading_list').delete().eq('id', existing.id);
+        setReadingList((prev) => prev.filter((r) => r.id !== existing.id));
+        return false;
+      }
+      const { data, error } = await supabase
+        .from('reading_list')
+        .insert({ document_id: documentId })
+        .select('id, user_id, document_id, created_at')
+        .single();
+      if (!error && data) {
+        const { data: doc } = await supabase
+          .from('documents')
+          .select('*')
+          .eq('id', documentId)
+          .single();
+        if (doc) {
+          setReadingList((prev) => [{ ...data as ReadingListItem, document: doc as Document }, ...prev]);
+        }
+        return true;
+      }
+      return false;
+    },
+    [user, readingList]
+  );
+
+  const isInReadingList = useCallback(
+    (documentId: string) => readingList.some((r) => r.document_id === documentId),
+    [readingList]
+  );
+
+  const removeFromReadingList = useCallback(
+    async (documentId: string) => {
+      if (!user) return;
+      const existing = readingList.find((r) => r.document_id === documentId);
+      if (existing) {
+        await supabase.from('reading_list').delete().eq('id', existing.id);
+        setReadingList((prev) => prev.filter((r) => r.id !== existing.id));
+      }
+    },
+    [user, readingList]
+  );
+
+  return { readingList, loading, toggleReadingList, isInReadingList, removeFromReadingList, refetch: fetchReadingList };
 }
 
 export function useDocuments() {

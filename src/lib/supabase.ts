@@ -59,3 +59,11 @@ export interface ReadingProgress {
   scroll_percent: number;
   updated_at: string;
 }
+
+export interface ReadingListItem {
+  id: string;
+  user_id: string;
+  document_id: string;
+  created_at: string;
+  document?: Document;
+}
