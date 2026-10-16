@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { BookOpen, BookMarked, Library as LibraryIcon, Loader2, Upload, ListTodo } from 'lucide-react';
+import { BookOpen, BookMarked, Library as LibraryIcon, Loader2, ListTodo } from 'lucide-react';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { ToastProvider } from '@/context/ToastContext';
 import { AuthScreen } from '@/components/AuthScreen';
@@ -12,6 +12,8 @@ import { MyUploads } from '@/components/MyUploads';
 import { UserMenu } from '@/components/UserMenu';
 import { AllDocuments } from '@/components/AllDocuments';
 import { ReadingListView } from '@/components/ReadingListView';
+import { ImportMenu } from '@/components/ImportMenu';
+import { OnlineLibraryModal } from '@/components/OnlineLibraryModal';
 import { useDocuments } from '@/hooks/useData';
 import { Document } from '@/lib/supabase';
 
@@ -22,6 +24,7 @@ function AppContent() {
   const { documents, loading: docsLoading, refetch } = useDocuments();
   const [view, setView] = useState<View>('library');
   const [activeDoc, setActiveDoc] = useState<Document | null>(null);
+  const [showOnlineLibrary, setShowOnlineLibrary] = useState(false);
 
   const handleUploaded = useCallback((_doc: Document) => {
     refetch();
@@ -44,7 +47,6 @@ function AppContent() {
     { key: 'library', label: 'Library', icon: LibraryIcon },
     { key: 'bookmarks', label: 'Bookmarks', icon: BookMarked },
     { key: 'reading-list', label: 'Reading List', icon: ListTodo },
-    { key: 'upload', label: 'Upload', icon: Upload },
   ];
 
   return (
@@ -81,11 +83,17 @@ function AppContent() {
             </div>
           </div>
 
-          <UserMenu
-            onProfile={() => { setActiveDoc(null); setView('profile'); }}
-            onMyUploads={() => { setActiveDoc(null); setView('my-uploads'); }}
-            onSignOut={signOut}
-          />
+          <div className="flex items-center gap-3">
+            <ImportMenu
+              onUpload={() => { setActiveDoc(null); setView('upload'); }}
+              onOnlineLibrary={() => { setShowOnlineLibrary(true); }}
+            />
+            <UserMenu
+              onProfile={() => { setActiveDoc(null); setView('profile'); }}
+              onMyUploads={() => { setActiveDoc(null); setView('my-uploads'); }}
+              onSignOut={signOut}
+            />
+          </div>
         </div>
 
         {/* Mobile nav */}
@@ -147,6 +155,11 @@ function AppContent() {
           </div>
         </footer>
       )}
+
+      <OnlineLibraryModal
+        open={showOnlineLibrary}
+        onClose={() => setShowOnlineLibrary(false)}
+      />
     </div>
   );
 }
