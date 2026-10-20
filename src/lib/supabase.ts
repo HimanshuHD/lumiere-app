@@ -37,6 +37,7 @@ export interface Document {
   file_url?: string | null;
   file_format?: string | null;
   file_name?: string | null;
+  source_url?: string | null;
 }
 
 export interface UploadResult {
@@ -57,6 +58,7 @@ export interface ReadingProgress {
   document_id: string;
   chapter_index: number;
   scroll_percent: number;
+  epub_cfi?: string | null;
   updated_at: string;
 }
 

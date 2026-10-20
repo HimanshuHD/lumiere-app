@@ -13,7 +13,8 @@ import {
   Sun,
   ScrollText,
 } from 'lucide-react';
-import { Document } from '@/lib/supabase';
+import { Document, ReadingProgress } from '@/lib/supabase';
+import type { Location as EpubLocation } from 'epubjs';
 import { useBookmarks, useReadingProgress, useReadingList } from '@/hooks/useData';
 import {
   ReaderSettings,
@@ -27,6 +28,8 @@ import {
   themeMap,
 } from '@/lib/settings';
 import { PdfViewer } from '@/components/PdfViewer';
+import type EpubBook from 'epubjs/types/book';
+import type EpubRendition from 'epubjs/types/rendition';
 
 interface ReaderProps {
   document: Document;
@@ -37,6 +40,30 @@ function isTextDoc(doc: Document): boolean {
   return doc.file_format === 'txt' || (!doc.file_url && doc.chapters.length > 0 && doc.chapters[0]?.content.length > 200);
 }
 
+const epubFileRequests = new Map<string, Promise<ArrayBuffer>>();
+
+function fetchEpubFile(url: string): Promise<ArrayBuffer> {
+  const existingRequest = epubFileRequests.get(url);
+  if (existingRequest) return existingRequest;
+
+  const request = fetch(url).then(async (response) => {
+    if (!response.ok) {
+      throw new Error(`Could not load the saved book file (${response.status}).`);
+    }
+    const data = await response.arrayBuffer();
+    const bytes = new Uint8Array(data);
+    if (bytes[0] !== 0x50 || bytes[1] !== 0x4b) {
+      throw new Error('The saved file is not a valid EPUB archive. Try removing it and adding it again from the catalog.');
+    }
+    return data;
+  });
+  epubFileRequests.set(url, request);
+  void request.finally(() => {
+    if (epubFileRequests.get(url) === request) epubFileRequests.delete(url);
+  }).catch(() => {});
+  return request;
+}
+
 export function Reader({ document: doc, onBack }: ReaderProps) {
   const [settings, setSettings] = useState<ReaderSettings>(() => loadSettings());
   const [chapterIndex, setChapterIndex] = useState(0);
@@ -44,8 +71,16 @@ export function Reader({ document: doc, onBack }: ReaderProps) {
   const [showSettings, setShowSettings] = useState(false);
   const [showToc, setShowToc] = useState(false);
   const [localBookmarked, setLocalBookmarked] = useState(false);
+  const [epubLoading, setEpubLoading] = useState(false);
+  const [epubError, setEpubError] = useState<string | null>(null);
+  const [epubLoadAttempt, setEpubLoadAttempt] = useState(0);
+  const [epubPosition, setEpubPosition] = useState({ page: 1, total: 1 });
+  const [epubAtStart, setEpubAtStart] = useState(true);
+  const [epubAtEnd, setEpubAtEnd] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
   const epubViewerRef = useRef<HTMLDivElement>(null);
+  const epubRenditionRef = useRef<EpubRendition | null>(null);
+  const epubProgressRef = useRef<ReadingProgress | undefined>(undefined);
   const scrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { toggleBookmark, isBookmarked } = useBookmarks();
@@ -60,13 +95,13 @@ export function Reader({ document: doc, onBack }: ReaderProps) {
     if (progressLoading) return;
 
     const prog = getProgress(doc.id);
+    epubProgressRef.current = prog;
     if (prog) {
       setChapterIndex(prog.chapter_index);
       setScrollPercent(prog.scroll_percent);
     } else {
       setChapterIndex(0);
       setScrollPercent(0);
-      void saveProgress(doc.id, 0, 0);
       void removeFromReadingList(doc.id);
     }
     setLocalBookmarked(isBookmarked(doc.id));
@@ -83,26 +118,96 @@ export function Reader({ document: doc, onBack }: ReaderProps) {
 
   // EPUB rendering
   useEffect(() => {
-    if (textMode || doc.file_format !== 'epub' || !doc.file_url || !epubViewerRef.current) return;
+    if (progressLoading || textMode || doc.file_format !== 'epub' || !doc.file_url || !epubViewerRef.current) return;
 
-    let rendition: any = null;
-    let book: any = null;
+    const container = epubViewerRef.current;
+    let cancelled = false;
+    let rendition: EpubRendition | undefined;
+    let book: EpubBook | undefined;
+    let pendingPosition: { percentage: number; cfi: string } | undefined;
+    let progressSaveTimer: ReturnType<typeof setTimeout> | undefined;
 
-    (async () => {
-      const ePub = (await import('epubjs')).default;
-      book = ePub(doc.file_url!);
-      rendition = book.renderTo(epubViewerRef.current!, {
-        width: '100%',
-        height: '100%',
-      });
-      rendition.display();
-    })();
+    const savePendingPosition = () => {
+      if (progressSaveTimer) clearTimeout(progressSaveTimer);
+      progressSaveTimer = undefined;
+      if (!pendingPosition) return;
+      const position = pendingPosition;
+      pendingPosition = undefined;
+      void saveProgress(doc.id, 0, position.percentage, position.cfi);
+    };
+
+    setEpubLoading(true);
+    setEpubError(null);
+    setEpubAtStart(true);
+    setEpubAtEnd(false);
+    setEpubPosition({ page: 1, total: 1 });
+    container.replaceChildren();
+
+    const loadEpub = async () => {
+      try {
+        const data = await fetchEpubFile(doc.file_url!);
+
+        const ePub = (await import('epubjs')).default;
+        if (cancelled) return;
+        book = ePub(data);
+        await book.ready;
+        if (cancelled) return;
+        const spine = await book.loaded.spine;
+
+        rendition = book.renderTo(container, {
+          width: '100%',
+          height: '100%',
+        });
+        epubRenditionRef.current = rendition;
+        rendition.on('relocated', (location: EpubLocation) => {
+          setEpubAtStart(location.atStart);
+          setEpubAtEnd(location.atEnd);
+          setEpubPosition({
+            page: location.start.displayed.page,
+            total: location.start.displayed.total,
+          });
+          const pages = Math.max(1, location.start.displayed.total);
+          const sectionProgress = Math.max(0, (location.start.displayed.page - 1) / pages);
+          pendingPosition = {
+            percentage: Math.min(1, Math.max(0, (location.start.index + sectionProgress) / Math.max(1, spine.length))),
+            cfi: location.start.cfi,
+          };
+          if (progressSaveTimer) clearTimeout(progressSaveTimer);
+          progressSaveTimer = setTimeout(savePendingPosition, 750);
+        });
+        window.addEventListener('pagehide', savePendingPosition);
+        await rendition.display(epubProgressRef.current?.epub_cfi || undefined);
+        if (!cancelled) setEpubLoading(false);
+      } catch (err) {
+        if (cancelled) return;
+        setEpubError(err instanceof Error ? err.message : 'Could not open this EPUB file.');
+        setEpubLoading(false);
+      }
+    };
+
+    void loadEpub();
 
     return () => {
-      if (rendition) rendition.destroy();
-      if (book) book.destroy();
+      cancelled = true;
+      window.removeEventListener('pagehide', savePendingPosition);
+      if (progressSaveTimer) clearTimeout(progressSaveTimer);
+      savePendingPosition();
+      if (epubRenditionRef.current === rendition) epubRenditionRef.current = null;
+      rendition?.destroy();
+      book?.destroy();
     };
-  }, [doc.file_url, doc.file_format, textMode]);
+  }, [doc.id, doc.file_url, doc.file_format, textMode, epubLoadAttempt, progressLoading, saveProgress]);
+
+  const turnEpubPage = useCallback(async (direction: 'previous' | 'next') => {
+    const rendition = epubRenditionRef.current;
+    if (!rendition) return;
+    try {
+      if (direction === 'previous') await rendition.prev();
+      else await rendition.next();
+    } catch (err) {
+      setEpubError(err instanceof Error ? err.message : 'Could not turn the EPUB page.');
+    }
+  }, []);
 
   // Scroll tracking + progress saving (text mode only)
   useEffect(() => {
@@ -346,8 +451,51 @@ export function Reader({ document: doc, onBack }: ReaderProps) {
 
       {/* EPUB Reader (epub.js) */}
       {!textMode && doc.file_format === 'epub' && doc.file_url && (
-        <div className="h-[calc(100vh-7rem)]">
+        <div className="relative h-[calc(100vh-7rem)]">
           <div ref={epubViewerRef} className="w-full h-full" />
+          {!epubLoading && !epubError && (
+            <>
+              <button
+                onClick={() => void turnEpubPage('previous')}
+                disabled={epubAtStart}
+                aria-label="Previous EPUB page"
+                className="absolute left-2 top-1/2 z-10 -translate-y-1/2 rounded-full border border-stone-200 bg-white/90 p-2 text-stone-700 shadow-md transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-40 sm:left-6"
+              >
+                <ChevronLeft className="h-5 w-5" />
+              </button>
+              <button
+                onClick={() => void turnEpubPage('next')}
+                disabled={epubAtEnd}
+                aria-label="Next EPUB page"
+                className="absolute right-2 top-1/2 z-10 -translate-y-1/2 rounded-full border border-stone-200 bg-white/90 p-2 text-stone-700 shadow-md transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-40 sm:right-6"
+              >
+                <ChevronRight className="h-5 w-5" />
+              </button>
+              <div className="absolute bottom-3 left-1/2 z-10 -translate-x-1/2 rounded-full bg-white/90 px-3 py-1 text-xs text-stone-500 shadow">
+                Page {epubPosition.page} of {epubPosition.total}
+              </div>
+            </>
+          )}
+          {epubLoading && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-white">
+              <div className="w-8 h-8 border-2 border-amber-600 border-t-transparent rounded-full animate-spin" />
+              <p className="text-sm text-stone-500">Loading EPUB...</p>
+            </div>
+          )}
+          {epubError && (
+            <div className="absolute inset-0 flex items-center justify-center bg-white px-6">
+              <div className="max-w-md text-center">
+                <p className="mb-2 text-sm font-medium text-red-600">Could not open this EPUB</p>
+                <p className="mb-4 text-xs text-stone-500">{epubError}</p>
+                <button
+                  onClick={() => setEpubLoadAttempt((attempt) => attempt + 1)}
+                  className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-amber-500"
+                >
+                  Try again
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
