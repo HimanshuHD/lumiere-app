@@ -1,9 +1,13 @@
-import { useState, useCallback } from 'react';
-import { X, Globe, ExternalLink, BookOpen, Search, ArrowLeft, Loader2, Download, AlertCircle, BookMarked } from 'lucide-react';
+import { useState, useCallback, type FormEvent } from 'react';
+import { X, Globe, ExternalLink, BookOpen, Search, ArrowLeft, Loader2, Download, AlertCircle, BookMarked, BookPlus } from 'lucide-react';
+import { supabase, type Document } from '@/lib/supabase';
+import { useAuth } from '@/context/AuthContext';
+import { useToast } from '@/context/ToastContext';
 
 interface OnlineLibraryModalProps {
   open: boolean;
   onClose: () => void;
+  onBookAdded: (document: Document) => void;
 }
 
 interface OpdsCatalog {
@@ -24,6 +28,7 @@ interface OpdsBook {
   coverUrl: string;
   downloadUrl: string;
   downloadType: string;
+  catalogUrl: string;
   categories: string[];
 }
 
@@ -32,6 +37,13 @@ interface OpdsFeedResult {
   subtitle: string;
   count: number;
   books: OpdsBook[];
+}
+
+function getReadableFormat(book: OpdsBook): 'epub' | 'pdf' | null {
+  const type = book.downloadType.toLowerCase();
+  if (type.includes('epub') || /\.epub(?:3)?(?:$|[.?])/i.test(book.downloadUrl)) return 'epub';
+  if (type.includes('pdf') || /\.pdf(?:$|[.?])/i.test(book.downloadUrl)) return 'pdf';
+  return null;
 }
 
 const OPDS_CATALOGS: OpdsCatalog[] = [
@@ -45,10 +57,10 @@ const OPDS_CATALOGS: OpdsCatalog[] = [
   },
   {
     name: 'Standard Ebooks',
-    url: 'https://standardebooks.org/feeds/opds',
+    url: 'https://standardebooks.org/feeds/atom/new-releases',
     website: 'https://standardebooks.org/',
-    description: 'Beautifully formatted, carefully proofread public domain books. Each ebook is crafted with attention to typography and readability.',
-    count: '1,000+ titles',
+    description: 'The latest beautifully formatted, carefully proofread public domain ebooks, with direct EPUB downloads.',
+    count: 'Latest releases',
     accent: 'from-stone-600 to-stone-700',
   },
   {
@@ -75,42 +87,42 @@ const OPDS_CATALOGS: OpdsCatalog[] = [
     count: 'Millions of titles',
     accent: 'from-red-500 to-red-600',
   },
-  {
-    name: 'OAPEN',
-    url: 'https://library.oapen.org/opds',
-    website: 'https://www.oapen.org/',
-    description: 'Open Access Publishing in European Networks. A collection of freely available academic books and research publications.',
-    count: '20,000+ titles',
-    accent: 'from-teal-500 to-teal-600',
-  },
 ];
 
-export function OnlineLibraryModal({ open, onClose }: OnlineLibraryModalProps) {
+export function OnlineLibraryModal({ open, onClose, onBookAdded }: OnlineLibraryModalProps) {
+  const { user } = useAuth();
+  const { showToast } = useToast();
   const [query, setQuery] = useState('');
+  const [rssFeedUrl, setRssFeedUrl] = useState('');
   const [selectedCatalog, setSelectedCatalog] = useState<OpdsCatalog | null>(null);
+  const [catalogHistory, setCatalogHistory] = useState<OpdsCatalog[]>([]);
   const [books, setBooks] = useState<OpdsBook[]>([]);
   const [feedTitle, setFeedTitle] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [addingBookId, setAddingBookId] = useState<string | null>(null);
 
-  const handleShowCatalog = useCallback(async (catalog: OpdsCatalog) => {
+  const loadCatalog = useCallback(async (catalog: OpdsCatalog) => {
     setSelectedCatalog(catalog);
     setBooks([]);
+    setFeedTitle(catalog.name);
     setError(null);
     setLoading(true);
     try {
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      const endpoint = `${supabaseUrl}/functions/v1/opds-fetch?url=${encodeURIComponent(catalog.url)}`;
+      const endpoint = new URL('/functions/v1/opds-fetch', supabaseUrl);
+      endpoint.searchParams.set('url', catalog.url);
       const res = await fetch(endpoint, {
         headers: {
           Authorization: `Bearer ${anonKey}`,
+          apikey: anonKey,
           'Content-Type': 'application/json',
         },
       });
       if (!res.ok) {
         const errBody = await res.json().catch(() => ({}));
-        throw new Error(errBody.error || `Failed to load catalog (${res.status})`);
+        throw new Error(errBody.error || errBody.message || `Failed to load catalog (${res.status})`);
       }
       const data: OpdsFeedResult = await res.json();
       setFeedTitle(data.title || catalog.name);
@@ -122,18 +134,160 @@ export function OnlineLibraryModal({ open, onClose }: OnlineLibraryModalProps) {
     }
   }, []);
 
+  const handleShowCatalog = useCallback((catalog: OpdsCatalog) => {
+    setCatalogHistory([]);
+    void loadCatalog(catalog);
+  }, [loadCatalog]);
+
+  const handleBrowseCatalog = useCallback((catalog: OpdsCatalog) => {
+    if (selectedCatalog) {
+      setCatalogHistory((history) => [...history, selectedCatalog]);
+    }
+    void loadCatalog(catalog);
+  }, [loadCatalog, selectedCatalog]);
+
+  const handleAddBook = useCallback(async (book: OpdsBook) => {
+    if (!user) {
+      showToast('Sign in to add books to your library.', 'error');
+      return;
+    }
+    if (!book.downloadUrl) return;
+
+    const format = getReadableFormat(book);
+    if (!format) {
+      showToast('This catalog entry does not provide a readable EPUB or PDF edition.', 'error');
+      return;
+    }
+
+    const bookId = book.id || book.downloadUrl;
+    setAddingBookId(bookId);
+    try {
+      const { data: existing, error: lookupError } = await supabase
+        .from('documents')
+        .select('*')
+        .eq('uploaded_by', user.id)
+        .eq('source_url', book.downloadUrl)
+        .maybeSingle();
+      if (lookupError) throw new Error(`Could not check your library: ${lookupError.message}`);
+      if (existing) {
+        showToast('This book is already in your library. Opening it now.');
+        onBookAdded(existing as Document);
+        return;
+      }
+
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      const endpoint = new URL('/functions/v1/opds-fetch', supabaseUrl);
+      endpoint.searchParams.set('download', book.downloadUrl);
+      const response = await fetch(endpoint, {
+        headers: {
+          Authorization: `Bearer ${anonKey}`,
+          apikey: anonKey,
+        },
+      });
+      if (!response.ok) {
+        const result = await response.json().catch(() => ({}));
+        throw new Error(result.error || result.message || `Could not fetch book file (${response.status})`);
+      }
+      if (response.headers.get('X-Document-Format') !== format) {
+        throw new Error('The catalog returned a different format than expected.');
+      }
+
+      const file = await response.blob();
+      const maxFileSize = 30 * 1024 * 1024;
+      if (file.size === 0 || file.size > maxFileSize) {
+        throw new Error(file.size === 0
+          ? 'The catalog returned an empty book file.'
+          : 'Book files must be smaller than 30 MB to add them to your library.');
+      }
+
+      const documentId = crypto.randomUUID();
+      const storagePath = `${user.id}/${documentId}.${format}`;
+      const contentType = format === 'epub' ? 'application/epub+zip' : 'application/pdf';
+      const { error: uploadError } = await supabase.storage
+        .from('documents')
+        .upload(storagePath, file, { contentType, cacheControl: '3600' });
+      if (uploadError) throw new Error(`Could not save book file: ${uploadError.message}`);
+
+      const { data: fileUrl } = supabase.storage.from('documents').getPublicUrl(storagePath);
+      const knownCategories = ['Fiction', 'Non-Fiction', 'Science', 'History', 'Technology', 'Philosophy', 'Adventure'];
+      const category = knownCategories.find((known) =>
+        book.categories.some((value) => value.toLowerCase() === known.toLowerCase())
+      ) || 'Fiction';
+      const { data: savedBook, error: insertError } = await supabase
+        .from('documents')
+        .insert({
+          title: book.title,
+          author: book.author,
+          category,
+          cover_url: book.coverUrl,
+          reading_time: 10,
+          summary: book.summary || 'Imported from an OPDS catalog.',
+          chapters: [],
+          is_featured: false,
+          uploaded_by: user.id,
+          file_url: fileUrl.publicUrl,
+          file_format: format,
+          file_name: `${book.title}.${format}`,
+          source_url: book.downloadUrl,
+        })
+        .select('*')
+        .single();
+
+      if (insertError) {
+        const { error: cleanupError } = await supabase.storage.from('documents').remove([storagePath]);
+        if (cleanupError) {
+          throw new Error(`Could not save book to your library: ${insertError.message}. File cleanup also failed: ${cleanupError.message}`);
+        }
+        throw new Error(`Could not save book to your library: ${insertError.message}`);
+      }
+
+      showToast('Book added to your library. Opening it now.');
+      onBookAdded(savedBook as Document);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Could not add this book to your library.', 'error');
+    } finally {
+      setAddingBookId(null);
+    }
+  }, [onBookAdded, showToast, user]);
+
+  const handleLoadRssFeed = useCallback((event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const url = rssFeedUrl.trim();
+    if (!url) return;
+    void handleShowCatalog({
+      name: 'RSS Feed',
+      url,
+      website: url,
+      description: 'RSS feed',
+      count: 'RSS Feed',
+      accent: 'from-blue-500 to-blue-600',
+    });
+  }, [handleShowCatalog, rssFeedUrl]);
+
   const handleBack = useCallback(() => {
+    const previousCatalog = catalogHistory[catalogHistory.length - 1];
+    if (previousCatalog) {
+      setCatalogHistory((history) => history.slice(0, -1));
+      void loadCatalog(previousCatalog);
+      return;
+    }
     setSelectedCatalog(null);
     setBooks([]);
     setFeedTitle('');
     setError(null);
-  }, []);
+  }, [catalogHistory, loadCatalog]);
 
   const handleClose = useCallback(() => {
     onClose();
-    handleBack();
+    setSelectedCatalog(null);
+    setCatalogHistory([]);
+    setBooks([]);
+    setFeedTitle('');
+    setError(null);
     setQuery('');
-  }, [onClose, handleBack]);
+    setRssFeedUrl('');
+  }, [onClose]);
 
   if (!open) return null;
 
@@ -157,10 +311,11 @@ export function OnlineLibraryModal({ open, onClose }: OnlineLibraryModalProps) {
             {selectedCatalog ? (
               <button
                 onClick={handleBack}
-                className="flex items-center gap-2 text-sm font-medium text-stone-600 hover:text-stone-900 transition-colors flex-shrink-0"
+                aria-label="Back to catalogs"
+                title="Back to catalogs"
+                className="flex items-center text-stone-600 hover:text-stone-900 transition-colors flex-shrink-0"
               >
                 <ArrowLeft className="w-4 h-4" />
-                Back
               </button>
             ) : null}
             <div className="flex items-center gap-3 min-w-0">
@@ -176,7 +331,7 @@ export function OnlineLibraryModal({ open, onClose }: OnlineLibraryModalProps) {
                   {selectedCatalog ? feedTitle : 'Online Library'}
                 </h2>
                 <p className="text-sm text-stone-500 truncate">
-                  {selectedCatalog ? selectedCatalog.name : 'Browse free OPDS catalogs to discover and download ebooks'}
+                  {selectedCatalog ? selectedCatalog.name : 'Browse OPDS catalogs or read an RSS feed'}
                 </p>
               </div>
             </div>
@@ -195,7 +350,7 @@ export function OnlineLibraryModal({ open, onClose }: OnlineLibraryModalProps) {
             {loading ? (
               <div className="flex flex-col items-center justify-center py-20">
                 <Loader2 className="w-8 h-8 text-amber-600 animate-spin mb-3" />
-                <p className="text-sm text-stone-500">Loading books from {selectedCatalog.name}...</p>
+                <p className="text-sm text-stone-500">Loading feed entries from {selectedCatalog.name}...</p>
               </div>
             ) : error ? (
               <div className="flex flex-col items-center justify-center py-20 px-6">
@@ -203,9 +358,9 @@ export function OnlineLibraryModal({ open, onClose }: OnlineLibraryModalProps) {
                   <AlertCircle className="w-6 h-6 text-red-500" />
                 </div>
                 <p className="text-sm text-red-600 text-center mb-1">{error}</p>
-                <p className="text-xs text-stone-400 text-center mb-4">Could not load this catalog's books. The catalog may be temporarily unavailable.</p>
+                <p className="text-xs text-stone-400 text-center mb-4">Could not load this feed. It may be temporarily unavailable or return an unsupported format.</p>
                 <button
-                  onClick={() => handleShowCatalog(selectedCatalog)}
+                  onClick={() => loadCatalog(selectedCatalog)}
                   className="text-sm font-medium text-amber-600 hover:text-amber-700 transition-colors"
                 >
                   Try again
@@ -213,11 +368,11 @@ export function OnlineLibraryModal({ open, onClose }: OnlineLibraryModalProps) {
               </div>
             ) : books.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-20">
-                <p className="text-sm text-stone-400">No books found in this catalog.</p>
+                <p className="text-sm text-stone-400">No feed entries found.</p>
               </div>
             ) : (
               <div className="p-4 space-y-2">
-                <p className="text-xs text-stone-400 px-2 pb-2">{books.length} books found</p>
+                <p className="text-xs text-stone-400 px-2 pb-2">{books.length} feed entries found</p>
                 {books.map((book, idx) => (
                   <div
                     key={`${book.id}-${idx}`}
@@ -247,6 +402,9 @@ export function OnlineLibraryModal({ open, onClose }: OnlineLibraryModalProps) {
                         {book.title}
                       </h4>
                       <p className="text-xs text-stone-500 mb-1">{book.author}</p>
+                      {book.updated && (
+                        <p className="text-[10px] text-stone-400 mb-1">{book.updated}</p>
+                      )}
                       {book.categories.length > 0 && (
                         <div className="flex flex-wrap gap-1 mb-1">
                           {book.categories.slice(0, 3).map((cat, i) => (
@@ -261,6 +419,23 @@ export function OnlineLibraryModal({ open, onClose }: OnlineLibraryModalProps) {
                       )}
                     </div>
 
+                    {book.catalogUrl && (
+                      <button
+                        onClick={() => handleBrowseCatalog({
+                          name: book.title,
+                          url: book.catalogUrl,
+                          website: book.catalogUrl,
+                          description: 'OPDS subcatalog',
+                          count: 'OPDS subcatalog',
+                          accent: selectedCatalog.accent,
+                        })}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-stone-700 bg-stone-100 hover:bg-stone-200 border border-stone-200 rounded-lg transition-all flex-shrink-0 whitespace-nowrap"
+                      >
+                        <BookOpen className="w-3.5 h-3.5" />
+                        Browse
+                      </button>
+                    )}
+
                     {/* Download button */}
                     {book.downloadUrl && (
                       <a
@@ -269,12 +444,27 @@ export function OnlineLibraryModal({ open, onClose }: OnlineLibraryModalProps) {
                         rel="noopener noreferrer"
                         className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg transition-all flex-shrink-0 whitespace-nowrap"
                       >
-                        <Download className="w-3.5 h-3.5" />
+                        {book.downloadType.includes('html')
+                          ? <ExternalLink className="w-3.5 h-3.5" />
+                          : <Download className="w-3.5 h-3.5" />}
                         {book.downloadType.includes('epub') ? 'EPUB'
                           : book.downloadType.includes('pdf') ? 'PDF'
                           : book.downloadType.includes('text') ? 'TXT'
-                          : 'Get'}
+                          : book.downloadType.includes('html') ? 'Read'
+                          : 'Open'}
                       </a>
+                    )}
+                    {getReadableFormat(book) && (
+                      <button
+                        onClick={() => void handleAddBook(book)}
+                        disabled={addingBookId !== null}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-green-700 hover:bg-green-600 disabled:opacity-60 disabled:cursor-wait rounded-lg transition-all flex-shrink-0 whitespace-nowrap"
+                      >
+                        {addingBookId === (book.id || book.downloadUrl)
+                          ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          : <BookPlus className="w-3.5 h-3.5" />}
+                        {addingBookId === (book.id || book.downloadUrl) ? 'Adding...' : 'Add to Library'}
+                      </button>
                     )}
                   </div>
                 ))}
@@ -302,9 +492,28 @@ export function OnlineLibraryModal({ open, onClose }: OnlineLibraryModalProps) {
             <div className="px-6 py-2 flex-shrink-0">
               <p className="text-xs text-stone-400 flex items-center gap-1.5">
                 <BookOpen className="w-3.5 h-3.5" />
-                OPDS (Open Publication Distribution System) catalogs let you browse and download free ebooks directly.
+                Browse OPDS catalogs or enter an RSS/Atom feed URL to read its latest entries.
               </p>
             </div>
+
+            <form onSubmit={handleLoadRssFeed} className="px-6 py-3 flex items-center gap-2 flex-shrink-0">
+              <input
+                type="url"
+                value={rssFeedUrl}
+                onChange={(event) => setRssFeedUrl(event.target.value)}
+                placeholder="https://example.com/feed.xml"
+                aria-label="RSS feed URL"
+                required
+                className="min-w-0 flex-1 px-4 py-2.5 bg-stone-50 border border-stone-200 rounded-xl text-stone-800 placeholder-stone-400 text-sm focus:outline-none focus:ring-2 focus:ring-amber-600/30 focus:border-amber-600/40 transition-all"
+              />
+              <button
+                type="submit"
+                className="inline-flex items-center gap-1.5 text-xs font-medium text-white bg-amber-600 hover:bg-amber-500 px-3 py-2.5 rounded-lg transition-all flex-shrink-0"
+              >
+                <BookMarked className="w-3.5 h-3.5" />
+                Read Feed
+              </button>
+            </form>
 
             {/* Catalog list */}
             <div className="overflow-y-auto px-6 pb-6 pt-2 space-y-3">

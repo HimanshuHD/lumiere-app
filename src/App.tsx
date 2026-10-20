@@ -159,6 +159,11 @@ function AppContent() {
       <OnlineLibraryModal
         open={showOnlineLibrary}
         onClose={() => setShowOnlineLibrary(false)}
+        onBookAdded={(doc) => {
+          refetch();
+          setShowOnlineLibrary(false);
+          setActiveDoc(doc);
+        }}
       />
     </div>
   );
