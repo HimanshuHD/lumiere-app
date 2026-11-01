@@ -220,13 +220,37 @@ export function useDocuments() {
 
   const fetchDocuments = useCallback(async () => {
     if (!user) return;
-    const { data, error } = await supabase
-      .from('documents')
-      .select('*')
-      .order('created_at', { ascending: true });
-    if (!error && data) {
-      setDocuments(data as Document[]);
+    const [documentsResult, membershipsResult] = await Promise.all([
+      supabase
+        .from('documents')
+        .select('*')
+        .order('created_at', { ascending: true }),
+      supabase
+        .from('document_library_memberships')
+        .select('document_id')
+        .eq('user_id', user.id),
+    ]);
+
+    if (documentsResult.error) {
+      console.error('Failed to load documents:', documentsResult.error);
+      setLoading(false);
+      return;
     }
+
+    if (membershipsResult.error) {
+      console.error('Failed to load catalog collection memberships:', membershipsResult.error);
+      setDocuments(((documentsResult.data || []) as Document[])
+        .filter((document) => document.origin !== 'catalog_import'));
+      setLoading(false);
+      return;
+    }
+
+    const membershipIds = new Set(
+      (membershipsResult.data || []).map((membership) => membership.document_id),
+    );
+    setDocuments(((documentsResult.data || []) as Document[]).filter((document) =>
+      document.origin !== 'catalog_import' || membershipIds.has(document.id)
+    ));
     setLoading(false);
   }, [user]);
 

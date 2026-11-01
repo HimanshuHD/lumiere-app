@@ -4,6 +4,8 @@ import { supabase, type Document } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import { requestTurnstileToken } from '@/lib/turnstile';
+import { addCatalogDocumentToCollection } from '@/services/catalogCollection';
+import { supabaseCatalogCollectionStore } from '@/services/supabaseCatalogCollection';
 
 interface OnlineLibraryModalProps {
   open: boolean;
@@ -57,14 +59,6 @@ function canImportBook(catalogUrl: string | undefined, book: OpdsBook): boolean 
   } catch {
     return false;
   }
-}
-
-function getCatalogSourceIdentity(bookId: string, downloadUrl: string): string {
-  const gutenbergBookId = bookId.match(/\/ebooks\/([0-9]+)(?:$|[?#])/i)?.[1] ||
-    downloadUrl.match(/\/(?:ebooks|cache\/epub)\/([0-9]+)/i)?.[1];
-  return gutenbergBookId
-    ? `project-gutenberg:${gutenbergBookId}`
-    : downloadUrl.split(/[?#]/, 1)[0].replace(/\/+$/, '').toLowerCase();
 }
 
 function isSharedCatalogDocument(value: unknown): value is Document {
@@ -211,7 +205,8 @@ export function OnlineLibraryModal({ open, onClose, onBookAdded }: OnlineLibrary
       showToast('Only catalog entries explicitly marked public domain in the USA can be imported.', 'error');
       return;
     }
-    if (!getReadableFormat(book)) {
+    const format = getReadableFormat(book);
+    if (!format) {
       showToast('This catalog entry does not provide a readable EPUB or PDF edition.', 'error');
       return;
     }
@@ -223,19 +218,6 @@ export function OnlineLibraryModal({ open, onClose, onBookAdded }: OnlineLibrary
       if (sessionError) throw new Error(`Could not verify your sign-in session: ${sessionError.message}`);
       if (!sessionData.session) throw new Error('Sign in to import catalog books.');
 
-      const sourceIdentity = getCatalogSourceIdentity(book.id, book.downloadUrl);
-      const { data: existing, error: lookupError } = await supabase
-        .from('documents')
-        .select('*')
-        .eq('source_identity', sourceIdentity)
-        .maybeSingle();
-      if (lookupError) throw new Error(`Could not check the shared catalog: ${lookupError.message}`);
-      if (existing) {
-        showToast('This shared catalog book is already available. Opening it now.');
-        onBookAdded(existing as Document);
-        return;
-      }
-
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
       const endpoint = new URL('/functions/v1/opds-fetch', supabaseUrl);
@@ -245,6 +227,8 @@ export function OnlineLibraryModal({ open, onClose, onBookAdded }: OnlineLibrary
           action: 'import',
           catalogUrl: selectedCatalog.url,
           bookId,
+          downloadUrl: book.downloadUrl,
+          format,
         }),
         headers: {
           'Content-Type': 'application/json',
@@ -260,8 +244,13 @@ export function OnlineLibraryModal({ open, onClose, onBookAdded }: OnlineLibrary
       if (!isSharedCatalogDocument(importedDocument)) {
         throw new Error('The catalog import response was invalid.');
       }
-      showToast('Book added to your library. Opening it now.');
-      onBookAdded(importedDocument);
+      const collectionDocument = await addCatalogDocumentToCollection(
+        supabaseCatalogCollectionStore,
+        user.id,
+        importedDocument,
+      );
+      showToast('Book added to your collection. Opening it now.');
+      onBookAdded(collectionDocument);
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Could not add this book to your library.', 'error');
     } finally {

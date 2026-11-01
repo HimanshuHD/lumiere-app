@@ -16,6 +16,7 @@ import {
   validateOutboundUrl,
   verifyTurnstileToken,
 } from "./security.ts";
+import { getCatalogSourceIdentity } from "./catalog_identity.ts";
 
 type XmlRecord = Record<string, unknown>;
 
@@ -210,12 +211,18 @@ async function importCatalogBook(req: Request): Promise<Response> {
   if (authError || !authData.user) return fail("Your sign-in session is invalid or expired.", 401);
 
   let catalogUrl: URL;
+  let requestedDownloadUrl: URL;
   let requestedBookId: string;
+  const requestedFormat = requestBody.format;
   try {
     catalogUrl = new URL(String(requestBody.catalogUrl || ""));
+    requestedDownloadUrl = new URL(String(requestBody.downloadUrl || ""));
     requestedBookId = typeof requestBody.bookId === "string" ? requestBody.bookId.trim() : "";
   } catch {
     return fail("Invalid catalog import request.", 400);
+  }
+  if (requestedFormat !== "epub" && requestedFormat !== "pdf") {
+    return fail("Choose a supported EPUB or PDF edition.", 400);
   }
 
   const allowedHosts = new Set([
@@ -226,7 +233,7 @@ async function importCatalogBook(req: Request): Promise<Response> {
   ]);
   const isAllowedUrl = (url: URL) =>
     validateOutboundUrl(url).ok && allowedHosts.has(url.hostname.toLowerCase());
-  if (!isAllowedUrl(catalogUrl) || !requestedBookId) {
+  if (!isAllowedUrl(catalogUrl) || !isAllowedUrl(requestedDownloadUrl) || !requestedBookId) {
     return fail("Only verified Project Gutenberg catalog entries can be imported.", 400);
   }
 
@@ -276,11 +283,33 @@ async function importCatalogBook(req: Request): Promise<Response> {
   }
 
   const links = childValues(entry, "link");
-  const acquisition = links.find((link) =>
-    attribute(link, "rel").startsWith("http://opds-spec.org/acquisition")
-  ) || links.find((link) => attribute(link, "rel") === "enclosure");
+  const acquisitionLinks = links.filter((link) =>
+    attribute(link, "rel").startsWith("http://opds-spec.org/acquisition") ||
+    attribute(link, "rel") === "enclosure"
+  );
+  const acquisition = acquisitionLinks.find((link) => {
+    const type = attribute(link, "type").toLowerCase();
+    const rawHref = attribute(link, "href");
+    let href: URL;
+    try {
+      href = new URL(rawHref, catalogUrl);
+    } catch {
+      return false;
+    }
+    const path = href.pathname.toLowerCase();
+    const format = type.includes("epub") || /\.epub(?:3)?$/i.test(path)
+      ? "epub"
+      : type.includes("pdf") || /\.pdf$/i.test(path)
+        ? "pdf"
+        : null;
+    return format === requestedFormat &&
+      isAllowedUrl(href) &&
+      href.href === requestedDownloadUrl.href;
+  });
   const downloadHref = attribute(acquisition, "href");
-  if (!downloadHref) return fail("This catalog entry has no downloadable edition.", 400);
+  if (!downloadHref) {
+    return fail(`This catalog entry has no downloadable ${requestedFormat.toUpperCase()} edition.`, 415);
+  }
 
   let downloadUrl: URL;
   try {
@@ -292,21 +321,10 @@ async function importCatalogBook(req: Request): Promise<Response> {
     return fail("The book file is hosted outside the approved Project Gutenberg domains.", 403);
   }
 
-  const mediaType = attribute(acquisition, "type").toLowerCase();
-  const path = downloadUrl.pathname.toLowerCase();
-  const format = mediaType.includes("epub") || /\.epub(?:3)?(?:$|[.?])/i.test(path)
-    ? "epub"
-    : mediaType.includes("pdf") || /\.pdf$/i.test(path)
-      ? "pdf"
-      : null;
-  if (!format) return fail("Only EPUB and PDF editions can be imported.", 415);
+  const format = requestedFormat;
 
   const canonicalSourceUrl = downloadUrl.toString();
-  const gutenbergBookId = requestedBookId.match(/\/ebooks\/([0-9]+)(?:$|[?#])/i)?.[1] ||
-    canonicalSourceUrl.match(/\/(?:ebooks|cache\/epub)\/([0-9]+)/i)?.[1];
-  const sourceIdentity = gutenbergBookId
-    ? `project-gutenberg:${gutenbergBookId}`
-    : canonicalSourceUrl.split(/[?#]/, 1)[0].replace(/\/+$/, "").toLowerCase();
+  const sourceIdentity = getCatalogSourceIdentity(requestedBookId, downloadUrl, format);
   const admin = createClient(supabaseUrl, serviceRoleKey, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
