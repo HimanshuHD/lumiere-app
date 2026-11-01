@@ -1,7 +1,7 @@
-import { useState } from 'react';
-import { BookOpen, BookMarked, Loader2 } from 'lucide-react';
+import { BookOpen, BookMarked } from 'lucide-react';
 import { Document } from '@/lib/supabase';
 import { useBookmarks, useReadingProgress } from '@/hooks/useData';
+import { DocumentCover } from '@/components/DocumentCover';
 
 interface BookmarksViewProps {
   onOpenDoc: (doc: Document) => void;
@@ -51,7 +51,10 @@ export function BookmarksView({ onOpenDoc }: BookmarksViewProps) {
             return (
               <div key={bm.id} onClick={() => onOpenDoc(doc)} className="group cursor-pointer">
                 <div className="relative aspect-[3/4] rounded-xl overflow-hidden mb-3 shadow-md group-hover:shadow-xl transition-all">
-                  <img src={doc.cover_url} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                  <DocumentCover
+                    document={doc}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                  />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
                   <div className="absolute top-2 right-2 w-7 h-7 rounded-full bg-white/90 flex items-center justify-center shadow-md">
                     <BookMarked className="w-3.5 h-3.5 text-amber-600" />

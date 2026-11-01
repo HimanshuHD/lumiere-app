@@ -28,6 +28,7 @@ import {
   themeMap,
 } from '@/lib/settings';
 import { PdfViewer } from '@/components/PdfViewer';
+import { useDocumentStorageUrl } from '@/hooks/useDocumentStorageUrl';
 import type EpubBook from 'epubjs/types/book';
 import type EpubRendition from 'epubjs/types/rendition';
 
@@ -37,7 +38,9 @@ interface ReaderProps {
 }
 
 function isTextDoc(doc: Document): boolean {
-  return doc.file_format === 'txt' || (!doc.file_url && doc.chapters.length > 0 && doc.chapters[0]?.content.length > 200);
+  if (doc.file_format === 'pdf' || doc.file_format === 'epub') return false;
+  return doc.file_format === 'txt' ||
+    (!doc.file_storage_path && !doc.file_url && doc.chapters.length > 0 && doc.chapters[0]?.content.length > 200);
 }
 
 const epubFileRequests = new Map<string, Promise<ArrayBuffer>>();
@@ -86,6 +89,7 @@ export function Reader({ document: doc, onBack }: ReaderProps) {
   const { toggleBookmark, isBookmarked } = useBookmarks();
   const { saveProgress, getProgress, loading: progressLoading } = useReadingProgress();
   const { removeFromReadingList } = useReadingList();
+  const { url: fileUrl, error: fileAccessError } = useDocumentStorageUrl(doc.file_storage_path, doc.file_url);
 
   const theme = themeMap[settings.theme];
   const textMode = isTextDoc(doc);
@@ -118,7 +122,7 @@ export function Reader({ document: doc, onBack }: ReaderProps) {
 
   // EPUB rendering
   useEffect(() => {
-    if (progressLoading || textMode || doc.file_format !== 'epub' || !doc.file_url || !epubViewerRef.current) return;
+    if (progressLoading || textMode || doc.file_format !== 'epub' || !fileUrl || !epubViewerRef.current) return;
 
     const container = epubViewerRef.current;
     let cancelled = false;
@@ -145,7 +149,7 @@ export function Reader({ document: doc, onBack }: ReaderProps) {
 
     const loadEpub = async () => {
       try {
-        const data = await fetchEpubFile(doc.file_url!);
+        const data = await fetchEpubFile(fileUrl);
 
         const ePub = (await import('epubjs')).default;
         if (cancelled) return;
@@ -196,7 +200,7 @@ export function Reader({ document: doc, onBack }: ReaderProps) {
       rendition?.destroy();
       book?.destroy();
     };
-  }, [doc.id, doc.file_url, doc.file_format, textMode, epubLoadAttempt, progressLoading, saveProgress]);
+  }, [doc.id, fileUrl, doc.file_format, textMode, epubLoadAttempt, progressLoading, saveProgress]);
 
   const turnEpubPage = useCallback(async (direction: 'previous' | 'next') => {
     const rendition = epubRenditionRef.current;
@@ -438,22 +442,38 @@ export function Reader({ document: doc, onBack }: ReaderProps) {
       )}
 
       {/* PDF Reader (pdfjs-dist canvas) */}
-      {!textMode && doc.file_format === 'pdf' && doc.file_url && !progressLoading && (
+      {!textMode && doc.file_format === 'pdf' && !progressLoading && (
         <div className="max-w-5xl mx-auto px-4 sm:px-6">
-          <PdfViewer
-            url={doc.file_url}
-            title={doc.title}
-            initialProgress={getProgress(doc.id)?.scroll_percent ?? 0}
-            onProgress={(percent) => saveProgress(doc.id, 0, percent)}
-          />
+          {fileUrl ? (
+            <PdfViewer
+              key={doc.id}
+              url={fileUrl}
+              title={doc.title}
+              initialProgress={getProgress(doc.id)?.scroll_percent ?? 0}
+              onProgress={(percent) => saveProgress(doc.id, 0, percent)}
+            />
+          ) : (
+            <p className="py-12 text-center text-sm text-stone-500">
+              {fileAccessError || (!doc.file_storage_path && !doc.file_url
+                ? 'The original document file is unavailable. Contact an administrator for help.'
+                : 'Preparing secure document access...')}
+            </p>
+          )}
         </div>
       )}
 
       {/* EPUB Reader (epub.js) */}
-      {!textMode && doc.file_format === 'epub' && doc.file_url && (
+      {!textMode && doc.file_format === 'epub' && (
         <div className="relative h-[calc(100vh-7rem)]">
-          <div ref={epubViewerRef} className="w-full h-full" />
-          {!epubLoading && !epubError && (
+          {fileUrl && <div ref={epubViewerRef} className="w-full h-full" />}
+          {!fileUrl && (
+            <p className="py-12 text-center text-sm text-stone-500">
+              {fileAccessError || (!doc.file_storage_path && !doc.file_url
+                ? 'The original document file is unavailable. Contact an administrator for help.'
+                : 'Preparing secure document access...')}
+            </p>
+          )}
+          {fileUrl && !epubLoading && !epubError && (
             <>
               <button
                 onClick={() => void turnEpubPage('previous')}

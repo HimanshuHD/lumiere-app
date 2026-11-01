@@ -3,6 +3,7 @@ import { ArrowLeft, ChevronLeft, ChevronRight, Clock, User, Hash, Search } from 
 import { Document } from '@/lib/supabase';
 import { ReadLaterButton } from '@/components/ReadLaterButton';
 import { useReadingProgress } from '@/hooks/useData';
+import { DocumentCover } from '@/components/DocumentCover';
 
 interface AllDocumentsProps {
   documents: Document[];
@@ -105,7 +106,7 @@ export function AllDocuments({ documents, loading, onOpenDoc, onBack }: AllDocum
                   >
                     <td className="px-4 py-3 max-w-xs">
                       <div className="flex items-center gap-3">
-                        <img src={doc.cover_url} alt="" className="w-8 h-11 object-cover rounded flex-shrink-0" />
+                        <DocumentCover document={doc} className="w-8 h-11 object-cover rounded flex-shrink-0" />
                         <div className="min-w-0 overflow-hidden">
                           <p className="text-sm font-medium text-stone-800 truncate group-hover:text-amber-700 transition-colors">{doc.title}</p>
                           <p className="text-xs text-stone-400 sm:hidden truncate">{doc.author}</p>

@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import {
   Upload,
   FileText,
@@ -26,12 +26,81 @@ const CATEGORIES = ['Fiction', 'Non-Fiction', 'Science', 'History', 'Technology'
 
 const ACCEPTED_FORMATS = '.pdf,.txt,.epub';
 
-async function extractPdfPageCount(file: File): Promise<number> {
-  const buffer = await file.arrayBuffer();
-  const bytes = new Uint8Array(buffer);
-  const text = new TextDecoder('latin1').decode(bytes);
-  const matches = text.match(/\/Type\s*\/Page[^s]/g);
-  return matches ? matches.length : 0;
+interface PdfDetails {
+  pageCount: number;
+  title: string;
+  author: string;
+  description: string;
+  cover: File | null;
+}
+
+async function extractPdfDetails(file: File): Promise<PdfDetails> {
+  const details: PdfDetails = {
+    pageCount: 0,
+    title: '',
+    author: '',
+    description: '',
+    cover: null,
+  };
+  let destroyPdf: (() => Promise<void>) | undefined;
+  const canvas = document.createElement('canvas');
+
+  try {
+    const pdfjsLib = await import('pdfjs-dist');
+    pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+      'pdfjs-dist/build/pdf.worker.min.mjs',
+      import.meta.url
+    ).toString();
+    const loadingTask = pdfjsLib.getDocument({ data: await file.arrayBuffer() });
+    const pdf = await loadingTask.promise;
+    destroyPdf = () => pdf.destroy();
+    details.pageCount = pdf.numPages;
+
+    try {
+      const { info } = await pdf.getMetadata();
+      const metadataInfo = info as Record<string, unknown>;
+      details.title = typeof metadataInfo.Title === 'string' ? metadataInfo.Title.trim() : '';
+      details.author = typeof metadataInfo.Author === 'string' ? metadataInfo.Author.trim() : '';
+      details.description = typeof metadataInfo.Subject === 'string' ? metadataInfo.Subject.trim() : '';
+    } catch {
+      // Some PDFs omit or contain unreadable metadata.
+    }
+
+    try {
+      const page = await pdf.getPage(1);
+      const initialViewport = page.getViewport({ scale: 1 });
+      const viewport = page.getViewport({ scale: Math.min(1.5, 480 / initialViewport.width) });
+      const context = canvas.getContext('2d');
+      if (!context) return details;
+
+      canvas.width = Math.ceil(viewport.width);
+      canvas.height = Math.ceil(viewport.height);
+      await page.render({ canvasContext: context, viewport }).promise;
+
+      const coverBlob = await new Promise<Blob | null>((resolve) =>
+        canvas.toBlob(resolve, 'image/jpeg', 0.84)
+      );
+      if (coverBlob) {
+        details.cover = new File([coverBlob], 'pdf-cover.jpg', { type: 'image/jpeg' });
+      }
+    } catch {
+      // The PDF may still have usable metadata even if its first page cannot be rendered.
+    }
+
+    return details;
+  } catch {
+    return details;
+  } finally {
+    canvas.width = 0;
+    canvas.height = 0;
+    if (destroyPdf) {
+      try {
+        await destroyPdf();
+      } catch {
+        // The extracted cover remains usable even if PDF cleanup fails.
+      }
+    }
+  }
 }
 
 function estimateTxtPageCount(file: File): Promise<number> {
@@ -43,7 +112,6 @@ function estimateTxtPageCount(file: File): Promise<number> {
 
 async function extractPageCount(file: File): Promise<number> {
   const ext = file.name.split('.').pop()?.toLowerCase();
-  if (ext === 'pdf') return extractPdfPageCount(file);
   if (ext === 'txt') return estimateTxtPageCount(file);
   return 0;
 }
@@ -53,7 +121,7 @@ function estimateReadingTime(pageCount: number): number {
   return Math.max(1, Math.round(pageCount / avgPagesPerMinute));
 }
 
-function textToChapters(text: string, title: string): { title: string; content: string }[] {
+function textToChapters(text: string): { title: string; content: string }[] {
   const normalized = text.replace(/\r\n/g, '\n');
   const sections = normalized.split(/\n{3,}/);
   if (sections.length <= 1) {
@@ -87,31 +155,68 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
   const [author, setAuthor] = useState('');
   const [category, setCategory] = useState('Fiction');
   const [summary, setSummary] = useState('');
+  const [visibility, setVisibility] = useState<'private' | 'shared'>('private');
   const [docFile, setDocFile] = useState<File | null>(null);
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
+  const [pdfCoverFile, setPdfCoverFile] = useState<File | null>(null);
+  const [pdfCoverPreview, setPdfCoverPreview] = useState<string | null>(null);
   const [pageCount, setPageCount] = useState<number | null>(null);
+  const [extractingPdfDetails, setExtractingPdfDetails] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const docInputRef = useRef<HTMLInputElement>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
+  const documentSelectionRef = useRef(0);
+
+  useEffect(() => {
+    return () => {
+      if (coverPreview) URL.revokeObjectURL(coverPreview);
+      if (pdfCoverPreview) URL.revokeObjectURL(pdfCoverPreview);
+    };
+  }, [coverPreview, pdfCoverPreview]);
 
   const handleDocSelect = useCallback(async (file: File) => {
+    const selection = documentSelectionRef.current + 1;
+    documentSelectionRef.current = selection;
     setDocFile(file);
     setError(null);
     setPageCount(null);
+    setExtractingPdfDetails(false);
+    setPdfCoverFile(null);
+    setPdfCoverPreview(null);
+
     try {
-      const count = await extractPageCount(file);
-      setPageCount(count);
-      if (!title) {
-        const baseName = file.name.replace(/\.[^.]+$/, '');
-        setTitle(baseName.replace(/[_-]/g, ' '));
+      const fileExtension = file.name.split('.').pop()?.toLowerCase();
+      if (fileExtension === 'pdf') {
+        setExtractingPdfDetails(true);
+        const details = await extractPdfDetails(file);
+        if (documentSelectionRef.current !== selection) return;
+        setPageCount(details.pageCount);
+        setPdfCoverFile(details.cover);
+        setPdfCoverPreview(details.cover ? URL.createObjectURL(details.cover) : null);
+        const filenameTitle = file.name.replace(/\.[^.]+$/, '').replace(/[_-]/g, ' ');
+        setTitle((current) => current.trim() ? current : details.title || filenameTitle);
+        if (details.author) setAuthor((current) => current.trim() ? current : details.author);
+        if (details.description) setSummary((current) => current.trim() ? current : details.description);
+      } else {
+        const count = await extractPageCount(file);
+        if (documentSelectionRef.current !== selection) return;
+        setPageCount(count);
+        const filenameTitle = file.name.replace(/\.[^.]+$/, '').replace(/[_-]/g, ' ');
+        setTitle((current) => current.trim() ? current : filenameTitle);
       }
     } catch {
-      setPageCount(0);
+      if (documentSelectionRef.current === selection) {
+        setPageCount(0);
+        const filenameTitle = file.name.replace(/\.[^.]+$/, '').replace(/[_-]/g, ' ');
+        setTitle((current) => current.trim() ? current : filenameTitle);
+      }
+    } finally {
+      if (documentSelectionRef.current === selection) setExtractingPdfDetails(false);
     }
-  }, [title]);
+  }, []);
 
   const handleCoverSelect = useCallback((file: File) => {
     setCoverFile(file);
@@ -131,15 +236,17 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
     if (file) handleCoverSelect(file);
   }, [handleCoverSelect]);
 
-  const canSubmit = title.trim() && author.trim() && docFile && coverFile && !uploading;
+  const canSubmit = title.trim() && author.trim() && docFile && !uploading && !extractingPdfDetails;
 
   const handleSubmit = async () => {
-    if (!user || !docFile || !coverFile || !title.trim() || !author.trim()) return;
+    if (!user || !docFile || !title.trim() || !author.trim()) return;
     setUploading(true);
     setError(null);
     setSuccess(false);
+    const uploadedPaths: string[] = [];
     try {
       const docExt = docFile.name.split('.').pop()?.toLowerCase();
+      const coverToUpload = coverFile || pdfCoverFile;
       const docId = crypto.randomUUID();
       const docPath = `${user.id}/${docId}.${docExt}`;
 
@@ -147,22 +254,23 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
         .from('documents')
         .upload(docPath, docFile);
       if (docUploadError) throw new Error(`Failed to upload document file: ${docUploadError.message}`);
+      uploadedPaths.push(docPath);
 
-      const { data: docUrlData } = supabase.storage.from('documents').getPublicUrl(docPath);
-
-      const coverExt = coverFile.name.split('.').pop()?.toLowerCase() || 'jpg';
-      const coverPath = `${user.id}/${docId}-cover.${coverExt}`;
-      const { error: coverUploadError } = await supabase.storage
-        .from('documents')
-        .upload(coverPath, coverFile);
-      if (coverUploadError) throw new Error(`Failed to upload cover image: ${coverUploadError.message}`);
-
-      const { data: coverUrlData } = supabase.storage.from('documents').getPublicUrl(coverPath);
+      let coverPath: string | null = null;
+      if (coverToUpload) {
+        const coverExt = coverToUpload.name.split('.').pop()?.toLowerCase() || 'jpg';
+        coverPath = `${user.id}/${docId}-cover.${coverExt}`;
+        const { error: coverUploadError } = await supabase.storage
+          .from('documents')
+          .upload(coverPath, coverToUpload);
+        if (coverUploadError) throw new Error(`Failed to upload cover image: ${coverUploadError.message}`);
+        uploadedPaths.push(coverPath);
+      }
 
       let chapters: { title: string; content: string }[] = [];
       if (docExt === 'txt') {
         const text = await docFile.text();
-        chapters = textToChapters(text, title);
+        chapters = textToChapters(text);
       } else {
         chapters = [{
           title: title,
@@ -180,12 +288,15 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
           author: author.trim(),
           category,
           summary: summary.trim() || 'No description provided.',
-          cover_url: coverUrlData.publicUrl,
+          cover_url: null,
+          cover_storage_path: coverPath,
           reading_time: readingTime,
           chapters: chapters as unknown as Record<string, unknown>[],
           is_featured: false,
           page_count: pages,
-          file_url: docUrlData.publicUrl,
+          origin: 'user_upload',
+          visibility,
+          file_storage_path: docPath,
           file_format: docExt,
           file_name: docFile.name,
         })
@@ -193,24 +304,37 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
         .single();
 
       if (insertError) throw new Error(`Failed to save document: ${insertError.message}`);
+      uploadedPaths.length = 0;
 
       setSuccess(true);
       setTitle('');
       setAuthor('');
       setSummary('');
       setCategory('Fiction');
+      setVisibility('private');
       setDocFile(null);
       setCoverFile(null);
       setCoverPreview(null);
+      setPdfCoverFile(null);
+      setPdfCoverPreview(null);
       setPageCount(null);
+      setExtractingPdfDetails(false);
 
       if (insertData) {
         onUploaded(insertData as Document);
       }
-      showToast('Document uploaded successfully! It is now available in the library.');
+      showToast(visibility === 'shared'
+        ? 'Document uploaded and shared with signed-in Lumiere users.'
+        : 'Document uploaded privately. Only you can access it.');
       setTimeout(() => setSuccess(false), 4000);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'An unexpected error occurred during upload.';
+      let msg = err instanceof Error ? err.message : 'An unexpected error occurred during upload.';
+      if (uploadedPaths.length > 0) {
+        const { error: cleanupError } = await supabase.storage.from('documents').remove(uploadedPaths);
+        if (cleanupError) {
+          msg = `${msg}. Uploaded file cleanup failed: ${cleanupError.message}`;
+        }
+      }
       setError(msg);
       showToast(msg, 'error');
     } finally {
@@ -219,14 +343,19 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
   };
 
   const resetForm = () => {
+    documentSelectionRef.current += 1;
     setTitle('');
     setAuthor('');
     setSummary('');
     setCategory('Fiction');
+    setVisibility('private');
     setDocFile(null);
     setCoverFile(null);
     setCoverPreview(null);
+    setPdfCoverFile(null);
+    setPdfCoverPreview(null);
     setPageCount(null);
+    setExtractingPdfDetails(false);
     setError(null);
     setSuccess(false);
   };
@@ -301,7 +430,14 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
             </div>
             {docFile && (
               <button
-                onClick={() => { setDocFile(null); setPageCount(null); }}
+                onClick={() => {
+                  documentSelectionRef.current += 1;
+                  setDocFile(null);
+                  setPageCount(null);
+                  setPdfCoverFile(null);
+                  setPdfCoverPreview(null);
+                  setExtractingPdfDetails(false);
+                }}
                 className="mt-2 text-xs text-stone-500 hover:text-red-500 transition-colors flex items-center gap-1"
               >
                 <X className="w-3 h-3" /> Remove file
@@ -312,7 +448,7 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
           <div>
             <label className="flex items-center gap-2 text-sm font-medium text-stone-700 mb-2">
               <ImageIcon className="w-4 h-4 text-stone-400" />
-              Book Cover <span className="text-red-500">*</span>
+              Book Cover <span className="text-xs font-normal text-stone-400">(optional)</span>
             </label>
             <div
               onDragOver={(e) => e.preventDefault()}
@@ -337,13 +473,50 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
                     <X className="w-3.5 h-3.5" />
                   </button>
                 </div>
+              ) : extractingPdfDetails && docFile?.name.toLowerCase().endsWith('.pdf') ? (
+                <div className="space-y-2">
+                  <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-amber-100 mb-2">
+                    <Loader2 className="w-6 h-6 text-amber-700 animate-spin" />
+                  </div>
+                  <p className="text-sm text-stone-600">Reading PDF metadata and extracting cover…</p>
+                  <p className="text-xs text-stone-400">You can still upload a different cover image.</p>
+                </div>
+              ) : pdfCoverPreview ? (
+                <>
+                  <img
+                    src={pdfCoverPreview}
+                    alt=""
+                    aria-hidden="true"
+                    className="absolute inset-0 h-full w-full object-cover rounded-lg"
+                  />
+                  <div className="absolute inset-0 bg-stone-950/55 rounded-lg" />
+                  <div className="relative z-10 space-y-2">
+                    <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-white/15 mb-2">
+                      <ImageIcon className="w-6 h-6 text-white" />
+                    </div>
+                    <p className="text-sm font-medium text-white">First page extracted from PDF</p>
+                    <p className="text-xs text-stone-100">Click or drag a cover image here to replace it</p>
+                  </div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setPdfCoverFile(null);
+                      setPdfCoverPreview(null);
+                    }}
+                    aria-label="Remove extracted PDF cover"
+                    className="absolute top-2 right-2 z-20 w-6 h-6 rounded-full bg-red-500 text-white flex items-center justify-center shadow-md hover:bg-red-600 transition-colors"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </>
               ) : (
                 <div className="space-y-2">
                   <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-stone-100 group-hover:bg-amber-100 transition-colors mb-2">
                     <ImageIcon className="w-6 h-6 text-stone-400 group-hover:text-amber-600 transition-colors" />
                   </div>
-                  <p className="text-sm text-stone-600">Click or drag to upload cover image</p>
+                  <p className="text-sm text-stone-600">Click or drag to upload a cover image</p>
                   <p className="text-xs text-stone-400">JPG, PNG, or WebP</p>
+                  <p className="text-xs text-stone-500">Without one, we’ll use the first page of a PDF when possible, or show the Lumiere fallback cover.</p>
                 </div>
               )}
             </div>
@@ -414,6 +587,40 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
               className="w-full px-4 py-2.5 bg-white border border-stone-200 rounded-lg text-sm text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-600/30 focus:border-amber-600/40 transition-all resize-none"
             />
           </div>
+
+          <fieldset>
+            <legend className="text-sm font-medium text-stone-700 mb-2">Who can access this document?</legend>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <label className="flex items-start gap-3 p-3 border border-stone-200 rounded-lg cursor-pointer flex-1">
+                <input
+                  type="radio"
+                  name="document-visibility"
+                  value="private"
+                  checked={visibility === 'private'}
+                  onChange={() => setVisibility('private')}
+                  className="mt-1 accent-amber-600"
+                />
+                <span>
+                  <span className="block text-sm font-medium text-stone-800">Private</span>
+                  <span className="block text-xs text-stone-500">Only you can view this document and its files.</span>
+                </span>
+              </label>
+              <label className="flex items-start gap-3 p-3 border border-stone-200 rounded-lg cursor-pointer flex-1">
+                <input
+                  type="radio"
+                  name="document-visibility"
+                  value="shared"
+                  checked={visibility === 'shared'}
+                  onChange={() => setVisibility('shared')}
+                  className="mt-1 accent-amber-600"
+                />
+                <span>
+                  <span className="block text-sm font-medium text-stone-800">Shared</span>
+                  <span className="block text-xs text-stone-500">Any signed-in Lumiere user can view and download it.</span>
+                </span>
+              </label>
+            </div>
+          </fieldset>
 
           {/* Auto-detected info */}
           {pageCount !== null && pageCount > 0 && (

@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { ChevronLeft, ChevronRight, Loader2, ZoomIn, ZoomOut } from 'lucide-react';
+import type { PDFDocumentProxy } from 'pdfjs-dist/types/src/display/api';
 
 interface PdfViewerProps {
   url: string;
@@ -11,9 +12,11 @@ interface PdfViewerProps {
 export function PdfViewer({ url, title, initialProgress = 0, onProgress }: PdfViewerProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const pdfDocRef = useRef<any>(null);
+  const pdfDocRef = useRef<PDFDocumentProxy | null>(null);
   const onProgressRef = useRef(onProgress);
   const initialProgressRef = useRef(initialProgress);
+  const currentPageRef = useRef(1);
+  const hasLoadedPdfRef = useRef(false);
   const [pageNum, setPageNum] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
   const [scale, setScale] = useState(1.2);
@@ -45,10 +48,15 @@ export function PdfViewer({ url, title, initialProgress = 0, onProgress }: PdfVi
         if (cancelled) return;
         pdfDocRef.current = pdf;
         setTotalPages(pdf.numPages);
+        const boundedCurrentPage = Math.min(Math.max(1, currentPageRef.current), pdf.numPages);
         const boundedProgress = Math.min(1, Math.max(0, initialProgressRef.current));
-        const restoredPage = pdf.numPages === 1
-          ? 1
-          : Math.round(boundedProgress * (pdf.numPages - 1)) + 1;
+        const restoredPage = hasLoadedPdfRef.current
+          ? boundedCurrentPage
+          : pdf.numPages === 1
+            ? 1
+            : Math.round(boundedProgress * (pdf.numPages - 1)) + 1;
+        hasLoadedPdfRef.current = true;
+        currentPageRef.current = restoredPage;
         setPageNum(restoredPage);
         setLoading(false);
       } catch (err) {
@@ -105,6 +113,10 @@ export function PdfViewer({ url, title, initialProgress = 0, onProgress }: PdfVi
     }
   }, [pageNum, scale, loading, totalPages, renderPage]);
 
+  useEffect(() => {
+    currentPageRef.current = pageNum;
+  }, [pageNum]);
+
   // Fit scale to container width on initial load
   useEffect(() => {
     if (!loading && containerRef.current && totalPages > 0) {
@@ -117,6 +129,7 @@ export function PdfViewer({ url, title, initialProgress = 0, onProgress }: PdfVi
 
   const goToPage = (n: number) => {
     if (n < 1 || n > totalPages || rendering) return;
+    currentPageRef.current = n;
     setPageNum(n);
   };
 
