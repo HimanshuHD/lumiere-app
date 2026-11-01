@@ -1,0 +1,11 @@
+# Supabase
+.branches
+.temp
+
+# OAuth provider credentials
+.env
+
+# dotenvx
+.env.keys
+.env.local
+.env.*.local
