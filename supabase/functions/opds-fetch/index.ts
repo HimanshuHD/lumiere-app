@@ -2,7 +2,7 @@ import { XMLParser, XMLValidator } from "npm:fast-xml-parser@4.5.3";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import {
   MAX_BOOK_DOWNLOAD_BYTES,
-  MAX_REDIRECTS,
+  fetchWithValidatedRedirects,
   validateOutboundUrl,
 } from "./security.ts";
 
@@ -111,30 +111,19 @@ async function importCatalogBook(req: Request): Promise<Response> {
     return fail("Only verified Project Gutenberg catalog entries can be imported.", 400);
   }
 
-  let feedResponse: Response | null = null;
-  for (let redirectCount = 0; redirectCount <= MAX_REDIRECTS; redirectCount += 1) {
-    feedResponse = await fetch(catalogUrl, {
+  let feedResult;
+  try {
+    feedResult = await fetchWithValidatedRedirects(catalogUrl, {
       headers: {
         "Accept": "application/atom+xml, application/xml, text/xml",
         "User-Agent": "Lumiere/1.0 OPDS Reader",
       },
-      redirect: "manual",
-    });
-    if (![301, 302, 303, 307, 308].includes(feedResponse.status)) break;
-    const location = feedResponse.headers.get("Location");
-    if (!location || redirectCount === MAX_REDIRECTS) {
-      return fail("The Project Gutenberg catalog redirected too many times.", 502);
-    }
-    try {
-      catalogUrl = new URL(location, catalogUrl);
-    } catch {
-      return fail("Project Gutenberg returned an invalid catalog redirect.", 502);
-    }
-    if (!isAllowedUrl(catalogUrl)) {
-      return fail("The catalog redirected outside the approved Project Gutenberg domains.", 502);
-    }
+    }, { isAllowedUrl });
+  } catch {
+    return fail("Could not safely fetch the Project Gutenberg catalog.", 502);
   }
-  if (!feedResponse) return fail("Could not load the Project Gutenberg catalog.", 502);
+  catalogUrl = feedResult.url;
+  const feedResponse = feedResult.response;
   if (!feedResponse.ok) return fail("Could not verify the catalog entry with Project Gutenberg.", 502);
 
   const feedText = await feedResponse.text();
@@ -204,30 +193,20 @@ async function importCatalogBook(req: Request): Promise<Response> {
     .maybeSingle();
   if (legacyLookupError) return fail(`Could not check legacy catalog records: ${legacyLookupError.message}`, 500);
 
-  let fileResponse: Response | null = null;
-  for (let redirectCount = 0; redirectCount <= 5; redirectCount += 1) {
-    fileResponse = await fetch(downloadUrl, {
+  let fileResult;
+  try {
+    fileResult = await fetchWithValidatedRedirects(downloadUrl, {
       headers: {
         "Accept": "application/epub+zip, application/pdf, application/octet-stream",
         "User-Agent": "Lumiere/1.0 OPDS Reader",
       },
-      redirect: "manual",
-    });
-    if (![301, 302, 303, 307, 308].includes(fileResponse.status)) break;
-    const location = fileResponse.headers.get("Location");
-    if (!location || redirectCount === 5) {
-      return fail("The book download redirected too many times.", 502);
-    }
-    try {
-      downloadUrl = new URL(location, downloadUrl);
-    } catch {
-      return fail("The book source returned an invalid redirect.", 502);
-    }
-    if (!isAllowedUrl(downloadUrl)) {
-      return fail("The book download redirected outside the approved source.", 502);
-    }
+    }, { isAllowedUrl });
+  } catch {
+    return fail("Could not safely fetch the Project Gutenberg book.", 502);
   }
-  if (!fileResponse?.ok) return fail(`Project Gutenberg returned status ${fileResponse?.status ?? 502}.`, 502);
+  downloadUrl = fileResult.url;
+  const fileResponse = fileResult.response;
+  if (!fileResponse.ok) return fail(`Project Gutenberg returned status ${fileResponse.status}.`, 502);
 
   const maxFileSize = MAX_BOOK_DOWNLOAD_BYTES;
   const declaredSize = Number(fileResponse.headers.get("Content-Length") || 0);
@@ -453,29 +432,22 @@ Deno.serve(async (req: Request) => {
         return errorResponse("Downloads are only supported from known OPDS catalog hosts", 400);
       }
 
-      let fileResponse: Response | null = null;
-      for (let redirectCount = 0; redirectCount <= MAX_REDIRECTS; redirectCount += 1) {
-        fileResponse = await fetch(currentUrl, {
+      let fileResult;
+      try {
+        fileResult = await fetchWithValidatedRedirects(currentUrl, {
           headers: {
             "Accept": "application/epub+zip, application/pdf, application/octet-stream, */*",
             "User-Agent": "Lumiere/1.0 OPDS Reader",
           },
-          redirect: "manual",
-        });
-        if (![301, 302, 303, 307, 308].includes(fileResponse.status)) break;
-        const location = fileResponse.headers.get("Location");
-        if (!location || redirectCount === MAX_REDIRECTS) {
-          return errorResponse("Book download redirected too many times", 502);
-        }
-        const nextUrl = new URL(location, currentUrl);
-        if (!isAllowedHost(nextUrl)) {
-          return errorResponse("Book download redirected to an unsupported host", 502);
-        }
-        currentUrl = nextUrl;
+        }, { isAllowedUrl: isAllowedHost });
+      } catch {
+        return errorResponse("Could not safely fetch the book download.", 502);
       }
+      currentUrl = fileResult.url;
+      const fileResponse = fileResult.response;
 
-      if (!fileResponse?.ok) {
-        return errorResponse(`Book source returned status ${fileResponse?.status ?? 502}`, 502);
+      if (!fileResponse.ok) {
+        return errorResponse(`Book source returned status ${fileResponse.status}`, 502);
       }
 
       const maxFileSize = MAX_BOOK_DOWNLOAD_BYTES;
@@ -550,12 +522,21 @@ Deno.serve(async (req: Request) => {
     }
     const parsedFeedUrl = validation.url;
 
-    const response = await fetch(parsedFeedUrl, {
+    let feedResult;
+    try {
+      feedResult = await fetchWithValidatedRedirects(parsedFeedUrl, {
       headers: {
         "Accept": "application/atom+xml, application/xml, text/xml, */*",
         "User-Agent": "Lumiere/1.0 OPDS Reader",
       },
-    });
+      });
+    } catch {
+      return new Response(
+        JSON.stringify({ error: "Could not safely fetch the catalog feed." }),
+        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+    const response = feedResult.response;
 
     if (!response.ok) {
       return new Response(
@@ -564,7 +545,7 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const baseFeedUrl = response.url || feedUrl;
+    const baseFeedUrl = feedResult.url.toString();
     const xmlText = await response.text();
     const validation = XMLValidator.validate(xmlText);
     if (validation !== true) {
