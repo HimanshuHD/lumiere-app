@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import type { Document } from '@/lib/supabase';
 import { useDocumentStorageUrl } from '@/hooks/useDocumentStorageUrl';
+import { useAuth } from '@/context/AuthContext';
+import { isDocumentLockedForUser } from '@/lib/documentAccess';
 
 const FALLBACK_COVER_URL = '/lumiere-book-cover.svg?v=2';
 
@@ -9,7 +11,12 @@ export function DocumentCover({ document, className, alt = '' }: {
   className?: string;
   alt?: string;
 }) {
-  const { url } = useDocumentStorageUrl(document.cover_storage_path, document.cover_url);
+  const { user } = useAuth();
+  const { url } = useDocumentStorageUrl(
+    document.cover_storage_path,
+    document.cover_url,
+    !isDocumentLockedForUser(document, user?.id),
+  );
   const [failedUrl, setFailedUrl] = useState<string | null>(null);
 
   const showingFallback = !url || failedUrl === url;

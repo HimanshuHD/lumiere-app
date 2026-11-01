@@ -1,10 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
-import { FileEdit, Trash2, X, Loader2, BookOpen, Download, Pencil, Save } from 'lucide-react';
+import { AlertTriangle, FileEdit, Trash2, X, Loader2, BookOpen, Download, Pencil, Save } from 'lucide-react';
 import { supabase, Document } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import { DocumentCover } from '@/components/DocumentCover';
 import { DocumentFileLink } from '@/components/DocumentFileLink';
+import { supabaseDocumentLifecycleDependencies } from '@/services/supabaseDocumentLifecycle';
+import { getUserDocumentDeletionImpact, deleteOwnedUserDocument, type UserDocumentDeletionImpact } from '@/services/userDocumentDeletion';
+import { supabaseUserDocumentDeletionStore } from '@/services/supabaseUserDocumentDeletion';
 
 const CATEGORIES = ['Fiction', 'Non-Fiction', 'Science', 'History', 'Technology', 'Philosophy', 'Adventure'];
 
@@ -15,6 +18,9 @@ export function MyUploads() {
   const [loading, setLoading] = useState(true);
   const [editDoc, setEditDoc] = useState<Document | null>(null);
   const [deleteDoc, setDeleteDoc] = useState<Document | null>(null);
+  const [deletionImpact, setDeletionImpact] = useState<UserDocumentDeletionImpact | null>(null);
+  const [deletionImpactError, setDeletionImpactError] = useState<string | null>(null);
+  const [loadingDeletionImpact, setLoadingDeletionImpact] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
   const fetchMyUploads = useCallback(async () => {
@@ -36,25 +42,40 @@ export function MyUploads() {
     fetchMyUploads();
   }, [fetchMyUploads]);
 
+  const prepareDelete = async (document: Document) => {
+    setDeleteDoc(document);
+    setDeletionImpact(null);
+    setDeletionImpactError(null);
+    setLoadingDeletionImpact(true);
+    try {
+      const impact = await getUserDocumentDeletionImpact(supabaseUserDocumentDeletionStore, document.id);
+      setDeletionImpact(impact);
+    } catch (error) {
+      setDeletionImpactError(error instanceof Error ? error.message : 'Could not load deletion details.');
+    } finally {
+      setLoadingDeletionImpact(false);
+    }
+  };
+
   const handleDelete = async () => {
-    if (!deleteDoc) return;
+    if (!deleteDoc || !user) return;
     setDeleting(true);
     try {
-      const { error } = await supabase.from('documents').delete().eq('id', deleteDoc.id);
-      if (error) throw new Error(error.message);
-
+      const result = await deleteOwnedUserDocument(
+        supabaseUserDocumentDeletionStore,
+        supabaseDocumentLifecycleDependencies,
+        user.id,
+        deleteDoc.id,
+      );
       setDocs((prev) => prev.filter((d) => d.id !== deleteDoc.id));
       setDeleteDoc(null);
-      const storagePaths = [deleteDoc.file_storage_path, deleteDoc.cover_storage_path]
-        .filter((path): path is string => Boolean(path));
-      if (storagePaths.length > 0) {
-        const { error: storageError } = await supabase.storage.from('documents').remove(storagePaths);
-        if (storageError) {
-          throw new Error(`Document deleted, but its storage files could not be removed: ${storageError.message}`);
-        }
+      if (result.cleanup.status === 'pending') {
+        const detail = result.cleanup.error
+          ?? `${result.cleanup.recovery?.pending ?? 0} storage file(s) remain queued for cleanup.`;
+        showToast(`Document and its references were deleted, but storage cleanup is pending. ${detail}`, 'error');
+      } else {
+        showToast('Document and its references were deleted permanently.');
       }
-
-      showToast('Document deleted successfully.');
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Failed to delete document.', 'error');
     } finally {
@@ -140,7 +161,7 @@ export function MyUploads() {
                         <Pencil className="w-4 h-4" />
                       </button>
                       <button
-                        onClick={() => setDeleteDoc(doc)}
+                        onClick={() => void prepareDelete(doc)}
                         className="p-2 rounded-lg text-stone-500 hover:text-red-600 hover:bg-red-50 transition-colors"
                         title="Delete"
                       >
@@ -169,10 +190,10 @@ export function MyUploads() {
 
       {/* Delete confirmation */}
       {deleteDoc && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setDeleteDoc(null)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => !deleting && setDeleteDoc(null)}>
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
           <div className="relative bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6" onClick={(e) => e.stopPropagation()}>
-            <button onClick={() => setDeleteDoc(null)} className="absolute top-4 right-4 w-8 h-8 rounded-full bg-stone-100 hover:bg-stone-200 flex items-center justify-center transition-colors">
+            <button onClick={() => !deleting && setDeleteDoc(null)} className="absolute top-4 right-4 w-8 h-8 rounded-full bg-stone-100 hover:bg-stone-200 flex items-center justify-center transition-colors">
               <X className="w-4 h-4 text-stone-500" />
             </button>
             <div className="flex items-center gap-3 mb-4">
@@ -182,18 +203,46 @@ export function MyUploads() {
               <h3 className="text-lg font-serif font-bold text-stone-800">Delete Document?</h3>
             </div>
             <p className="text-sm text-stone-500 mb-6">
-              Are you sure you want to delete <span className="font-medium text-stone-700">"{deleteDoc.title}"</span>? This action cannot be undone.
+              Deleting <span className="font-medium text-stone-700">"{deleteDoc.title}"</span> permanently removes the document and all user bookmarks, reading progress, and Read Later references. This action is irreversible.
             </p>
+            {loadingDeletionImpact ? (
+              <div className="flex items-center gap-2 text-sm text-stone-500 mb-6">
+                <Loader2 className="h-4 w-4 animate-spin" /> Checking who will be affected...
+              </div>
+            ) : deletionImpactError ? (
+              <div className="mb-6 space-y-3">
+                <p className="text-sm text-red-700">{deletionImpactError}</p>
+                <button
+                  onClick={() => void prepareDelete(deleteDoc)}
+                  className="text-sm font-medium text-amber-700 hover:text-amber-800"
+                >
+                  Retry impact check
+                </button>
+              </div>
+            ) : deletionImpact && (
+              <div className="mb-6 rounded-lg border border-red-100 bg-red-50 p-3">
+                <p className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-red-800">
+                  <AlertTriangle className="h-4 w-4" /> Distinct affected users by reference type
+                </p>
+                <ul className="space-y-1 text-sm text-red-800">
+                  <li>{deletionImpact.bookmarkUsers} bookmarked</li>
+                  <li>{deletionImpact.readingUsers} have reading progress</li>
+                  <li>{deletionImpact.readingListUsers} saved it to Read Later</li>
+                </ul>
+                <p className="mt-2 text-xs text-red-700">A user may appear in more than one count.</p>
+              </div>
+            )}
             <div className="flex items-center gap-3 justify-end">
               <button
-                onClick={() => setDeleteDoc(null)}
+                onClick={() => !deleting && setDeleteDoc(null)}
+                disabled={deleting}
                 className="px-4 py-2 text-sm font-medium text-stone-600 bg-white border border-stone-200 rounded-lg hover:bg-stone-50 transition-all"
               >
                 Cancel
               </button>
               <button
                 onClick={handleDelete}
-                disabled={deleting}
+                disabled={deleting || loadingDeletionImpact || !deletionImpact}
                 className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-500 rounded-lg transition-all disabled:opacity-50"
               >
                 {deleting ? (
@@ -218,8 +267,13 @@ function EditDocumentModal({ doc, onClose, onSaved }: { doc: Document; onClose: 
   const [summary, setSummary] = useState(doc.summary);
   const [visibility, setVisibility] = useState(doc.visibility);
   const [saving, setSaving] = useState(false);
+  const [confirmPrivate, setConfirmPrivate] = useState(false);
 
-  const handleSave = async () => {
+  const handleSave = async (visibilityConfirmed = false) => {
+    if (doc.visibility === 'shared' && visibility === 'private' && !visibilityConfirmed) {
+      setConfirmPrivate(true);
+      return;
+    }
     setSaving(true);
     try {
       const { data, error } = await supabase
@@ -238,7 +292,7 @@ function EditDocumentModal({ doc, onClose, onSaved }: { doc: Document; onClose: 
       showToast(visibility === doc.visibility
         ? 'Document updated successfully.'
         : visibility === 'private'
-          ? 'Document is private now. New access links will be blocked; existing links expire within 15 minutes.'
+          ? 'Document is private now. Other users can still see their saved reference, but cannot open the document.'
           : 'Document is shared with signed-in Lumiere users.');
       onSaved(data as Document);
     } catch (err) {
@@ -277,6 +331,36 @@ function EditDocumentModal({ doc, onClose, onSaved }: { doc: Document; onClose: 
                 </DocumentFileLink>
               )}
             </div>
+            {confirmPrivate && (
+              <div className="absolute inset-0 z-10 flex items-center justify-center rounded-2xl bg-black/40 p-5">
+                <div className="w-full rounded-xl bg-white p-5 shadow-xl">
+                  <div className="mb-3 flex items-center gap-2 text-amber-800">
+                    <AlertTriangle className="h-5 w-5" />
+                    <h4 className="font-semibold">Make this document private?</h4>
+                  </div>
+                  <p className="mb-5 text-sm leading-relaxed text-stone-600">
+                    Other users will lose access to the file. Their bookmarks, reading progress, and Read Later references will remain, and the document will appear locked in their lists.
+                  </p>
+                  <div className="flex justify-end gap-3">
+                    <button
+                      onClick={() => setConfirmPrivate(false)}
+                      disabled={saving}
+                      className="rounded-lg border border-stone-200 px-4 py-2 text-sm font-medium text-stone-600 hover:bg-stone-50 disabled:opacity-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => void handleSave(true)}
+                      disabled={saving}
+                      className="inline-flex items-center gap-2 rounded-lg bg-amber-700 px-4 py-2 text-sm font-medium text-white hover:bg-amber-800 disabled:opacity-50"
+                    >
+                      {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+                      Make Private
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
           <div>
             <label className="block text-xs font-medium text-stone-500 mb-1.5">Title</label>
@@ -298,7 +382,7 @@ function EditDocumentModal({ doc, onClose, onSaved }: { doc: Document; onClose: 
               <option value="shared">Shared — all signed-in users can access it</option>
             </select>
             <p className="text-xs text-stone-400 mt-1.5">
-              Changing to Private blocks new access, but downloaded copies and already-issued links remain usable until they expire.
+              Private documents are available only to you. Other users may still see a locked entry when they have saved a reference; already-issued download links remain usable until they expire.
             </p>
           </div>
           <div>
@@ -345,7 +429,7 @@ function EditDocumentModal({ doc, onClose, onSaved }: { doc: Document; onClose: 
               Cancel
             </button>
             <button
-              onClick={handleSave}
+              onClick={() => void handleSave()}
               disabled={saving || !title.trim() || !author.trim()}
               className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-white bg-amber-600 hover:bg-amber-500 rounded-lg transition-all disabled:opacity-50 shadow-lg shadow-amber-600/20"
             >

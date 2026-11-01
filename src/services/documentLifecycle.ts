@@ -11,7 +11,8 @@ export type UserUploadStage =
   | 'document-upload'
   | 'cover-upload'
   | 'document-insert'
-  | 'reconciliation';
+  | 'reconciliation'
+  | 'document-delete';
 
 export type UserDocumentMetadata = Pick<
   Document,
@@ -139,8 +140,12 @@ function getRecoveryRecord(
 export async function recoverPendingUserUploadFiles(
   dependencies: DocumentLifecycleDependencies,
   userId: string,
+  operationId?: string,
 ): Promise<UserUploadRecoveryResult> {
-  const pendingRecords = await dependencies.database.listPendingRecoveryRecords(userId);
+  const allPendingRecords = await dependencies.database.listPendingRecoveryRecords(userId);
+  const pendingRecords = operationId
+    ? allPendingRecords.filter((record) => record.operationId === operationId)
+    : allPendingRecords;
   let recovered = 0;
   let pending = 0;
 

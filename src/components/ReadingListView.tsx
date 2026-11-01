@@ -3,6 +3,9 @@ import { Document } from '@/lib/supabase';
 import { useReadingList } from '@/hooks/useData';
 import { ReadLaterButton } from '@/components/ReadLaterButton';
 import { DocumentCover } from '@/components/DocumentCover';
+import { useAuth } from '@/context/AuthContext';
+import { DocumentAccessNotice } from '@/components/DocumentAccessNotice';
+import { isDocumentLockedForUser } from '@/lib/documentAccess';
 
 interface ReadingListViewProps {
   onOpenDoc: (doc: Document) => void;
@@ -10,6 +13,7 @@ interface ReadingListViewProps {
 
 export function ReadingListView({ onOpenDoc }: ReadingListViewProps) {
   const { readingList, loading } = useReadingList();
+  const { user } = useAuth();
 
   if (loading) {
     return (
@@ -48,25 +52,28 @@ export function ReadingListView({ onOpenDoc }: ReadingListViewProps) {
           {readingList.map((item) => {
             const doc = item.document;
             if (!doc) return null;
+            const locked = isDocumentLockedForUser(doc, user?.id);
             return (
               <div key={item.id} className="group">
                 <div
-                  onClick={() => onOpenDoc(doc)}
-                  className="relative aspect-[3/4] rounded-xl overflow-hidden mb-3 shadow-md group-hover:shadow-xl transition-all cursor-pointer"
+                  onClick={() => !locked && onOpenDoc(doc)}
+                  aria-disabled={locked}
+                  className={`relative aspect-[3/4] rounded-xl overflow-hidden mb-3 shadow-md group-hover:shadow-xl transition-all ${locked ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
                 >
                   <DocumentCover
                     document={doc}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
+                  {locked && <DocumentAccessNotice overlay />}
                   <div className="absolute top-2 right-2 w-7 h-7 rounded-full bg-white/90 flex items-center justify-center shadow-md">
                     <Clock className="w-3.5 h-3.5 text-amber-600" />
                   </div>
-                  <div className="absolute bottom-3 left-3 right-3 opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 transition-all">
+                  {!locked && <div className="absolute bottom-3 left-3 right-3 opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 transition-all">
                     <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/95 text-stone-900 text-xs font-medium rounded-lg shadow-lg">
                       Start Reading
                     </span>
-                  </div>
+                  </div>}
                 </div>
                 <h3 className="font-serif font-semibold text-stone-800 text-sm leading-snug line-clamp-2 group-hover:text-amber-700 transition-colors">
                   {doc.title}
