@@ -2,7 +2,11 @@ import { XMLParser, XMLValidator } from "npm:fast-xml-parser@4.5.3";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import {
   MAX_BOOK_DOWNLOAD_BYTES,
+  MAX_FEED_RESPONSE_BYTES,
+  OutboundResponseError,
   fetchWithValidatedRedirects,
+  readResponseBytes,
+  readResponseText,
   validateOutboundUrl,
 } from "./security.ts";
 
@@ -119,14 +123,28 @@ async function importCatalogBook(req: Request): Promise<Response> {
         "User-Agent": "Lumiere/1.0 OPDS Reader",
       },
     }, { isAllowedUrl });
-  } catch {
+  } catch (error) {
+    if (error instanceof OutboundResponseError && error.reason === "timeout") {
+      return fail("The Project Gutenberg catalog request timed out.", 504);
+    }
     return fail("Could not safely fetch the Project Gutenberg catalog.", 502);
   }
   catalogUrl = feedResult.url;
   const feedResponse = feedResult.response;
   if (!feedResponse.ok) return fail("Could not verify the catalog entry with Project Gutenberg.", 502);
 
-  const feedText = await feedResponse.text();
+  let feedText: string;
+  try {
+    feedText = await readResponseText(feedResponse);
+  } catch (error) {
+    if (error instanceof OutboundResponseError && error.reason === "too_large") {
+      return fail("Catalog feeds must be smaller than 2 MiB.", 413);
+    }
+    if (error instanceof OutboundResponseError && error.reason === "timeout") {
+      return fail("The Project Gutenberg catalog request timed out.", 504);
+    }
+    return fail("Could not read the Project Gutenberg catalog feed.", 502);
+  }
   const validation = XMLValidator.validate(feedText);
   if (validation !== true) return fail("Project Gutenberg returned an invalid catalog feed.", 502);
 
@@ -201,38 +219,29 @@ async function importCatalogBook(req: Request): Promise<Response> {
         "User-Agent": "Lumiere/1.0 OPDS Reader",
       },
     }, { isAllowedUrl });
-  } catch {
+  } catch (error) {
+    if (error instanceof OutboundResponseError && error.reason === "timeout") {
+      return fail("The Project Gutenberg book download timed out.", 504);
+    }
     return fail("Could not safely fetch the Project Gutenberg book.", 502);
   }
   downloadUrl = fileResult.url;
   const fileResponse = fileResult.response;
   if (!fileResponse.ok) return fail(`Project Gutenberg returned status ${fileResponse.status}.`, 502);
 
-  const maxFileSize = MAX_BOOK_DOWNLOAD_BYTES;
-  const declaredSize = Number(fileResponse.headers.get("Content-Length") || 0);
-  if (declaredSize > maxFileSize) return fail("Book files must be smaller than 30 MB.", 413);
-  const reader = fileResponse.body?.getReader();
-  if (!reader) return fail("The catalog returned an empty book file.", 502);
-  const chunks: Uint8Array[] = [];
-  let totalBytes = 0;
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    totalBytes += value.byteLength;
-    if (totalBytes > maxFileSize) {
-      await reader.cancel();
+  let bytes: Uint8Array;
+  try {
+    bytes = await readResponseBytes(fileResponse, MAX_BOOK_DOWNLOAD_BYTES);
+  } catch (error) {
+    if (error instanceof OutboundResponseError && error.reason === "too_large") {
       return fail("Book files must be smaller than 30 MB.", 413);
     }
-    chunks.push(value);
+    if (error instanceof OutboundResponseError && error.reason === "timeout") {
+      return fail("The Project Gutenberg book download timed out.", 504);
+    }
+    return fail("Could not read the Project Gutenberg book file.", 502);
   }
-  if (totalBytes === 0) return fail("The catalog returned an empty book file.", 502);
-
-  const bytes = new Uint8Array(totalBytes);
-  let offset = 0;
-  for (const chunk of chunks) {
-    bytes.set(chunk, offset);
-    offset += chunk.length;
-  }
+  if (bytes.length === 0) return fail("The catalog returned an empty book file.", 502);
   const isEpub = bytes[0] === 0x50 && bytes[1] === 0x4b;
   const isPdf = bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46;
   if ((format === "epub" && !isEpub) || (format === "pdf" && !isPdf)) {
@@ -440,7 +449,10 @@ Deno.serve(async (req: Request) => {
             "User-Agent": "Lumiere/1.0 OPDS Reader",
           },
         }, { isAllowedUrl: isAllowedHost });
-      } catch {
+      } catch (error) {
+        if (error instanceof OutboundResponseError && error.reason === "timeout") {
+          return errorResponse("The book download timed out.", 504);
+        }
         return errorResponse("Could not safely fetch the book download.", 502);
       }
       currentUrl = fileResult.url;
@@ -450,32 +462,19 @@ Deno.serve(async (req: Request) => {
         return errorResponse(`Book source returned status ${fileResponse.status}`, 502);
       }
 
-      const maxFileSize = MAX_BOOK_DOWNLOAD_BYTES;
-      const contentLength = Number(fileResponse.headers.get("Content-Length") || 0);
-      if (contentLength > maxFileSize) {
-        return errorResponse("Book files must be smaller than 30 MB", 413);
-      }
-      const reader = fileResponse.body?.getReader();
-      if (!reader) return errorResponse("The catalog returned an empty book file.", 502);
-      const chunks: Uint8Array[] = [];
-      let totalBytes = 0;
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        totalBytes += value.byteLength;
-        if (totalBytes > maxFileSize) {
-          await reader.cancel();
-          return errorResponse("Book files must be smaller than 30 MB", 413);
+      let bytes: Uint8Array;
+      try {
+        bytes = await readResponseBytes(fileResponse, MAX_BOOK_DOWNLOAD_BYTES);
+      } catch (error) {
+        if (error instanceof OutboundResponseError && error.reason === "too_large") {
+          return errorResponse("Book files must be smaller than 30 MB.", 413);
         }
-        chunks.push(value);
+        if (error instanceof OutboundResponseError && error.reason === "timeout") {
+          return errorResponse("The book download timed out.", 504);
+        }
+        return errorResponse("Could not read the book file.", 502);
       }
-      if (totalBytes === 0) return errorResponse("The catalog returned an empty book file.", 502);
-      const bytes = new Uint8Array(totalBytes);
-      let offset = 0;
-      for (const chunk of chunks) {
-        bytes.set(chunk, offset);
-        offset += chunk.byteLength;
-      }
+      if (bytes.length === 0) return errorResponse("The catalog returned an empty book file.", 502);
 
       const sourceType = (fileResponse.headers.get("Content-Type") || "")
         .split(";")[0]
@@ -525,12 +524,18 @@ Deno.serve(async (req: Request) => {
     let feedResult;
     try {
       feedResult = await fetchWithValidatedRedirects(parsedFeedUrl, {
-      headers: {
-        "Accept": "application/atom+xml, application/xml, text/xml, */*",
-        "User-Agent": "Lumiere/1.0 OPDS Reader",
-      },
+        headers: {
+          "Accept": "application/atom+xml, application/xml, text/xml, */*",
+          "User-Agent": "Lumiere/1.0 OPDS Reader",
+        },
       });
-    } catch {
+    } catch (error) {
+      if (error instanceof OutboundResponseError && error.reason === "timeout") {
+        return new Response(
+          JSON.stringify({ error: "The catalog feed request timed out." }),
+          { status: 504, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
       return new Response(
         JSON.stringify({ error: "Could not safely fetch the catalog feed." }),
         { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
@@ -546,7 +551,27 @@ Deno.serve(async (req: Request) => {
     }
 
     const baseFeedUrl = feedResult.url.toString();
-    const xmlText = await response.text();
+    let xmlText: string;
+    try {
+      xmlText = await readResponseText(response, MAX_FEED_RESPONSE_BYTES);
+    } catch (error) {
+      if (error instanceof OutboundResponseError && error.reason === "too_large") {
+        return new Response(
+          JSON.stringify({ error: "Catalog feeds must be smaller than 2 MiB." }),
+          { status: 413, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+      if (error instanceof OutboundResponseError && error.reason === "timeout") {
+        return new Response(
+          JSON.stringify({ error: "The catalog feed request timed out." }),
+          { status: 504, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+      return new Response(
+        JSON.stringify({ error: "Could not read the catalog feed." }),
+        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
     const validation = XMLValidator.validate(xmlText);
     if (validation !== true) {
       return new Response(

@@ -5,8 +5,11 @@ import {
   MAX_FEED_RESPONSE_BYTES,
   MAX_REDIRECTS,
   REQUEST_TIMEOUT_MS,
+  OutboundResponseError,
   fetchWithValidatedRedirects,
   isPublicIpAddress,
+  readResponseBytes,
+  readResponseText,
   validateResolvedOutboundUrl,
   validateOutboundUrl,
 } from '../supabase/functions/opds-fetch/security.ts';
@@ -189,6 +192,72 @@ describe('validated redirect fetching', () => {
         }),
       }),
       /exceeded the allowed number of redirects/,
+    );
+  });
+
+  it('aborts a stalled outbound request at its timeout', async () => {
+    await assert.rejects(
+      fetchWithValidatedRedirects('https://feeds.example.org/feed', {}, {
+        timeoutMs: 10,
+        resolveDns: publicResolver,
+        fetcher: (_url, init) => new Promise((_resolve, reject) => {
+          init.signal?.addEventListener('abort', () => reject(new Error('aborted')), { once: true });
+        }),
+      }),
+      (error: unknown) => error instanceof OutboundResponseError && error.reason === 'timeout',
+    );
+  });
+});
+
+describe('bounded response reading', () => {
+  it('reads text and bytes while enforcing Content-Length and streamed limits', async () => {
+    assert.equal(await readResponseText(new Response('<feed/>'), 16), '<feed/>');
+    await assert.rejects(
+      readResponseBytes(new Response('too large', {
+        headers: { 'Content-Length': '9' },
+      }), 8),
+      (error: unknown) => error instanceof OutboundResponseError && error.reason === 'too_large',
+    );
+
+    const streamed = new Response(new ReadableStream({
+      start(controller) {
+        controller.enqueue(new Uint8Array(4));
+        controller.enqueue(new Uint8Array(5));
+        controller.close();
+      },
+    }));
+    await assert.rejects(
+      readResponseBytes(streamed, 8),
+      (error: unknown) => error instanceof OutboundResponseError && error.reason === 'too_large',
+    );
+  });
+
+  it('terminates stalled response bodies within the timeout', async () => {
+    const response = new Response(new ReadableStream({
+      pull() {
+        return new Promise<void>(() => undefined);
+      },
+    }));
+    await assert.rejects(
+      readResponseBytes(response, 16, 10),
+      (error: unknown) => error instanceof OutboundResponseError && error.reason === 'timeout',
+    );
+  });
+
+  it('applies the body timeout to the whole response, not each individual chunk', async () => {
+    const response = new Response(new ReadableStream({
+      async start(controller) {
+        controller.enqueue(new Uint8Array([1]));
+        await new Promise((resolve) => setTimeout(resolve, 8));
+        controller.enqueue(new Uint8Array([2]));
+        await new Promise((resolve) => setTimeout(resolve, 8));
+        controller.enqueue(new Uint8Array([3]));
+        controller.close();
+      },
+    }));
+    await assert.rejects(
+      readResponseBytes(response, 16, 12),
+      (error: unknown) => error instanceof OutboundResponseError && error.reason === 'timeout',
     );
   });
 });

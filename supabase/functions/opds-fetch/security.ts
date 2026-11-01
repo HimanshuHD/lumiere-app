@@ -18,11 +18,22 @@ export interface ValidatedFetchOptions {
   isAllowedUrl?: (url: URL) => boolean;
   resolveDns?: DnsResolver;
   fetcher?: Fetcher;
+  timeoutMs?: number;
 }
 
 export interface ValidatedFetchResult {
   response: Response;
   url: URL;
+}
+
+export class OutboundResponseError extends Error {
+  readonly reason: "too_large" | "timeout";
+
+  constructor(reason: "too_large" | "timeout") {
+    super(reason === "too_large" ? "Outbound response exceeded its size limit." : "Outbound request timed out.");
+    this.name = "OutboundResponseError";
+    this.reason = reason;
+  }
 }
 
 export function validateOutboundUrl(value: string | URL): OutboundUrlValidation {
@@ -156,6 +167,7 @@ export async function fetchWithValidatedRedirects(
   options: ValidatedFetchOptions = {},
 ): Promise<ValidatedFetchResult> {
   const maxRedirects = options.maxRedirects ?? MAX_REDIRECTS;
+  const timeoutMs = options.timeoutMs ?? REQUEST_TIMEOUT_MS;
   const isAllowedUrl = options.isAllowedUrl ?? (() => true);
   const fetcher = options.fetcher ?? fetch;
   const resolver = options.resolveDns ?? resolveDns;
@@ -167,7 +179,21 @@ export async function fetchWithValidatedRedirects(
       throw new Error(validation.ok ? "Outbound URL is not an approved destination." : validation.error);
     }
 
-    const response = await fetcher(validation.url, { ...init, redirect: "manual" });
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+    let response: Response;
+    try {
+      response = await fetcher(validation.url, {
+        ...init,
+        signal: controller.signal,
+        redirect: "manual",
+      });
+    } catch (error) {
+      if (controller.signal.aborted) throw new OutboundResponseError("timeout");
+      throw error;
+    } finally {
+      clearTimeout(timeout);
+    }
     if (!REDIRECT_STATUSES.has(response.status)) return { response, url: validation.url };
 
     const location = response.headers.get("Location");
@@ -186,4 +212,58 @@ export async function fetchWithValidatedRedirects(
     await response.body?.cancel();
     url = nextUrl;
   }
+}
+
+export async function readResponseBytes(
+  response: Response,
+  maxBytes: number,
+  timeoutMs = REQUEST_TIMEOUT_MS,
+): Promise<Uint8Array> {
+  const contentLength = response.headers.get("Content-Length");
+  if (contentLength !== null) {
+    if (!/^\d+$/.test(contentLength)) throw new Error("Outbound response had an invalid content length.");
+    if (Number(contentLength) > maxBytes) throw new OutboundResponseError("too_large");
+  }
+
+  const reader = response.body?.getReader();
+  if (!reader) return new Uint8Array();
+
+  const chunks: Uint8Array[] = [];
+  let totalBytes = 0;
+  let timeout: ReturnType<typeof setTimeout>;
+  const timedOut = new Promise<never>((_, reject) => {
+    timeout = setTimeout(() => reject(new OutboundResponseError("timeout")), timeoutMs);
+  });
+  try {
+    while (true) {
+      const { done, value } = await Promise.race([reader.read(), timedOut]);
+      if (done) break;
+
+      totalBytes += value.byteLength;
+      if (totalBytes > maxBytes) throw new OutboundResponseError("too_large");
+      chunks.push(value);
+    }
+  } catch (error) {
+    clearTimeout(timeout);
+    await reader.cancel(error).catch(() => undefined);
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
+
+  const bytes = new Uint8Array(totalBytes);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return bytes;
+}
+
+export async function readResponseText(
+  response: Response,
+  maxBytes = MAX_FEED_RESPONSE_BYTES,
+  timeoutMs = REQUEST_TIMEOUT_MS,
+): Promise<string> {
+  return new TextDecoder().decode(await readResponseBytes(response, maxBytes, timeoutMs));
 }
