@@ -1,6 +1,8 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { supabase, Document, Bookmark, ReadingProgress, ReadingListItem } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
+
+const readingProgressFetches = new Map<string, Promise<ReadingProgress[]>>();
 
 export function useBookmarks() {
   const { user } = useAuth();
@@ -66,18 +68,37 @@ export function useBookmarks() {
 export function useReadingProgress() {
   const { user } = useAuth();
   const [progress, setProgress] = useState<ReadingProgress[]>([]);
+  const progressRef = useRef(progress);
+  progressRef.current = progress;
   const [loading, setLoading] = useState(true);
 
   const fetchProgress = useCallback(async () => {
     if (!user) return;
-    const { data, error } = await supabase
-      .from('reading_progress')
-      .select('*')
-      .eq('user_id', user.id);
-    if (!error && data) {
-      setProgress(data as ReadingProgress[]);
+    let request = readingProgressFetches.get(user.id);
+    if (!request) {
+      request = (async () => {
+        const { data, error } = await supabase
+          .from('reading_progress')
+          .select('*')
+          .eq('user_id', user.id);
+        if (error) throw error;
+        return (data || []) as ReadingProgress[];
+      })();
+      readingProgressFetches.set(user.id, request);
+      void request.finally(() => {
+        if (readingProgressFetches.get(user.id) === request) {
+          readingProgressFetches.delete(user.id);
+        }
+      }).catch(() => {});
     }
-    setLoading(false);
+
+    try {
+      setProgress(await request);
+    } catch (error) {
+      console.error('Failed to load reading progress:', error);
+    } finally {
+      setLoading(false);
+    }
   }, [user]);
 
   useEffect(() => {
@@ -85,43 +106,30 @@ export function useReadingProgress() {
   }, [fetchProgress]);
 
   const saveProgress = useCallback(
-    async (documentId: string, chapterIndex: number, scrollPercent: number) => {
+    async (documentId: string, chapterIndex: number, scrollPercent: number, epubCfi?: string) => {
       if (!user) return;
-      const existing = progress.find((p) => p.document_id === documentId);
-      if (existing) {
-        const { error } = await supabase
-          .from('reading_progress')
-          .update({
-            chapter_index: chapterIndex,
-            scroll_percent: scrollPercent,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', existing.id);
-        if (!error) {
-          setProgress((prev) =>
-            prev.map((p) =>
-              p.id === existing.id
-                ? { ...p, chapter_index: chapterIndex, scroll_percent: scrollPercent }
-                : p
-            )
-          );
-        }
-      } else {
-        const { data, error } = await supabase
-          .from('reading_progress')
-          .insert({
-            document_id: documentId,
-            chapter_index: chapterIndex,
-            scroll_percent: scrollPercent,
-          })
-          .select('*')
-          .single();
-        if (!error && data) {
-          setProgress((prev) => [...prev, data as ReadingProgress]);
-        }
+      const existing = progressRef.current.find((p) => p.document_id === documentId);
+      const { data, error } = await supabase
+        .from('reading_progress')
+        .upsert({
+          document_id: documentId,
+          chapter_index: chapterIndex,
+          scroll_percent: scrollPercent,
+          epub_cfi: epubCfi ?? existing?.epub_cfi ?? null,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'user_id,document_id' })
+        .select('*')
+        .single();
+      if (error) {
+        console.error('Failed to save reading progress:', error);
+        return;
       }
+      setProgress((prev) => [
+        ...prev.filter((item) => item.document_id !== documentId),
+        data as ReadingProgress,
+      ]);
     },
-    [user, progress]
+    [user]
   );
 
   const getProgress = useCallback(
