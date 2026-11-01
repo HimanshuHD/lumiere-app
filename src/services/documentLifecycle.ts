@@ -39,6 +39,10 @@ export interface DocumentLifecycleStorage {
 export interface DocumentLifecycleDatabase {
   findById(id: string): Promise<Document | null>;
   insert(document: UserDocumentInsert): Promise<Document>;
+  saveRecoveryRecords(records: UserUploadRecovery[]): Promise<void>;
+  listPendingRecoveryRecords(userId: string): Promise<UserUploadRecovery[]>;
+  markRecoveryRecordCompleted(record: UserUploadRecovery): Promise<void>;
+  recordRecoveryAttempt(record: UserUploadRecovery, error: string): Promise<void>;
 }
 
 export interface DocumentLifecycleDependencies {
@@ -52,6 +56,21 @@ export interface UserDocumentUpload {
   documentFile: File;
   coverFile: File | null;
   metadata: UserDocumentMetadata;
+}
+
+export interface UserUploadRecovery {
+  operationId: string;
+  userId: string;
+  storagePath: string;
+  stage: UserUploadStage;
+  status: 'cleanup_pending' | 'reconciliation_pending';
+  lastError: string;
+  attempts: number;
+}
+
+export interface UserUploadRecoveryResult {
+  recovered: number;
+  pending: number;
 }
 
 export class DocumentLifecycleError extends Error {
@@ -98,6 +117,52 @@ function matchesUpload(
 
 function getExtension(file: File): string {
   return file.name.split('.').pop()?.toLowerCase() || 'bin';
+}
+
+function getRecoveryRecord(
+  operationId: string,
+  userId: string,
+  storagePath: string,
+  stage: UserUploadStage,
+  status: UserUploadRecovery['status'],
+  lastError: string,
+): UserUploadRecovery {
+  return { operationId, userId, storagePath, stage, status, lastError, attempts: 0 };
+}
+
+export async function recoverPendingUserUploadFiles(
+  dependencies: DocumentLifecycleDependencies,
+  userId: string,
+): Promise<UserUploadRecoveryResult> {
+  const pendingRecords = await dependencies.database.listPendingRecoveryRecords(userId);
+  let recovered = 0;
+  let pending = 0;
+
+  for (const record of pendingRecords) {
+    try {
+      const document = await dependencies.database.findById(record.operationId);
+      if (document) {
+        const ownsDocument = document.origin === 'user_upload' && document.uploaded_by === userId;
+        const pathIsAttached = document.file_storage_path === record.storagePath ||
+          document.cover_storage_path === record.storagePath;
+        if (ownsDocument && pathIsAttached) {
+          await dependencies.database.markRecoveryRecordCompleted(record);
+          recovered += 1;
+          continue;
+        }
+        throw new Error('The recovery path is associated with a different document; no file was removed.');
+      }
+
+      await dependencies.storage.remove([record.storagePath]);
+      await dependencies.database.markRecoveryRecordCompleted(record);
+      recovered += 1;
+    } catch (error) {
+      pending += 1;
+      await dependencies.database.recordRecoveryAttempt(record, errorMessage(error));
+    }
+  }
+
+  return { recovered, pending };
 }
 
 export async function uploadUserDocument(
@@ -156,8 +221,26 @@ export async function uploadUserDocument(
         const savedDocument = await dependencies.database.findById(operationId);
         if (matchesUpload(savedDocument, userId, documentPath, coverPath)) return savedDocument;
       } catch (reconciliationError) {
+        const recoveryRecords = createdPaths.map((path) =>
+          getRecoveryRecord(
+            operationId,
+            userId,
+            path,
+            stage,
+            'reconciliation_pending',
+            errorMessage(reconciliationError),
+          )
+        );
+        let recoveryMessage = '';
+        if (recoveryRecords.length > 0) {
+          try {
+            await dependencies.database.saveRecoveryRecords(recoveryRecords);
+          } catch (recoverySaveError) {
+            recoveryMessage = ` Recovery tracking could not be saved: ${errorMessage(recoverySaveError)}.`;
+          }
+        }
         throw new DocumentLifecycleError(
-          `Could not confirm whether the document was saved: ${errorMessage(reconciliationError)}`,
+          `Could not confirm whether the document was saved: ${errorMessage(reconciliationError)}.${recoveryMessage}`,
           operationId,
           'reconciliation',
           createdPaths,
@@ -176,11 +259,47 @@ export async function uploadUserDocument(
       }
     }
 
+    const recoveryRecords = [
+      ...(cleanupError
+        ? createdPaths.map((path) =>
+          getRecoveryRecord(
+            operationId,
+            userId,
+            path,
+            stage,
+            'cleanup_pending',
+            errorMessage(cleanupError),
+          )
+        )
+        : []),
+      ...uncertainPaths.map((path) =>
+        getRecoveryRecord(
+          operationId,
+          userId,
+          path,
+          stage,
+          'cleanup_pending',
+          errorMessage(error),
+        )
+      ),
+    ];
+    let recoverySaveError: unknown;
+    if (recoveryRecords.length > 0) {
+      try {
+        await dependencies.database.saveRecoveryRecords(recoveryRecords);
+      } catch (errorDuringRecoverySave) {
+        recoverySaveError = errorDuringRecoverySave;
+      }
+    }
+
     const message = cleanupError
       ? `Upload failed during ${stage}: ${errorMessage(error)}. Cleanup also failed: ${errorMessage(cleanupError)}`
       : `Upload failed during ${stage}: ${errorMessage(error)}`;
+    const recoveryMessage = recoverySaveError
+      ? ` Recovery tracking could not be saved: ${errorMessage(recoverySaveError)}.`
+      : '';
     throw new DocumentLifecycleError(
-      message,
+      `${message}${recoveryMessage}`,
       operationId,
       stage,
       [...(cleanupError ? createdPaths : []), ...uncertainPaths],

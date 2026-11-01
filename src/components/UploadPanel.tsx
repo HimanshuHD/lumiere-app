@@ -14,14 +14,15 @@ import {
   CheckCircle2,
   Hash,
 } from 'lucide-react';
-import { supabase, Document } from '@/lib/supabase';
+import { Document } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import {
   DocumentLifecycleError,
+  recoverPendingUserUploadFiles,
   uploadUserDocument,
-  type DocumentLifecycleDependencies,
 } from '@/services/documentLifecycle';
+import { supabaseDocumentLifecycleDependencies } from '@/services/supabaseDocumentLifecycle';
 
 interface UploadPanelProps {
   onUploaded: (doc: Document) => void;
@@ -184,6 +185,30 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
     };
   }, [coverPreview, pdfCoverPreview]);
 
+  const userId = user?.id;
+
+  useEffect(() => {
+    if (!userId) return;
+    let active = true;
+    void recoverPendingUserUploadFiles(supabaseDocumentLifecycleDependencies, userId)
+      .then(({ recovered, pending }) => {
+        if (!active) return;
+        if (recovered > 0) {
+          showToast(`Recovered cleanup for ${recovered} incomplete upload file${recovered === 1 ? '' : 's'}.`);
+        }
+        if (pending > 0) {
+          showToast(`${pending} upload cleanup${pending === 1 ? '' : 's'} still need attention.`, 'error');
+        }
+      })
+      .catch((recoveryError: unknown) => {
+        console.error('Could not recover incomplete document uploads:', recoveryError);
+        if (active) showToast('Could not check for incomplete upload cleanup.', 'error');
+      });
+    return () => {
+      active = false;
+    };
+  }, [showToast, userId]);
+
   const handleDocSelect = useCallback(async (file: File) => {
     const selection = documentSelectionRef.current + 1;
     documentSelectionRef.current = selection;
@@ -272,40 +297,7 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
 
       const pages = pageCount || 1;
       const readingTime = estimateReadingTime(pages);
-      const dependencies: DocumentLifecycleDependencies = {
-        storage: {
-          async upload(path, file) {
-            const { error } = await supabase.storage.from('documents').upload(path, file);
-            if (error) throw new Error(error.message);
-          },
-          async remove(paths) {
-            const { error } = await supabase.storage.from('documents').remove(paths);
-            if (error) throw new Error(error.message);
-          },
-        },
-        database: {
-          async findById(id) {
-            const { data, error } = await supabase
-              .from('documents')
-              .select('*')
-              .eq('id', id)
-              .maybeSingle();
-            if (error) throw new Error(error.message);
-            return data as Document | null;
-          },
-          async insert(document) {
-            const { data, error } = await supabase
-              .from('documents')
-              .insert(document)
-              .select('*')
-              .single();
-            if (error) throw new Error(error.message);
-            if (!data) throw new Error('The saved document was not returned.');
-            return data as Document;
-          },
-        },
-      };
-      const uploadedDocument = await uploadUserDocument(dependencies, {
+      const uploadedDocument = await uploadUserDocument(supabaseDocumentLifecycleDependencies, {
         operationId,
         userId: user.id,
         documentFile: docFile,

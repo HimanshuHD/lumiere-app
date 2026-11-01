@@ -3,10 +3,12 @@ import { describe, it } from 'node:test';
 import type { Document } from '../src/lib/supabase.ts';
 import {
   DocumentLifecycleError,
+  recoverPendingUserUploadFiles,
   uploadUserDocument,
   type DocumentLifecycleDatabase,
   type DocumentLifecycleStorage,
   type UserDocumentInsert,
+  type UserUploadRecovery,
 } from '../src/services/documentLifecycle.ts';
 
 const operationId = 'operation-123';
@@ -40,9 +42,16 @@ function createHarness(options: {
   findById?: (id: string) => Promise<Document | null>;
   upload?: (path: string, file: File) => Promise<void>;
   remove?: (paths: string[]) => Promise<void>;
+  saveRecoveryRecords?: (records: UserUploadRecovery[]) => Promise<void>;
+  listPendingRecoveryRecords?: (id: string) => Promise<UserUploadRecovery[]>;
+  markRecoveryRecordCompleted?: (record: UserUploadRecovery) => Promise<void>;
+  recordRecoveryAttempt?: (record: UserUploadRecovery, error: string) => Promise<void>;
 } = {}) {
   const uploads: string[] = [];
   const removals: string[][] = [];
+  const recoveryRecords: UserUploadRecovery[] = [];
+  const completedRecoveryRecords: UserUploadRecovery[] = [];
+  const recoveryAttempts: Array<{ record: UserUploadRecovery; error: string }> = [];
   const storage: DocumentLifecycleStorage = {
     async upload(path, file) {
       uploads.push(path);
@@ -60,8 +69,31 @@ function createHarness(options: {
     async insert(input) {
       return options.insert ? options.insert(input) : savedDocument(input);
     },
+    async saveRecoveryRecords(records) {
+      recoveryRecords.push(...records);
+      await options.saveRecoveryRecords?.(records);
+    },
+    async listPendingRecoveryRecords(id) {
+      return options.listPendingRecoveryRecords?.(id) ?? [];
+    },
+    async markRecoveryRecordCompleted(record) {
+      completedRecoveryRecords.push(record);
+      await options.markRecoveryRecordCompleted?.(record);
+    },
+    async recordRecoveryAttempt(record, error) {
+      recoveryAttempts.push({ record, error });
+      await options.recordRecoveryAttempt?.(record, error);
+    },
   };
-  return { database, storage, uploads, removals };
+  return {
+    database,
+    storage,
+    uploads,
+    removals,
+    recoveryRecords,
+    completedRecoveryRecords,
+    recoveryAttempts,
+  };
 }
 
 describe('uploadUserDocument', () => {
@@ -130,6 +162,7 @@ describe('uploadUserDocument', () => {
       `${userId}/${operationId}.pdf`,
       `${userId}/${operationId}-cover.jpg`,
     ]]);
+    assert.deepEqual(harness.recoveryRecords, []);
   });
 
   it('cleans up the uploaded document when the cover upload fails and retains its uncertain path', async () => {
@@ -154,6 +187,8 @@ describe('uploadUserDocument', () => {
     );
 
     assert.deepEqual(harness.removals, [[`${userId}/${operationId}.pdf`]]);
+    assert.equal(harness.recoveryRecords.length, 1);
+    assert.equal(harness.recoveryRecords[0].status, 'cleanup_pending');
   });
 
   it('retains failed cleanup paths for recovery', async () => {
@@ -179,6 +214,65 @@ describe('uploadUserDocument', () => {
         error.recoveryPaths.includes(`${userId}/${operationId}.pdf`) &&
         error.message.includes('Storage unavailable'),
     );
+    assert.equal(harness.recoveryRecords.length, 2);
+    assert.ok(harness.recoveryRecords.every((record) => record.lastError === 'Storage unavailable.'));
+  });
+
+  it('persists uncertain files when the database insert cannot be reconciled', async () => {
+    let lookups = 0;
+    const harness = createHarness({
+      async insert() {
+        throw new Error('Insert response was lost.');
+      },
+      async findById() {
+        lookups += 1;
+        if (lookups === 1) return null;
+        throw new Error('Database lookup unavailable.');
+      },
+    });
+
+    await assert.rejects(
+      uploadUserDocument(harness, {
+        operationId,
+        userId,
+        documentFile,
+        coverFile,
+        metadata,
+      }),
+      (error: unknown) => error instanceof DocumentLifecycleError &&
+        error.stage === 'reconciliation' &&
+        error.message.includes('Could not confirm whether the document was saved'),
+    );
+
+    assert.equal(harness.recoveryRecords.length, 2);
+    assert.ok(harness.recoveryRecords.every((record) => record.status === 'reconciliation_pending'));
+    assert.deepEqual(harness.removals, []);
+  });
+
+  it('surfaces when durable recovery tracking itself fails', async () => {
+    const harness = createHarness({
+      async insert() {
+        throw new Error('Insert failed.');
+      },
+      async remove() {
+        throw new Error('Storage unavailable.');
+      },
+      async saveRecoveryRecords() {
+        throw new Error('Database unavailable.');
+      },
+    });
+
+    await assert.rejects(
+      uploadUserDocument(harness, {
+        operationId,
+        userId,
+        documentFile,
+        coverFile,
+        metadata,
+      }),
+      (error: unknown) => error instanceof DocumentLifecycleError &&
+        error.message.includes('Recovery tracking could not be saved: Database unavailable.'),
+    );
   });
 
   it('does not upload files again when a retry finds its completed operation', async () => {
@@ -202,5 +296,81 @@ describe('uploadUserDocument', () => {
 
     assert.equal(document.id, operationId);
     assert.deepEqual(harness.uploads, []);
+  });
+
+  it('retries persisted cleanup and marks the record complete', async () => {
+    const record: UserUploadRecovery = {
+      operationId,
+      userId,
+      storagePath: `${userId}/${operationId}.pdf`,
+      stage: 'document-insert',
+      status: 'cleanup_pending',
+      lastError: 'Storage unavailable.',
+      attempts: 2,
+    };
+    const harness = createHarness({
+      async listPendingRecoveryRecords() { return [record]; },
+      async findById() { return null; },
+    });
+
+    const result = await recoverPendingUserUploadFiles(harness, userId);
+
+    assert.deepEqual(result, { recovered: 1, pending: 0 });
+    assert.deepEqual(harness.removals, [[record.storagePath]]);
+    assert.deepEqual(harness.completedRecoveryRecords, [record]);
+    assert.deepEqual(harness.recoveryAttempts, []);
+  });
+
+  it('does not remove a recovery path attached to a saved document', async () => {
+    const path = `${userId}/${operationId}.pdf`;
+    const record: UserUploadRecovery = {
+      operationId,
+      userId,
+      storagePath: path,
+      stage: 'reconciliation',
+      status: 'reconciliation_pending',
+      lastError: 'Could not confirm the document save.',
+      attempts: 0,
+    };
+    const document = savedDocument({
+      ...metadata,
+      id: operationId,
+      origin: 'user_upload',
+      uploaded_by: userId,
+      file_storage_path: path,
+      cover_storage_path: null,
+    });
+    const harness = createHarness({
+      async listPendingRecoveryRecords() { return [record]; },
+      async findById() { return document; },
+    });
+
+    const result = await recoverPendingUserUploadFiles(harness, userId);
+
+    assert.deepEqual(result, { recovered: 1, pending: 0 });
+    assert.deepEqual(harness.removals, []);
+    assert.deepEqual(harness.completedRecoveryRecords, [record]);
+  });
+
+  it('retains and reports records whose recovery still fails', async () => {
+    const record: UserUploadRecovery = {
+      operationId,
+      userId,
+      storagePath: `${userId}/${operationId}.pdf`,
+      stage: 'document-insert',
+      status: 'cleanup_pending',
+      lastError: 'Initial cleanup failed.',
+      attempts: 0,
+    };
+    const harness = createHarness({
+      async listPendingRecoveryRecords() { return [record]; },
+      async findById() { return null; },
+      async remove() { throw new Error('Storage unavailable again.'); },
+    });
+
+    const result = await recoverPendingUserUploadFiles(harness, userId);
+
+    assert.deepEqual(result, { recovered: 0, pending: 1 });
+    assert.equal(harness.recoveryAttempts[0].error, 'Storage unavailable again.');
   });
 });
