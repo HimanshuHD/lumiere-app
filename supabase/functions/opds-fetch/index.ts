@@ -4,6 +4,7 @@ import {
   MAX_BOOK_DOWNLOAD_BYTES,
   MAX_FEED_RESPONSE_BYTES,
   OutboundResponseError,
+  detectSupportedBookFormat,
   fetchWithValidatedRedirects,
   readResponseBytes,
   readResponseText,
@@ -242,9 +243,7 @@ async function importCatalogBook(req: Request): Promise<Response> {
     return fail("Could not read the Project Gutenberg book file.", 502);
   }
   if (bytes.length === 0) return fail("The catalog returned an empty book file.", 502);
-  const isEpub = bytes[0] === 0x50 && bytes[1] === 0x4b;
-  const isPdf = bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46;
-  if ((format === "epub" && !isEpub) || (format === "pdf" && !isPdf)) {
+  if (detectSupportedBookFormat(bytes) !== format) {
     return fail("The downloaded file does not match the catalog's declared format.", 415);
   }
 
@@ -476,27 +475,18 @@ Deno.serve(async (req: Request) => {
       }
       if (bytes.length === 0) return errorResponse("The catalog returned an empty book file.", 502);
 
-      const sourceType = (fileResponse.headers.get("Content-Type") || "")
-        .split(";")[0]
-        .trim()
-        .toLowerCase();
-      const path = currentUrl.pathname.toLowerCase();
-      const isZip = bytes[0] === 0x50 && bytes[1] === 0x4b;
-      const isEpub = isZip &&
-        (sourceType.includes("epub") || /\.epub(?:3)?(?:$|[.?])/.test(path));
-      const isPdf = sourceType === "application/pdf" ||
-        (bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46);
-      if (!isEpub && !isPdf) {
+      const format = detectSupportedBookFormat(bytes);
+      if (!format) {
         return errorResponse("The catalog download is not a supported EPUB or PDF file", 415);
       }
 
       return new Response(bytes, {
         headers: {
           ...corsHeaders,
-          "Content-Type": isEpub ? "application/epub+zip" : "application/pdf",
+          "Content-Type": format === "epub" ? "application/epub+zip" : "application/pdf",
           "Content-Length": String(bytes.length),
           "Content-Disposition": "attachment",
-          "X-Document-Format": isEpub ? "epub" : "pdf",
+          "X-Document-Format": format,
           "Access-Control-Expose-Headers": "X-Document-Format",
           "Cache-Control": "no-store",
         },

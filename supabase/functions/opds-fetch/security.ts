@@ -128,6 +128,58 @@ export function isPublicIpAddress(address: string): boolean {
   return isGlobalUnicast && !isDocumentation && !isProtocolAssignment && !isSixToFour;
 }
 
+export type SupportedBookFormat = "epub" | "pdf";
+
+export function detectSupportedBookFormat(bytes: Uint8Array): SupportedBookFormat | null {
+  const isPdf = bytes.length >= 8 &&
+    bytes.subarray(0, Math.min(bytes.length, 1024)).some((byte, index, header) =>
+      byte === 0x25 &&
+      header[index + 1] === 0x50 &&
+      header[index + 2] === 0x44 &&
+      header[index + 3] === 0x46 &&
+      header[index + 4] === 0x2d &&
+      header[index + 5] >= 0x31 &&
+      header[index + 5] <= 0x32 &&
+      header[index + 6] === 0x2e &&
+      header[index + 7] >= 0x30 &&
+      header[index + 7] <= 0x39
+    );
+  if (isPdf) return "pdf";
+
+  if (
+    bytes.length < 30 ||
+    bytes[0] !== 0x50 ||
+    bytes[1] !== 0x4b ||
+    bytes[2] !== 0x03 ||
+    bytes[3] !== 0x04
+  ) return null;
+
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const compressionMethod = view.getUint16(8, true);
+  const compressedSize = view.getUint32(18, true);
+  const uncompressedSize = view.getUint32(22, true);
+  const fileNameLength = view.getUint16(26, true);
+  const extraFieldLength = view.getUint16(28, true);
+  const fileNameStart = 30;
+  const fileContentStart = fileNameStart + fileNameLength + extraFieldLength;
+  const epubMimetype = new TextEncoder().encode("application/epub+zip");
+  if (
+    compressionMethod !== 0 ||
+    fileNameLength !== 8 ||
+    extraFieldLength !== 0 ||
+    compressedSize !== epubMimetype.length ||
+    uncompressedSize !== epubMimetype.length ||
+    fileContentStart + epubMimetype.length > bytes.length
+  ) return null;
+
+  const fileName = new TextDecoder().decode(bytes.subarray(fileNameStart, fileNameStart + fileNameLength));
+  if (fileName !== "mimetype") return null;
+  for (let index = 0; index < epubMimetype.length; index += 1) {
+    if (bytes[fileContentStart + index] !== epubMimetype[index]) return null;
+  }
+  return "epub";
+}
+
 async function resolveDns(hostname: string, recordType: DnsRecordType): Promise<string[]> {
   try {
     return await Deno.resolveDns(hostname, recordType);

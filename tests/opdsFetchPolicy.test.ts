@@ -6,6 +6,7 @@ import {
   MAX_REDIRECTS,
   REQUEST_TIMEOUT_MS,
   OutboundResponseError,
+  detectSupportedBookFormat,
   fetchWithValidatedRedirects,
   isPublicIpAddress,
   readResponseBytes,
@@ -259,5 +260,39 @@ describe('bounded response reading', () => {
       readResponseBytes(response, 16, 12),
       (error: unknown) => error instanceof OutboundResponseError && error.reason === 'timeout',
     );
+  });
+});
+
+describe('supported book file validation', () => {
+  const makeEpub = (fileName = 'mimetype', content = 'application/epub+zip') => {
+    const name = new TextEncoder().encode(fileName);
+    const body = new TextEncoder().encode(content);
+    const header = new Uint8Array(30 + name.length + body.length);
+    const view = new DataView(header.buffer);
+    header.set([0x50, 0x4b, 0x03, 0x04]);
+    view.setUint16(8, 0, true);
+    view.setUint32(18, body.length, true);
+    view.setUint32(22, body.length, true);
+    view.setUint16(26, name.length, true);
+    view.setUint16(28, 0, true);
+    header.set(name, 30);
+    header.set(body, 30 + name.length);
+    return header;
+  };
+
+  it('recognizes a valid EPUB mimetype header and a PDF header', () => {
+    assert.equal(detectSupportedBookFormat(makeEpub()), 'epub');
+    assert.equal(detectSupportedBookFormat(new TextEncoder().encode('%PDF-1.7\n')), 'pdf');
+    const pdfWithPreamble = new Uint8Array(32);
+    pdfWithPreamble.set(new TextEncoder().encode('%PDF-2.0'), 16);
+    assert.equal(detectSupportedBookFormat(pdfWithPreamble), 'pdf');
+  });
+
+  it('rejects MIME-type- or extension-only matches and malformed file headers', () => {
+    assert.equal(detectSupportedBookFormat(new TextEncoder().encode('<html>not a PDF</html>')), null);
+    assert.equal(detectSupportedBookFormat(new Uint8Array([0x50, 0x4b, 0x03, 0x04])), null);
+    assert.equal(detectSupportedBookFormat(makeEpub('content.opf')), null);
+    assert.equal(detectSupportedBookFormat(makeEpub('mimetype', 'text/plain')), null);
+    assert.equal(detectSupportedBookFormat(new TextEncoder().encode('%PDF-invalid')), null);
   });
 });
