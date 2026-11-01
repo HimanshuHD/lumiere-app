@@ -13,6 +13,10 @@ import {
 
 type XmlRecord = Record<string, unknown>;
 
+function logInternalError(operation: string, error: unknown): void {
+  console.error(`[opds-fetch] ${operation} failed`, error);
+}
+
 const parser = new XMLParser({
   attributeNamePrefix: "@_",
   ignoreAttributes: false,
@@ -202,7 +206,10 @@ async function importCatalogBook(req: Request): Promise<Response> {
     .eq("source_identity", sourceIdentity)
     .eq("origin", "catalog_import")
     .maybeSingle();
-  if (lookupError) return fail(`Could not check the shared catalog: ${lookupError.message}`, 500);
+  if (lookupError) {
+    logInternalError("shared catalog lookup", lookupError);
+    return fail("Could not check the shared catalog.", 500);
+  }
   if (existing) return respond(existing);
   const { data: legacyDocument, error: legacyLookupError } = await admin
     .from("documents")
@@ -210,7 +217,10 @@ async function importCatalogBook(req: Request): Promise<Response> {
     .eq("source_identity", sourceIdentity)
     .eq("origin", "legacy_unowned")
     .maybeSingle();
-  if (legacyLookupError) return fail(`Could not check legacy catalog records: ${legacyLookupError.message}`, 500);
+  if (legacyLookupError) {
+    logInternalError("legacy catalog lookup", legacyLookupError);
+    return fail("Could not check legacy catalog records.", 500);
+  }
 
   let fileResult;
   try {
@@ -282,7 +292,10 @@ async function importCatalogBook(req: Request): Promise<Response> {
     contentType,
     cacheControl: "900",
   });
-  if (uploadError) return fail(`Could not save the catalog file: ${uploadError.message}`, 500);
+  if (uploadError) {
+    logInternalError("catalog file upload", uploadError);
+    return fail("Could not save the catalog file.", 500);
+  }
 
   const documentValues = {
     title,
@@ -315,8 +328,9 @@ async function importCatalogBook(req: Request): Promise<Response> {
     });
     if (auditError) {
       const { error: cleanupError } = await admin.storage.from("documents").remove([storagePath]);
-      const cleanupMessage = cleanupError ? ` File cleanup also failed: ${cleanupError.message}` : "";
-      return fail(`Could not audit the legacy catalog restoration: ${auditError.message}.${cleanupMessage}`, 500);
+      logInternalError("legacy catalog audit", auditError);
+      if (cleanupError) logInternalError("catalog file cleanup after audit failure", cleanupError);
+      return fail("Could not restore the verified legacy catalog record.", 500);
     }
 
     const { data: restoredBook, error: restoreError } = await admin
@@ -335,14 +349,17 @@ async function importCatalogBook(req: Request): Promise<Response> {
         .eq("origin", "catalog_import")
         .maybeSingle();
       if (concurrentLookupError) {
-        return fail(`Could not resolve the concurrent catalog restoration: ${concurrentLookupError.message}`, 500);
+        logInternalError("concurrent catalog restoration lookup", concurrentLookupError);
+        if (cleanupError) logInternalError("catalog file cleanup after restore failure", cleanupError);
+        return fail("Could not resolve the catalog restoration.", 500);
       }
       if (concurrentBook && !cleanupError) return respond(concurrentBook);
-      const cleanupMessage = cleanupError ? ` File cleanup also failed: ${cleanupError.message}` : "";
+      if (cleanupError) logInternalError("catalog file cleanup after restore failure", cleanupError);
       if (concurrentBook) {
-        return fail(`The book is available, but temporary file cleanup failed.${cleanupMessage}`, 500);
+        return fail("The book is available, but temporary file cleanup failed.", 500);
       }
-      return fail(`Could not restore the verified legacy catalog record: ${restoreError.message}.${cleanupMessage}`, 500);
+      logInternalError("legacy catalog restoration", restoreError);
+      return fail("Could not restore the verified legacy catalog record.", 500);
     }
     if (restoredBook) return respond(restoredBook);
 
@@ -354,14 +371,16 @@ async function importCatalogBook(req: Request): Promise<Response> {
       .eq("origin", "catalog_import")
       .maybeSingle();
     if (concurrentLookupError) {
-      return fail(`Could not resolve the concurrent catalog restoration: ${concurrentLookupError.message}`, 500);
+      logInternalError("concurrent catalog restoration lookup", concurrentLookupError);
+      if (cleanupError) logInternalError("catalog file cleanup after restore race", cleanupError);
+      return fail("Could not resolve the catalog restoration.", 500);
     }
     if (concurrentBook && !cleanupError) return respond(concurrentBook);
-    const cleanupMessage = cleanupError ? ` File cleanup also failed: ${cleanupError.message}` : "";
+    if (cleanupError) logInternalError("catalog file cleanup after restore race", cleanupError);
     if (concurrentBook) {
-      return fail(`The book is available, but temporary file cleanup failed.${cleanupMessage}`, 500);
+      return fail("The book is available, but temporary file cleanup failed.", 500);
     }
-    return fail(`The legacy catalog record changed during import.${cleanupMessage}`, 409);
+    return fail("The legacy catalog record changed during import.", 409);
   }
 
   const { data: savedBook, error: insertError } = await admin
@@ -378,14 +397,17 @@ async function importCatalogBook(req: Request): Promise<Response> {
       .eq("source_identity", sourceIdentity)
       .maybeSingle();
     if (canonicalError) {
-      return fail(`Could not resolve the concurrent catalog import: ${canonicalError.message}`, 500);
+      logInternalError("concurrent catalog import lookup", canonicalError);
+      if (cleanupError) logInternalError("catalog file cleanup after insert failure", cleanupError);
+      return fail("Could not resolve the catalog import.", 500);
     }
     if (canonical && !cleanupError) return respond(canonical);
-    const cleanupMessage = cleanupError ? ` File cleanup also failed: ${cleanupError.message}` : "";
+    if (cleanupError) logInternalError("catalog file cleanup after insert failure", cleanupError);
     if (canonical) {
-      return fail(`The book is available, but temporary file cleanup failed.${cleanupMessage}`, 500);
+      return fail("The book is available, but temporary file cleanup failed.", 500);
     }
-    return fail(`Could not save the shared catalog record: ${insertError.message}.${cleanupMessage}`, 500);
+    logInternalError("shared catalog insert", insertError);
+    return fail("Could not save the shared catalog record.", 500);
   }
 
   return respond(savedBook);
@@ -697,8 +719,9 @@ Deno.serve(async (req: Request) => {
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (err) {
+    logInternalError("request handler", err);
     return new Response(
-      JSON.stringify({ error: err instanceof Error ? err.message : "An unexpected error occurred" }),
+      JSON.stringify({ error: "The catalog request could not be completed." }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   }
