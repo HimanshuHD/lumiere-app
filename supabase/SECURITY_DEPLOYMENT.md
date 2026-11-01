@@ -10,7 +10,7 @@
 - Existing catalog duplicates with the same normalized source URL are merged. Bookmarks and reading-list entries are retained, and the newest reading-progress row is kept per user.
 - Storage URLs that point into the `documents` bucket are converted to object paths. Persisted document URLs are cleared.
 - File URLs that cannot be mapped to a bucket object are copied to the server-only `document_security_migration_audit` table for review before restoring access.
-- Migrated storage paths with no corresponding object, plus legacy shared records without a source identity, are recorded for manual review.
+- Legacy document or cover URLs whose storage objects are absent from this project are retained in the audit table for manual review and are not converted into local storage paths. Curated shared records may continue using their existing external cover URL when the corresponding local object is unavailable; private uploads do not fall back to public storage URLs.
 - Duplicate catalog object paths are also recorded in that audit table. The migration does not remove storage objects.
 
 Review the seed-ID allowlist and ownership classifications against a production backup before applying the migration. The audit table has RLS enabled and no client policies; inspect it with a privileged database connection.

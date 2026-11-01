@@ -5,6 +5,7 @@ CREATE TABLE IF NOT EXISTS document_security_migration_audit (
   file_storage_path text,
   cover_storage_path text,
   legacy_file_url text,
+  legacy_cover_url text,
   reason text NOT NULL,
   archived_at timestamptz NOT NULL DEFAULT now()
 );
@@ -60,30 +61,84 @@ SET
   END,
   file_storage_path = CASE
     WHEN file_url LIKE '%/storage/v1/object/public/documents/%'
-      THEN split_part(
-        substr(
-          file_url,
-          strpos(file_url, '/storage/v1/object/public/documents/')
-            + length('/storage/v1/object/public/documents/')
-        ),
-        '?',
-        1
+      AND EXISTS (
+        SELECT 1
+        FROM storage.objects AS object
+        WHERE object.bucket_id = 'documents'
+          AND object.name = split_part(
+            substr(
+              file_url,
+              strpos(file_url, '/storage/v1/object/public/documents/')
+                + length('/storage/v1/object/public/documents/')
+            ),
+            '?',
+            1
+          )
       )
+    THEN split_part(
+      substr(
+        file_url,
+        strpos(file_url, '/storage/v1/object/public/documents/')
+          + length('/storage/v1/object/public/documents/')
+      ),
+      '?',
+      1
+    )
     ELSE NULL
   END,
   cover_storage_path = CASE
     WHEN cover_url LIKE '%/storage/v1/object/public/documents/%'
-      THEN split_part(
+      AND EXISTS (
+        SELECT 1
+        FROM storage.objects AS object
+        WHERE object.bucket_id = 'documents'
+          AND object.name = split_part(
+            substr(
+              cover_url,
+              strpos(cover_url, '/storage/v1/object/public/documents/')
+                + length('/storage/v1/object/public/documents/')
+            ),
+            '?',
+            1
+          )
+      )
+    THEN split_part(
+      substr(
+        cover_url,
+        strpos(cover_url, '/storage/v1/object/public/documents/')
+          + length('/storage/v1/object/public/documents/')
+      ),
+      '?',
+      1
+    )
+    ELSE NULL
+  END;
+
+INSERT INTO document_security_migration_audit (
+  document_id,
+  legacy_cover_url,
+  reason
+)
+SELECT
+  document.id,
+  document.cover_url,
+  'Legacy cover URL points to a documents storage object that is absent from this project; restore the object or review the URL'
+FROM documents AS document
+WHERE document.cover_url LIKE '%/storage/v1/object/public/documents/%'
+  AND NOT EXISTS (
+    SELECT 1
+    FROM storage.objects AS object
+    WHERE object.bucket_id = 'documents'
+      AND object.name = split_part(
         substr(
-          cover_url,
-          strpos(cover_url, '/storage/v1/object/public/documents/')
+          document.cover_url,
+          strpos(document.cover_url, '/storage/v1/object/public/documents/')
             + length('/storage/v1/object/public/documents/')
         ),
         '?',
         1
       )
-    ELSE NULL
-  END;
+  );
 
 INSERT INTO document_security_migration_audit (
   document_id,
@@ -129,6 +184,8 @@ SET
   file_url = NULL,
   cover_url = CASE
     WHEN cover_storage_path IS NOT NULL THEN NULL
+    WHEN origin = 'legacy_unowned'
+      AND cover_url LIKE '%/storage/v1/object/public/documents/%' THEN NULL
     ELSE cover_url
   END
 WHERE origin IN ('catalog_import', 'legacy_unowned');
@@ -138,6 +195,7 @@ SET
   file_url = NULL,
   cover_url = CASE
     WHEN cover_storage_path IS NOT NULL THEN NULL
+    WHEN cover_url LIKE '%/storage/v1/object/public/documents/%' THEN NULL
     ELSE cover_url
   END
 WHERE origin = 'user_upload';
