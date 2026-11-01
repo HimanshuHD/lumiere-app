@@ -1,5 +1,0 @@
--- Verification:
--- SELECT count(*) FROM documents;    -- expect 9
--- SELECT count(*) FROM bookmarks;    -- expect 1
--- SELECT count(*) FROM reading_progress; -- expect 4
--- SELECT count(*) FROM profiles;     -- expect 1
