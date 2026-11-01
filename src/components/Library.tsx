@@ -3,6 +3,8 @@ import { Search, Clock, BookMarked, Play, Star, Sparkles, User, FileText, Hash, 
 import { Document, ReadingProgress } from '@/lib/supabase';
 import { useBookmarks, useReadingProgress } from '@/hooks/useData';
 import { ReadLaterButton } from '@/components/ReadLaterButton';
+import { DocumentCover } from '@/components/DocumentCover';
+import { DocumentFileLink } from '@/components/DocumentFileLink';
 
 interface LibraryProps {
   documents: Document[];
@@ -83,7 +85,7 @@ export function Library({ documents, loading, onOpenDoc, onViewAll }: LibraryPro
           onClick={() => onOpenDoc(featured)}
         >
           <div className="absolute inset-0">
-            <img src={featured.cover_url} alt="" className="w-full h-full object-cover" />
+            <DocumentCover document={featured} className="w-full h-full object-cover" />
             <div className="absolute inset-0 bg-gradient-to-t from-stone-900 via-stone-900/80 to-stone-900/30" />
           </div>
           <div className="relative p-8 sm:p-12 lg:p-16 min-h-[320px] sm:min-h-[380px] flex flex-col justify-end">
@@ -128,7 +130,7 @@ export function Library({ documents, loading, onOpenDoc, onViewAll }: LibraryPro
                   onClick={() => onOpenDoc(doc)}
                   className="flex gap-4 p-4 bg-white rounded-xl border border-stone-200 hover:border-amber-400 hover:shadow-lg transition-all cursor-pointer group"
                 >
-                  <img src={doc.cover_url} alt="" className="w-16 h-24 object-cover rounded-md flex-shrink-0" />
+                  <DocumentCover document={doc} className="w-16 h-24 object-cover rounded-md flex-shrink-0" />
                   <div className="flex-1 min-w-0">
                     <h3 className="font-serif font-semibold text-stone-800 text-sm truncate group-hover:text-amber-700 transition-colors">
                       {doc.title}
@@ -191,7 +193,7 @@ export function Library({ documents, loading, onOpenDoc, onViewAll }: LibraryPro
                     >
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
-                          <img src={doc.cover_url} alt="" className="w-8 h-11 object-cover rounded flex-shrink-0" />
+                          <DocumentCover document={doc} className="w-8 h-11 object-cover rounded flex-shrink-0" />
                           <div className="min-w-0">
                             <p className="text-sm font-medium text-stone-800 truncate group-hover:text-amber-700 transition-colors">{doc.title}</p>
                             <p className="text-xs text-stone-400 sm:hidden">{doc.author}</p>
@@ -254,7 +256,7 @@ export function Library({ documents, loading, onOpenDoc, onViewAll }: LibraryPro
               <X className="w-4 h-4 text-stone-500" />
             </button>
             <div className="flex flex-col sm:flex-row gap-6 p-6">
-              <img src={selectedDoc.cover_url} alt="" className="w-32 h-44 object-cover rounded-lg shadow-md flex-shrink-0 mx-auto sm:mx-0" />
+              <DocumentCover document={selectedDoc} className="w-32 h-44 object-cover rounded-lg shadow-md flex-shrink-0 mx-auto sm:mx-0" />
               <div className="flex-1 min-w-0">
                 <h3 className="text-xl font-serif font-bold text-stone-800 mb-1">{selectedDoc.title}</h3>
                 <p className="text-sm text-stone-500 mb-3">by {selectedDoc.author}</p>
@@ -292,17 +294,15 @@ export function Library({ documents, loading, onOpenDoc, onViewAll }: LibraryPro
                   </p>
                 </div>
                 <div className="flex items-center gap-3 flex-wrap">
-                  {selectedDoc.file_url && (
-                    <a
-                      href={selectedDoc.file_url}
+                  {(selectedDoc.file_storage_path || selectedDoc.file_url) && (
+                    <DocumentFileLink
+                      document={selectedDoc}
                       download={selectedDoc.file_name || undefined}
-                      target="_blank"
-                      rel="noopener noreferrer"
                       className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-stone-700 bg-stone-100 hover:bg-stone-200 border border-stone-200 rounded-lg transition-all"
                     >
                       <Download className="w-4 h-4 text-stone-500" />
                       Download original {(selectedDoc.file_format || 'file').toUpperCase()}
-                    </a>
+                    </DocumentFileLink>
                   )}
                   {!selectedProgress && <ReadLaterButton doc={selectedDoc} />}
                   <button
@@ -366,9 +366,8 @@ export function Library({ documents, loading, onOpenDoc, onViewAll }: LibraryPro
               className="group cursor-pointer"
             >
               <div className="relative aspect-[3/4] rounded-xl overflow-hidden mb-3 shadow-md group-hover:shadow-xl transition-all">
-                <img
-                  src={doc.cover_url}
-                  alt=""
+                <DocumentCover
+                  document={doc}
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />

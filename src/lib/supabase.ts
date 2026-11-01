@@ -26,18 +26,23 @@ export interface Document {
   title: string;
   author: string;
   category: string;
-  cover_url: string;
+  cover_url: string | null;
   reading_time: number;
   summary: string;
   chapters: Chapter[];
   is_featured: boolean;
   created_at: string;
+  origin: 'user_upload' | 'catalog_import' | 'legacy_unowned';
+  visibility: 'private' | 'shared';
   uploaded_by?: string | null;
   page_count?: number | null;
   file_url?: string | null;
+  file_storage_path?: string | null;
+  cover_storage_path?: string | null;
   file_format?: string | null;
   file_name?: string | null;
   source_url?: string | null;
+  source_identity?: string | null;
 }
 
 export interface UploadResult {

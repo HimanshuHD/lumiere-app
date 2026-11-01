@@ -53,7 +53,7 @@ function estimateReadingTime(pageCount: number): number {
   return Math.max(1, Math.round(pageCount / avgPagesPerMinute));
 }
 
-function textToChapters(text: string, title: string): { title: string; content: string }[] {
+function textToChapters(text: string): { title: string; content: string }[] {
   const normalized = text.replace(/\r\n/g, '\n');
   const sections = normalized.split(/\n{3,}/);
   if (sections.length <= 1) {
@@ -87,6 +87,7 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
   const [author, setAuthor] = useState('');
   const [category, setCategory] = useState('Fiction');
   const [summary, setSummary] = useState('');
+  const [visibility, setVisibility] = useState<'private' | 'shared'>('private');
   const [docFile, setDocFile] = useState<File | null>(null);
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
@@ -138,6 +139,7 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
     setUploading(true);
     setError(null);
     setSuccess(false);
+    const uploadedPaths: string[] = [];
     try {
       const docExt = docFile.name.split('.').pop()?.toLowerCase();
       const docId = crypto.randomUUID();
@@ -147,8 +149,7 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
         .from('documents')
         .upload(docPath, docFile);
       if (docUploadError) throw new Error(`Failed to upload document file: ${docUploadError.message}`);
-
-      const { data: docUrlData } = supabase.storage.from('documents').getPublicUrl(docPath);
+      uploadedPaths.push(docPath);
 
       const coverExt = coverFile.name.split('.').pop()?.toLowerCase() || 'jpg';
       const coverPath = `${user.id}/${docId}-cover.${coverExt}`;
@@ -156,13 +157,12 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
         .from('documents')
         .upload(coverPath, coverFile);
       if (coverUploadError) throw new Error(`Failed to upload cover image: ${coverUploadError.message}`);
-
-      const { data: coverUrlData } = supabase.storage.from('documents').getPublicUrl(coverPath);
+      uploadedPaths.push(coverPath);
 
       let chapters: { title: string; content: string }[] = [];
       if (docExt === 'txt') {
         const text = await docFile.text();
-        chapters = textToChapters(text, title);
+        chapters = textToChapters(text);
       } else {
         chapters = [{
           title: title,
@@ -180,12 +180,15 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
           author: author.trim(),
           category,
           summary: summary.trim() || 'No description provided.',
-          cover_url: coverUrlData.publicUrl,
+          cover_url: null,
+          cover_storage_path: coverPath,
           reading_time: readingTime,
           chapters: chapters as unknown as Record<string, unknown>[],
           is_featured: false,
           page_count: pages,
-          file_url: docUrlData.publicUrl,
+          origin: 'user_upload',
+          visibility,
+          file_storage_path: docPath,
           file_format: docExt,
           file_name: docFile.name,
         })
@@ -193,12 +196,14 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
         .single();
 
       if (insertError) throw new Error(`Failed to save document: ${insertError.message}`);
+      uploadedPaths.length = 0;
 
       setSuccess(true);
       setTitle('');
       setAuthor('');
       setSummary('');
       setCategory('Fiction');
+      setVisibility('private');
       setDocFile(null);
       setCoverFile(null);
       setCoverPreview(null);
@@ -207,10 +212,18 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
       if (insertData) {
         onUploaded(insertData as Document);
       }
-      showToast('Document uploaded successfully! It is now available in the library.');
+      showToast(visibility === 'shared'
+        ? 'Document uploaded and shared with signed-in Lumiere users.'
+        : 'Document uploaded privately. Only you can access it.');
       setTimeout(() => setSuccess(false), 4000);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'An unexpected error occurred during upload.';
+      let msg = err instanceof Error ? err.message : 'An unexpected error occurred during upload.';
+      if (uploadedPaths.length > 0) {
+        const { error: cleanupError } = await supabase.storage.from('documents').remove(uploadedPaths);
+        if (cleanupError) {
+          msg = `${msg}. Uploaded file cleanup failed: ${cleanupError.message}`;
+        }
+      }
       setError(msg);
       showToast(msg, 'error');
     } finally {
@@ -223,6 +236,7 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
     setAuthor('');
     setSummary('');
     setCategory('Fiction');
+    setVisibility('private');
     setDocFile(null);
     setCoverFile(null);
     setCoverPreview(null);
@@ -414,6 +428,40 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
               className="w-full px-4 py-2.5 bg-white border border-stone-200 rounded-lg text-sm text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-600/30 focus:border-amber-600/40 transition-all resize-none"
             />
           </div>
+
+          <fieldset>
+            <legend className="text-sm font-medium text-stone-700 mb-2">Who can access this document?</legend>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <label className="flex items-start gap-3 p-3 border border-stone-200 rounded-lg cursor-pointer flex-1">
+                <input
+                  type="radio"
+                  name="document-visibility"
+                  value="private"
+                  checked={visibility === 'private'}
+                  onChange={() => setVisibility('private')}
+                  className="mt-1 accent-amber-600"
+                />
+                <span>
+                  <span className="block text-sm font-medium text-stone-800">Private</span>
+                  <span className="block text-xs text-stone-500">Only you can view this document and its files.</span>
+                </span>
+              </label>
+              <label className="flex items-start gap-3 p-3 border border-stone-200 rounded-lg cursor-pointer flex-1">
+                <input
+                  type="radio"
+                  name="document-visibility"
+                  value="shared"
+                  checked={visibility === 'shared'}
+                  onChange={() => setVisibility('shared')}
+                  className="mt-1 accent-amber-600"
+                />
+                <span>
+                  <span className="block text-sm font-medium text-stone-800">Shared</span>
+                  <span className="block text-xs text-stone-500">Any signed-in Lumiere user can view and download it.</span>
+                </span>
+              </label>
+            </div>
+          </fieldset>
 
           {/* Auto-detected info */}
           {pageCount !== null && pageCount > 0 && (

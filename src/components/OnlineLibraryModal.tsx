@@ -30,6 +30,7 @@ interface OpdsBook {
   downloadType: string;
   catalogUrl: string;
   categories: string[];
+  rights: string;
 }
 
 interface OpdsFeedResult {
@@ -44,6 +45,42 @@ function getReadableFormat(book: OpdsBook): 'epub' | 'pdf' | null {
   if (type.includes('epub') || /\.epub(?:3)?(?:$|[.?])/i.test(book.downloadUrl)) return 'epub';
   if (type.includes('pdf') || /\.pdf(?:$|[.?])/i.test(book.downloadUrl)) return 'pdf';
   return null;
+}
+
+function canImportBook(catalogUrl: string | undefined, book: OpdsBook): boolean {
+  if (!catalogUrl || !book.id || !/public domain in the usa/i.test(book.rights)) return false;
+  try {
+    const url = new URL(catalogUrl);
+    return url.protocol === 'https:' &&
+      ['gutenberg.org', 'www.gutenberg.org', 'm.gutenberg.org', 'aleph.gutenberg.org'].includes(url.hostname);
+  } catch {
+    return false;
+  }
+}
+
+function getCatalogSourceIdentity(bookId: string, downloadUrl: string): string {
+  const gutenbergBookId = bookId.match(/\/ebooks\/([0-9]+)(?:$|[?#])/i)?.[1] ||
+    downloadUrl.match(/\/(?:ebooks|cache\/epub)\/([0-9]+)/i)?.[1];
+  return gutenbergBookId
+    ? `project-gutenberg:${gutenbergBookId}`
+    : downloadUrl.split(/[?#]/, 1)[0].replace(/\/+$/, '').toLowerCase();
+}
+
+function isSharedCatalogDocument(value: unknown): value is Document {
+  if (typeof value !== 'object' || value === null) return false;
+  const record = value as Record<string, unknown>;
+  return typeof record.id === 'string' &&
+    typeof record.title === 'string' &&
+    typeof record.author === 'string' &&
+    typeof record.category === 'string' &&
+    (typeof record.cover_url === 'string' || record.cover_url === null) &&
+    typeof record.reading_time === 'number' &&
+    typeof record.summary === 'string' &&
+    Array.isArray(record.chapters) &&
+    typeof record.is_featured === 'boolean' &&
+    typeof record.created_at === 'string' &&
+    record.origin === 'catalog_import' &&
+    record.visibility === 'shared';
 }
 
 const OPDS_CATALOGS: OpdsCatalog[] = [
@@ -151,26 +188,31 @@ export function OnlineLibraryModal({ open, onClose, onBookAdded }: OnlineLibrary
       showToast('Sign in to add books to your library.', 'error');
       return;
     }
-    if (!book.downloadUrl) return;
-
-    const format = getReadableFormat(book);
-    if (!format) {
+    if (!selectedCatalog || !canImportBook(selectedCatalog.url, book)) {
+      showToast('Only catalog entries explicitly marked public domain in the USA can be imported.', 'error');
+      return;
+    }
+    if (!getReadableFormat(book)) {
       showToast('This catalog entry does not provide a readable EPUB or PDF edition.', 'error');
       return;
     }
 
-    const bookId = book.id || book.downloadUrl;
+    const bookId = book.id;
     setAddingBookId(bookId);
     try {
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError) throw new Error(`Could not verify your sign-in session: ${sessionError.message}`);
+      if (!sessionData.session) throw new Error('Sign in to import catalog books.');
+
+      const sourceIdentity = getCatalogSourceIdentity(book.id, book.downloadUrl);
       const { data: existing, error: lookupError } = await supabase
         .from('documents')
         .select('*')
-        .eq('uploaded_by', user.id)
-        .eq('source_url', book.downloadUrl)
+        .eq('source_identity', sourceIdentity)
         .maybeSingle();
-      if (lookupError) throw new Error(`Could not check your library: ${lookupError.message}`);
+      if (lookupError) throw new Error(`Could not check the shared catalog: ${lookupError.message}`);
       if (existing) {
-        showToast('This book is already in your library. Opening it now.');
+        showToast('This shared catalog book is already available. Opening it now.');
         onBookAdded(existing as Document);
         return;
       }
@@ -178,78 +220,36 @@ export function OnlineLibraryModal({ open, onClose, onBookAdded }: OnlineLibrary
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
       const endpoint = new URL('/functions/v1/opds-fetch', supabaseUrl);
-      endpoint.searchParams.set('download', book.downloadUrl);
       const response = await fetch(endpoint, {
+        method: 'POST',
+        body: JSON.stringify({
+          action: 'import',
+          catalogUrl: selectedCatalog.url,
+          bookId,
+          accessToken: sessionData.session.access_token,
+        }),
         headers: {
+          'Content-Type': 'application/json',
           Authorization: `Bearer ${anonKey}`,
           apikey: anonKey,
         },
       });
       if (!response.ok) {
         const result = await response.json().catch(() => ({}));
-        throw new Error(result.error || result.message || `Could not fetch book file (${response.status})`);
+        throw new Error(result.error || result.message || `Could not import catalog book (${response.status})`);
       }
-      if (response.headers.get('X-Document-Format') !== format) {
-        throw new Error('The catalog returned a different format than expected.');
+      const importedDocument: unknown = await response.json();
+      if (!isSharedCatalogDocument(importedDocument)) {
+        throw new Error('The catalog import response was invalid.');
       }
-
-      const file = await response.blob();
-      const maxFileSize = 30 * 1024 * 1024;
-      if (file.size === 0 || file.size > maxFileSize) {
-        throw new Error(file.size === 0
-          ? 'The catalog returned an empty book file.'
-          : 'Book files must be smaller than 30 MB to add them to your library.');
-      }
-
-      const documentId = crypto.randomUUID();
-      const storagePath = `${user.id}/${documentId}.${format}`;
-      const contentType = format === 'epub' ? 'application/epub+zip' : 'application/pdf';
-      const { error: uploadError } = await supabase.storage
-        .from('documents')
-        .upload(storagePath, file, { contentType, cacheControl: '3600' });
-      if (uploadError) throw new Error(`Could not save book file: ${uploadError.message}`);
-
-      const { data: fileUrl } = supabase.storage.from('documents').getPublicUrl(storagePath);
-      const knownCategories = ['Fiction', 'Non-Fiction', 'Science', 'History', 'Technology', 'Philosophy', 'Adventure'];
-      const category = knownCategories.find((known) =>
-        book.categories.some((value) => value.toLowerCase() === known.toLowerCase())
-      ) || 'Fiction';
-      const { data: savedBook, error: insertError } = await supabase
-        .from('documents')
-        .insert({
-          title: book.title,
-          author: book.author,
-          category,
-          cover_url: book.coverUrl,
-          reading_time: 10,
-          summary: book.summary || 'Imported from an OPDS catalog.',
-          chapters: [],
-          is_featured: false,
-          uploaded_by: user.id,
-          file_url: fileUrl.publicUrl,
-          file_format: format,
-          file_name: `${book.title}.${format}`,
-          source_url: book.downloadUrl,
-        })
-        .select('*')
-        .single();
-
-      if (insertError) {
-        const { error: cleanupError } = await supabase.storage.from('documents').remove([storagePath]);
-        if (cleanupError) {
-          throw new Error(`Could not save book to your library: ${insertError.message}. File cleanup also failed: ${cleanupError.message}`);
-        }
-        throw new Error(`Could not save book to your library: ${insertError.message}`);
-      }
-
       showToast('Book added to your library. Opening it now.');
-      onBookAdded(savedBook as Document);
+      onBookAdded(importedDocument);
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Could not add this book to your library.', 'error');
     } finally {
       setAddingBookId(null);
     }
-  }, [onBookAdded, showToast, user]);
+  }, [onBookAdded, selectedCatalog, showToast, user]);
 
   const handleLoadRssFeed = useCallback((event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -373,6 +373,9 @@ export function OnlineLibraryModal({ open, onClose, onBookAdded }: OnlineLibrary
             ) : (
               <div className="p-4 space-y-2">
                 <p className="text-xs text-stone-400 px-2 pb-2">{books.length} feed entries found</p>
+                <p className="text-xs text-stone-500 px-2 pb-2">
+                  Only Project Gutenberg entries explicitly marked public domain in the USA can be added. Imported books are shared with all signed-in Lumiere users.
+                </p>
                 {books.map((book, idx) => (
                   <div
                     key={`${book.id}-${idx}`}
@@ -454,16 +457,16 @@ export function OnlineLibraryModal({ open, onClose, onBookAdded }: OnlineLibrary
                           : 'Open'}
                       </a>
                     )}
-                    {getReadableFormat(book) && (
+                    {getReadableFormat(book) && canImportBook(selectedCatalog?.url, book) && (
                       <button
                         onClick={() => void handleAddBook(book)}
                         disabled={addingBookId !== null}
                         className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-green-700 hover:bg-green-600 disabled:opacity-60 disabled:cursor-wait rounded-lg transition-all flex-shrink-0 whitespace-nowrap"
                       >
-                        {addingBookId === (book.id || book.downloadUrl)
+                        {addingBookId === book.id
                           ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
                           : <BookPlus className="w-3.5 h-3.5" />}
-                        {addingBookId === (book.id || book.downloadUrl) ? 'Adding...' : 'Add to Library'}
+                        {addingBookId === book.id ? 'Adding...' : 'Add to Shared Library'}
                       </button>
                     )}
                   </div>

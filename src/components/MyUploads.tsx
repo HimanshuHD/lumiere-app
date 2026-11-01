@@ -1,8 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
-import { FileEdit, Trash2, X, Loader2, BookOpen, Clock, Hash, Download, Pencil, Save } from 'lucide-react';
+import { FileEdit, Trash2, X, Loader2, BookOpen, Download, Pencil, Save } from 'lucide-react';
 import { supabase, Document } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
+import { DocumentCover } from '@/components/DocumentCover';
+import { DocumentFileLink } from '@/components/DocumentFileLink';
 
 const CATEGORIES = ['Fiction', 'Non-Fiction', 'Science', 'History', 'Technology', 'Philosophy', 'Adventure'];
 
@@ -22,11 +24,13 @@ export function MyUploads() {
       .select('*')
       .eq('uploaded_by', user.id)
       .order('created_at', { ascending: false });
-    if (!error && data) {
+    if (error) {
+      showToast(`Could not load your uploads: ${error.message}`, 'error');
+    } else if (data) {
       setDocs(data as Document[]);
     }
     setLoading(false);
-  }, [user]);
+  }, [showToast, user]);
 
   useEffect(() => {
     fetchMyUploads();
@@ -36,28 +40,21 @@ export function MyUploads() {
     if (!deleteDoc) return;
     setDeleting(true);
     try {
-      // Delete storage files if they exist
-      if (deleteDoc.file_url) {
-        const fileExt = deleteDoc.file_format || '';
-        const pathPattern = `${user?.id}/`;
-        // Try to extract path from URL — best-effort deletion
-        const url = new URL(deleteDoc.file_url);
-        const pathParts = url.pathname.split('/');
-        const fileName = pathParts[pathParts.length - 1];
-        const folderName = pathParts[pathParts.length - 2];
-        if (folderName && fileName) {
-          await supabase.storage.from('documents').remove([`${folderName}/${fileName}`]);
-        }
-        void fileExt;
-        void pathPattern;
-      }
-
       const { error } = await supabase.from('documents').delete().eq('id', deleteDoc.id);
       if (error) throw new Error(error.message);
 
       setDocs((prev) => prev.filter((d) => d.id !== deleteDoc.id));
-      showToast('Document deleted successfully.');
       setDeleteDoc(null);
+      const storagePaths = [deleteDoc.file_storage_path, deleteDoc.cover_storage_path]
+        .filter((path): path is string => Boolean(path));
+      if (storagePaths.length > 0) {
+        const { error: storageError } = await supabase.storage.from('documents').remove(storagePaths);
+        if (storageError) {
+          throw new Error(`Document deleted, but its storage files could not be removed: ${storageError.message}`);
+        }
+      }
+
+      showToast('Document deleted successfully.');
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Failed to delete document.', 'error');
     } finally {
@@ -101,6 +98,7 @@ export function MyUploads() {
                 <th className="text-left px-4 py-3 text-xs font-medium text-stone-500 uppercase tracking-wider w-[40%]">Document</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-stone-500 uppercase tracking-wider hidden sm:table-cell">Category</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-stone-500 uppercase tracking-wider hidden md:table-cell">Format</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-stone-500 uppercase tracking-wider hidden md:table-cell">Visibility</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-stone-500 uppercase tracking-wider hidden lg:table-cell">Uploaded</th>
                 <th className="px-4 py-3 text-right text-xs font-medium text-stone-500 uppercase tracking-wider w-24">Actions</th>
               </tr>
@@ -110,7 +108,7 @@ export function MyUploads() {
                 <tr key={doc.id} className="border-b border-stone-100 last:border-0 hover:bg-stone-50/50 transition-colors">
                   <td className="px-4 py-3 max-w-xs">
                     <div className="flex items-center gap-3">
-                      <img src={doc.cover_url} alt="" className="w-8 h-11 object-cover rounded flex-shrink-0" />
+                      <DocumentCover document={doc} className="w-8 h-11 object-cover rounded flex-shrink-0" />
                       <div className="min-w-0 overflow-hidden">
                         <p className="text-sm font-medium text-stone-800 truncate max-w-[180px]">{doc.title}</p>
                         <p className="text-xs text-stone-400 truncate max-w-[180px]">{doc.author}</p>
@@ -122,6 +120,12 @@ export function MyUploads() {
                   </td>
                   <td className="px-4 py-3 hidden md:table-cell">
                     <span className="text-xs text-stone-500 uppercase">{doc.file_format || 'txt'}</span>
+                    {doc.file_format && doc.file_format !== 'txt' && !doc.file_storage_path && !doc.file_url && (
+                      <span className="block text-[10px] text-amber-700 normal-case">Original file unavailable</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 hidden md:table-cell">
+                    <span className="text-xs text-stone-500 capitalize">{doc.visibility}</span>
                   </td>
                   <td className="px-4 py-3 text-sm text-stone-500 hidden lg:table-cell">
                     {new Date(doc.created_at).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}
@@ -212,6 +216,7 @@ function EditDocumentModal({ doc, onClose, onSaved }: { doc: Document; onClose: 
   const [author, setAuthor] = useState(doc.author);
   const [category, setCategory] = useState(doc.category);
   const [summary, setSummary] = useState(doc.summary);
+  const [visibility, setVisibility] = useState(doc.visibility);
   const [saving, setSaving] = useState(false);
 
   const handleSave = async () => {
@@ -224,12 +229,17 @@ function EditDocumentModal({ doc, onClose, onSaved }: { doc: Document; onClose: 
           author: author.trim(),
           category,
           summary: summary.trim(),
+          visibility,
         })
         .eq('id', doc.id)
         .select('*')
         .single();
       if (error) throw new Error(error.message);
-      showToast('Document updated successfully.');
+      showToast(visibility === doc.visibility
+        ? 'Document updated successfully.'
+        : visibility === 'private'
+          ? 'Document is private now. New access links will be blocked; existing links expire within 15 minutes.'
+          : 'Document is shared with signed-in Lumiere users.');
       onSaved(data as Document);
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Failed to update document.', 'error');
@@ -253,18 +263,18 @@ function EditDocumentModal({ doc, onClose, onSaved }: { doc: Document; onClose: 
         </div>
         <div className="p-6 space-y-5">
           <div className="flex items-center gap-4 pb-4 border-b border-stone-100">
-            <img src={doc.cover_url} alt="" className="w-14 h-20 object-cover rounded-lg shadow-md flex-shrink-0" />
+            <DocumentCover document={doc} className="w-14 h-20 object-cover rounded-lg shadow-md flex-shrink-0" />
             <div className="min-w-0">
               <p className="text-xs text-stone-400 uppercase tracking-wide">{doc.file_format || 'txt'} file</p>
-              {doc.file_url && (
-                <a
-                  href={doc.file_url}
+              {(doc.file_storage_path || doc.file_url) && (
+                <DocumentFileLink
+                  document={doc}
                   download={doc.file_name || undefined}
                   className="inline-flex items-center gap-1.5 text-xs text-amber-600 hover:text-amber-700 font-medium mt-1"
                 >
                   <Download className="w-3 h-3" />
                   Download original
-                </a>
+                </DocumentFileLink>
               )}
             </div>
           </div>
@@ -276,6 +286,20 @@ function EditDocumentModal({ doc, onClose, onSaved }: { doc: Document; onClose: 
               onChange={(e) => setTitle(e.target.value)}
               className="w-full px-4 py-2.5 bg-white border border-stone-200 rounded-lg text-sm text-stone-800 focus:outline-none focus:ring-2 focus:ring-amber-600/30 focus:border-amber-600/40 transition-all"
             />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-stone-500 mb-1.5">Visibility</label>
+            <select
+              value={visibility}
+              onChange={(event) => setVisibility(event.target.value as 'private' | 'shared')}
+              className="w-full px-4 py-2.5 bg-white border border-stone-200 rounded-lg text-sm text-stone-800 focus:outline-none focus:ring-2 focus:ring-amber-600/30 focus:border-amber-600/40"
+            >
+              <option value="private">Private — only you can access it</option>
+              <option value="shared">Shared — all signed-in users can access it</option>
+            </select>
+            <p className="text-xs text-stone-400 mt-1.5">
+              Changing to Private blocks new access, but downloaded copies and already-issued links remain usable until they expire.
+            </p>
           </div>
           <div>
             <label className="block text-xs font-medium text-stone-500 mb-1.5">Author</label>

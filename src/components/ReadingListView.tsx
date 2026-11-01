@@ -2,6 +2,7 @@ import { BookOpen, Clock, ListTodo } from 'lucide-react';
 import { Document } from '@/lib/supabase';
 import { useReadingList } from '@/hooks/useData';
 import { ReadLaterButton } from '@/components/ReadLaterButton';
+import { DocumentCover } from '@/components/DocumentCover';
 
 interface ReadingListViewProps {
   onOpenDoc: (doc: Document) => void;
@@ -53,9 +54,8 @@ export function ReadingListView({ onOpenDoc }: ReadingListViewProps) {
                   onClick={() => onOpenDoc(doc)}
                   className="relative aspect-[3/4] rounded-xl overflow-hidden mb-3 shadow-md group-hover:shadow-xl transition-all cursor-pointer"
                 >
-                  <img
-                    src={doc.cover_url}
-                    alt=""
+                  <DocumentCover
+                    document={doc}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
