@@ -138,6 +138,7 @@ function AppContent() {
                 loading={docsLoading}
                 onOpenDoc={setActiveDoc}
                 onBack={() => setView('library')}
+                onCollectionChanged={async () => { await refetch(); }}
               />
             )}
           </>

@@ -11,4 +11,12 @@ export const supabaseCatalogCollectionStore: CatalogCollectionStore = {
       );
     if (error) throw new Error(`Could not add catalog document to your collection: ${error.message}`);
   },
+  async removeMembership(userId, documentId) {
+    const { error } = await supabase
+      .from('document_library_memberships')
+      .delete()
+      .eq('user_id', userId)
+      .eq('document_id', documentId);
+    if (error) throw new Error(`Could not remove catalog document from your collection: ${error.message}`);
+  },
 };

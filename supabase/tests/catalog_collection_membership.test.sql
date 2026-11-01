@@ -1,7 +1,7 @@
 BEGIN;
 
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
-SELECT plan(8);
+SELECT plan(9);
 
 INSERT INTO auth.users (
   instance_id,
@@ -105,6 +105,9 @@ SELECT is(
   0,
   'a different user cannot read another personal collection'
 );
+INSERT INTO public.document_library_memberships (document_id)
+VALUES ('45000000-0000-0000-0000-000000000001')
+ON CONFLICT (user_id, document_id) DO NOTHING;
 
 SELECT set_config('request.jwt.claim.sub', '44000000-0000-0000-0000-000000000001', true);
 SELECT throws_ok(
@@ -125,6 +128,13 @@ SELECT is(
     WHERE id = '45000000-0000-0000-0000-000000000001'),
   1,
   'removing membership does not delete the canonical document'
+);
+SELECT set_config('request.jwt.claim.sub', '44000000-0000-0000-0000-000000000002', true);
+SELECT is(
+  (SELECT count(*)::integer FROM public.document_library_memberships
+    WHERE document_id = '45000000-0000-0000-0000-000000000001'),
+  1,
+  'removing one membership leaves another user collection untouched'
 );
 
 SELECT is(
