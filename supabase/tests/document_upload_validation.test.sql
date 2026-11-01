@@ -1,7 +1,7 @@
 BEGIN;
 
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
-SELECT plan(14);
+SELECT plan(12);
 
 INSERT INTO auth.users (
   instance_id,
@@ -149,56 +149,27 @@ SELECT throws_ok(
   'an owner cannot attach an unvalidated object by directly inserting a document'
 );
 
-SELECT throws_ok(
+SELECT lives_ok(
   $$INSERT INTO storage.objects (bucket_id, name, owner_id, metadata)
     VALUES (
       'documents',
-      '43000000-0000-0000-0000-000000000001/forged.pdf',
+      '43000000-0000-0000-0000-000000000001/43000000-0000-4000-8000-000000000004.pdf',
       '43000000-0000-0000-0000-000000000001',
-      '{"mimetype":"image/jpeg","size":100}'
+      '{"mimetype":"image/jpeg","size":"unknown"}'
     )$$,
-  '42501',
-  NULL,
-  'clients cannot bypass byte validation by supplying a matching or forged MIME type'
+  'owner-scoped objects can stage despite client metadata because finalization validates bytes'
 );
-
-SELECT throws_ok(
-  $$INSERT INTO storage.objects (bucket_id, name, owner_id, metadata)
-    VALUES (
-      'documents',
-      '43000000-0000-0000-0000-000000000001/large-cover-cover.jpg',
-      '43000000-0000-0000-0000-000000000001',
-      '{"mimetype":"image/jpeg","size":5242881}'
-    )$$,
-  '42501',
-  NULL,
-  'cover objects cannot be created directly with forged size metadata'
-);
-
-SELECT throws_ok(
-  $$INSERT INTO storage.objects (bucket_id, name, owner_id, metadata)
-    VALUES (
-      'documents',
-      '43000000-0000-0000-0000-000000000001/large.pdf',
-      '43000000-0000-0000-0000-000000000001',
-      '{"mimetype":"application/pdf","size":52428801}'
-    )$$,
-  '42501',
-  NULL,
-  'document objects cannot be created directly with forged size metadata'
-);
-
-SELECT throws_ok(
-  $$INSERT INTO storage.objects (bucket_id, name, owner_id, metadata)
-    VALUES (
-      'documents',
-      '43000000-0000-0000-0000-000000000001/unknown.pdf',
-      '43000000-0000-0000-0000-000000000001',
-      '{"mimetype":"application/pdf","size":"unknown"}'
-    )$$,
-  '42501',
-  NULL,
-  'objects with missing or malformed metadata cannot bypass the validation endpoint'
+SELECT ok(
+  EXISTS (
+    SELECT 1
+    FROM pg_policies
+    WHERE schemaname = 'storage'
+      AND tablename = 'objects'
+      AND policyname = 'documents_bucket_insert'
+      AND with_check LIKE '%can_cleanup_document_storage_object%'
+      AND with_check NOT LIKE '%metadata%'
+  ),
+  'staging is limited to unused owner paths without relying on pre-insert metadata'
 );
 
 RESET ROLE;
