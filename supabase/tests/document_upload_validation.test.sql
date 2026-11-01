@@ -1,7 +1,7 @@
 BEGIN;
 
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
-SELECT plan(6);
+SELECT plan(14);
 
 INSERT INTO auth.users (
   instance_id,
@@ -26,6 +26,37 @@ VALUES (
   now()
 );
 
+INSERT INTO public.documents (
+  id,
+  title,
+  author,
+  category,
+  uploaded_by,
+  origin,
+  visibility,
+  file_format,
+  file_storage_path
+)
+VALUES (
+  '43000000-0000-0000-0000-000000000002',
+  'Existing validated upload',
+  'Test Author',
+  'Fiction',
+  '43000000-0000-0000-0000-000000000001',
+  'user_upload',
+  'private',
+  'pdf',
+  '43000000-0000-0000-0000-000000000001/43000000-0000-4000-8000-000000000002.pdf'
+);
+
+INSERT INTO storage.objects (bucket_id, name, owner_id, metadata)
+VALUES (
+  'documents',
+  '43000000-0000-0000-0000-000000000001/43000000-0000-4000-8000-000000000002.pdf',
+  '43000000-0000-0000-0000-000000000001',
+  '{"mimetype":"application/pdf","size":100}'
+);
+
 SELECT is(
   (SELECT file_size_limit FROM storage.buckets WHERE id = 'documents'),
   52428800::bigint,
@@ -35,18 +66,87 @@ SELECT is(
 SET LOCAL ROLE authenticated;
 SELECT set_config('request.jwt.claim.sub', '43000000-0000-0000-0000-000000000001', true);
 
+SELECT ok(
+  EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'storage'
+      AND tablename = 'objects'
+      AND policyname = 'documents_bucket_insert'
+  ),
+  'authenticated clients can stage owner-scoped objects before server-side validation'
+);
+SELECT ok(
+  NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'storage'
+      AND tablename = 'objects'
+      AND policyname = 'documents_bucket_update'
+  ),
+  'authenticated clients cannot replace validated files through direct storage updates'
+);
+SELECT ok(
+  NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public'
+      AND tablename = 'documents'
+      AND policyname = 'insert_documents'
+  ),
+  'authenticated clients must finalize document records through the validation service'
+);
+SELECT ok(
+  NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public'
+      AND tablename = 'documents'
+      AND policyname = 'delete_documents'
+  ),
+  'authenticated clients must use the recoverable document deletion workflow'
+);
 INSERT INTO storage.objects (bucket_id, name, owner_id, metadata)
 VALUES (
   'documents',
-  '43000000-0000-0000-0000-000000000001/valid.pdf',
+  '43000000-0000-0000-0000-000000000001/43000000-0000-4000-8000-000000000003.pdf',
   '43000000-0000-0000-0000-000000000001',
   '{"mimetype":"application/pdf","size":100}'
 );
 SELECT is(
   (SELECT count(*)::integer FROM storage.objects
-    WHERE name = '43000000-0000-0000-0000-000000000001/valid.pdf'),
+    WHERE name = '43000000-0000-0000-0000-000000000001/43000000-0000-4000-8000-000000000003.pdf'),
   1,
-  'an owner can upload a supported document with matching metadata'
+  'owners can stage files with supported metadata for byte-level finalization'
+);
+SELECT is(
+  public.can_cleanup_document_storage_object(
+    '43000000-0000-0000-0000-000000000001/43000000-0000-4000-8000-000000000002.pdf'
+  ),
+  false,
+  'an owner cannot directly delete storage files while their document record exists'
+);
+SELECT throws_ok(
+  $$UPDATE public.documents SET file_format = 'txt'
+    WHERE id = '43000000-0000-0000-0000-000000000002'$$,
+  '42501',
+  NULL,
+  'an owner cannot change the validated upload format after finalization'
+);
+DELETE FROM public.documents
+WHERE id = '43000000-0000-0000-0000-000000000002';
+SELECT is(
+  (SELECT count(*)::integer FROM public.documents
+    WHERE id = '43000000-0000-0000-0000-000000000002'),
+  1,
+  'an owner cannot bypass recoverable deletion with a direct delete'
+);
+SELECT throws_ok(
+  $$INSERT INTO public.documents (
+      title, author, category, uploaded_by, origin, visibility, file_format
+    ) VALUES (
+      'Unvalidated upload', 'Test Author', 'Fiction',
+      '43000000-0000-0000-0000-000000000001', 'user_upload', 'private', 'pdf'
+    )$$,
+  '42501',
+  NULL,
+  'an owner cannot attach an unvalidated object by directly inserting a document'
 );
 
 SELECT throws_ok(
@@ -59,7 +159,7 @@ SELECT throws_ok(
     )$$,
   '42501',
   NULL,
-  'a document extension cannot be paired with an unrelated MIME type'
+  'clients cannot bypass byte validation by supplying a matching or forged MIME type'
 );
 
 SELECT throws_ok(
@@ -72,7 +172,7 @@ SELECT throws_ok(
     )$$,
   '42501',
   NULL,
-  'cover uploads are limited to 5 MB'
+  'cover objects cannot be created directly with forged size metadata'
 );
 
 SELECT throws_ok(
@@ -85,7 +185,7 @@ SELECT throws_ok(
     )$$,
   '42501',
   NULL,
-  'document uploads are limited to 50 MB'
+  'document objects cannot be created directly with forged size metadata'
 );
 
 SELECT throws_ok(
@@ -98,7 +198,7 @@ SELECT throws_ok(
     )$$,
   '42501',
   NULL,
-  'uploads with missing or malformed size metadata fail closed'
+  'objects with missing or malformed metadata cannot bypass the validation endpoint'
 );
 
 RESET ROLE;

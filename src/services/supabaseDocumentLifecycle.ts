@@ -53,12 +53,25 @@ export const supabaseDocumentLifecycleDependencies: DocumentLifecycleDependencie
       return data as Document | null;
     },
     async insert(document: UserDocumentInsert) {
+      const { chapters, ...payload } = document;
+      void chapters;
+      const { data: finalized, error: finalizeError } = await supabase.functions.invoke<{ id: string }>(
+        'finalize-user-document-upload',
+        { body: { document: payload } },
+      );
+      if (finalizeError) {
+        throw new Error(`Could not validate and finalize the uploaded document: ${finalizeError.message}`);
+      }
+      if (finalized?.id !== document.id) {
+        throw new Error('The upload service did not confirm document finalization.');
+      }
+
       const { data, error } = await supabase
         .from('documents')
-        .insert(document)
         .select('*')
+        .eq('id', document.id)
         .single();
-      throwOnError(error, 'Could not save document');
+      throwOnError(error, 'Could not load finalized document');
       if (!data) throw new Error('The saved document was not returned.');
       return data as Document;
     },

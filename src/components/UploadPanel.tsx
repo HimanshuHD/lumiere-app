@@ -30,6 +30,7 @@ import {
   validateDocumentFile,
 } from '@/services/documentValidation';
 import { supabaseDocumentLifecycleDependencies } from '@/services/supabaseDocumentLifecycle';
+import { textToChapters } from '@/services/documentText';
 
 interface UploadPanelProps {
   onUploaded: (doc: Document) => void;
@@ -131,33 +132,6 @@ async function extractPageCount(file: File, format: string): Promise<number | nu
 function estimateReadingTime(pageCount: number): number {
   const avgPagesPerMinute = 2;
   return Math.max(1, Math.round(pageCount / avgPagesPerMinute));
-}
-
-function textToChapters(text: string): { title: string; content: string }[] {
-  const normalized = text.replace(/\r\n/g, '\n');
-  const sections = normalized.split(/\n{3,}/);
-  if (sections.length <= 1) {
-    const chunks: string[] = [];
-    const paragraphs = normalized.split(/\n{2,}/);
-    let current = '';
-    for (const para of paragraphs) {
-      if ((current + para).length > 5000 && current) {
-        chunks.push(current);
-        current = para;
-      } else {
-        current = current ? current + '\n\n' + para : para;
-      }
-    }
-    if (current) chunks.push(current);
-    return chunks.map((content, i) => ({
-      title: `Section ${i + 1}`,
-      content,
-    }));
-  }
-  return sections.map((content, i) => ({
-    title: `Section ${i + 1}`,
-    content: content.trim(),
-  }));
 }
 
 export function UploadPanel({ onUploaded }: UploadPanelProps) {
