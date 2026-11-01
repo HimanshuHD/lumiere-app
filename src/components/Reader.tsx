@@ -446,6 +446,7 @@ export function Reader({ document: doc, onBack }: ReaderProps) {
         <div className="max-w-5xl mx-auto px-4 sm:px-6">
           {fileUrl ? (
             <PdfViewer
+              key={doc.id}
               url={fileUrl}
               title={doc.title}
               initialProgress={getProgress(doc.id)?.scroll_percent ?? 0}
