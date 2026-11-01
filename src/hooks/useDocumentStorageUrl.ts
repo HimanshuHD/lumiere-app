@@ -1,17 +1,23 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { getSignedUrlRefreshDelay } from './documentStorageUrlRefresh';
 
 const SIGNED_URL_TTL_SECONDS = 900;
 const SIGNED_URL_REFRESH_MS = 720_000;
 
 interface SignedUrlCacheEntry {
   promise: Promise<string>;
-  expiresAt: number;
+  refreshAt: number;
 }
 
 const signedUrlCache = new Map<string, SignedUrlCacheEntry>();
 
-async function getSignedDocumentUrl(storagePath: string): Promise<string> {
+interface SignedUrlResult {
+  url: string;
+  refreshAt: number;
+}
+
+async function getSignedDocumentUrl(storagePath: string): Promise<SignedUrlResult> {
   const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
   if (sessionError) throw sessionError;
   const userId = sessionData.session?.user.id;
@@ -19,16 +25,18 @@ async function getSignedDocumentUrl(storagePath: string): Promise<string> {
 
   const cacheKey = `${userId}:${storagePath}`;
   const cached = signedUrlCache.get(cacheKey);
-  if (cached && Date.now() < cached.expiresAt) return cached.promise;
+  if (cached && Date.now() < cached.refreshAt) {
+    return { url: await cached.promise, refreshAt: cached.refreshAt };
+  }
 
   const entry: SignedUrlCacheEntry = {
-    expiresAt: Number.POSITIVE_INFINITY,
+    refreshAt: Number.POSITIVE_INFINITY,
     promise: supabase.storage
       .from('documents')
       .createSignedUrl(storagePath, SIGNED_URL_TTL_SECONDS)
       .then(({ data, error }) => {
         if (error) throw error;
-        entry.expiresAt = Date.now() + SIGNED_URL_REFRESH_MS;
+        entry.refreshAt = Date.now() + SIGNED_URL_REFRESH_MS;
         return data.signedUrl;
       })
       .catch((error: unknown) => {
@@ -37,7 +45,7 @@ async function getSignedDocumentUrl(storagePath: string): Promise<string> {
       }),
   };
   signedUrlCache.set(cacheKey, entry);
-  return entry.promise;
+  return { url: await entry.promise, refreshAt: entry.refreshAt };
 }
 
 export function useDocumentStorageUrl(storagePath: string | null | undefined, fallbackUrl?: string | null) {
@@ -58,11 +66,14 @@ export function useDocumentStorageUrl(storagePath: string | null | undefined, fa
 
     const loadSignedUrl = async () => {
       try {
-        const signedUrl = await getSignedDocumentUrl(storagePath);
+        const { url: signedUrl, refreshAt } = await getSignedDocumentUrl(storagePath);
         if (!active) return;
         setUrl(signedUrl);
         setError(null);
-        refreshTimer = setTimeout(() => void loadSignedUrl(), SIGNED_URL_REFRESH_MS);
+        refreshTimer = setTimeout(
+          () => void loadSignedUrl(),
+          getSignedUrlRefreshDelay(refreshAt),
+        );
       } catch (error) {
         if (!active) return;
         console.error('Failed to authorize document storage access:', error);
