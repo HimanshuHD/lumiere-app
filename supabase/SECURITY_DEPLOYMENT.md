@@ -35,7 +35,18 @@ Document owners can also access objects under their own user-ID folder for stora
 
 ## OPDS outbound request policy
 
-Custom RSS/Atom feeds are supported only over HTTPS, on the standard HTTPS port, without URL credentials. IP-literal hosts, unqualified hostnames, and local or special-use hostname suffixes are not supported. Curated catalog browsing and the Project Gutenberg import flow remain supported. The outbound request policy enforces a 15-second request/body timeout, a 2 MiB feed response limit, a 30 MiB book-download limit, and at most five redirects. Downloaded books must have an EPUB ZIP header with the required first `mimetype` entry or a PDF header; MIME types and filename extensions alone are not trusted. DNS answers are checked before each connection, but native `fetch` resolves the hostname independently; this does not pin the checked address and leaves a DNS-rebinding/TOCTOU risk. Close that gap with a controlled outbound proxy that enforces destination IP policy at connection time.
+The OPDS fetch protections delivered for [issue #10](https://github.com/HimanshuHD/lumiere-app/issues/10) are:
+
+- Custom RSS/Atom feeds use HTTPS on the standard port, without URL credentials. IP-literal hosts, unqualified hostnames, and local or special-use hostname suffixes are rejected. Curated catalog browsing and the Project Gutenberg import flow remain supported.
+- Initial destinations and every redirect are checked against the URL and DNS-address policies. Redirects are followed manually and are limited to five.
+- Requests and response-body reads have a 15-second timeout. Feed responses are limited to 2 MiB and book downloads to 30 MiB.
+- Downloaded books must have an EPUB ZIP header with the required first `mimetype` entry or a PDF header; MIME types and filename extensions alone are not trusted.
+- Anonymous feed browsing requires a Cloudflare Turnstile challenge. Authenticated browsing requires a valid Supabase user session. Both use a configurable per-IP quota, defaulting to five requests per minute.
+- Internal failures are logged server-side and returned to clients as predictable errors without exposing internal details.
+
+The DNS checks do not pin the checked address to the address used by the network connection: native `fetch` resolves the hostname independently. This leaves a DNS-rebinding/time-of-check-to-time-of-use risk. That connection-time enforcement work is intentionally deferred to [issue #21](https://github.com/HimanshuHD/lumiere-app/issues/21), pending a controlled egress proxy; the current checks must not be treated as eliminating the risk.
+
+The focused policy tests are in `tests/opdsFetchPolicy.test.ts`; they cover URL/DNS policy, redirects, time and size bounds, Turnstile/rate-limit helpers, and downloaded-file signatures. The issue #21 follow-up requires additional tests proving that the validated address is the one actually contacted, including DNS rebinding.
 
 Feed browsing is rate-limited to five requests per client IP per minute by default; configure `OPDS_REQUESTS_PER_IP_PER_MINUTE` to an integer from 1 to 100. Authenticated browsing requires a valid Supabase user session and is subject to the same IP quota. Anonymous browsing additionally requires a Cloudflare Turnstile token with the `opds_browse` action. Configure `TURNSTILE_SECRET_KEY` and `TURNSTILE_EXPECTED_HOSTNAME` as Edge Function secrets, and `VITE_TURNSTILE_SITE_KEY` in the frontend build environment. Set the expected hostname to the exact app hostname. The function uses `cf-connecting-ip` when present, otherwise the first address in `x-forwarded-for`; verify that the deployed Supabase gateway supplies/overwrites these headers before relying on IP-based quotas. Rate-limit records store an HMAC of the client IP (using the service-role key), are inaccessible to client roles, and old buckets are periodically removed.
 
