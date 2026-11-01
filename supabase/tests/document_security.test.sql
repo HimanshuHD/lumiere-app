@@ -1,7 +1,7 @@
 BEGIN;
 
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
-SELECT plan(25);
+SELECT plan(30);
 
 INSERT INTO auth.users (
   instance_id,
@@ -287,6 +287,19 @@ SELECT ok(
   ),
   'the privileged storage-reference check is only executable by signed-in users'
 );
+SELECT ok(
+  has_function_privilege(
+    'authenticated',
+    'public.can_attach_document_storage_paths(uuid,text,text)',
+    'EXECUTE'
+  )
+  AND NOT has_function_privilege(
+    'anon',
+    'public.can_attach_document_storage_paths(uuid,text,text)',
+    'EXECUTE'
+  ),
+  'the protected-path association check is only executable by signed-in users'
+);
 
 SET LOCAL ROLE anon;
 SELECT set_config('request.jwt.claim.sub', '30000000-0000-0000-0000-000000000003', true);
@@ -382,6 +395,27 @@ SELECT throws_ok(
   NULL,
   'an owner cannot turn an upload into a catalog record'
 );
+SELECT throws_ok(
+  $$INSERT INTO public.documents (
+      title, author, category, uploaded_by, origin, visibility, file_storage_path
+    )
+    VALUES (
+      'Aliased quarantined file', 'Test Author', 'Fiction',
+      '10000000-0000-0000-0000-000000000001', 'user_upload', 'private',
+      '10000000-0000-0000-0000-000000000001/quarantined-book.epub'
+    )$$,
+  '42501',
+  NULL,
+  'an owner cannot attach a quarantined file to a new upload'
+);
+SELECT throws_ok(
+  $$UPDATE public.documents
+    SET file_storage_path = '10000000-0000-0000-0000-000000000001/quarantined-book.epub'
+    WHERE id = '20000000-0000-0000-0000-000000000001'$$,
+  '42501',
+  NULL,
+  'an owner cannot update an upload to reference a quarantined file'
+);
 SELECT lives_ok(
   $$INSERT INTO public.bookmarks (user_id, document_id)
     VALUES ('10000000-0000-0000-0000-000000000001',
@@ -417,6 +451,32 @@ SELECT is(
       AND name = '10000000-0000-0000-0000-000000000001/quarantined-book.epub'),
   0,
   'an owner cannot select a quarantined legacy file for a new signed URL'
+);
+UPDATE storage.objects
+SET metadata = jsonb_set(metadata, '{blocked}', 'true'::jsonb)
+WHERE bucket_id = 'documents'
+  AND name = '10000000-0000-0000-0000-000000000001/quarantined-book.epub';
+SELECT is(
+  (SELECT metadata ->> 'blocked' FROM storage.objects
+    WHERE bucket_id = 'documents'
+      AND name = '10000000-0000-0000-0000-000000000001/quarantined-book.epub'),
+  NULL::text,
+  'an owner cannot mutate a quarantined file through storage'
+);
+SELECT is(
+  NOT public.can_cleanup_document_storage_object(
+    '10000000-0000-0000-0000-000000000001/quarantined-book.epub'
+  )
+  AND NOT EXISTS (
+    SELECT 1
+    FROM public.documents AS document
+    WHERE (document.file_storage_path = '10000000-0000-0000-0000-000000000001/quarantined-book.epub'
+      OR document.cover_storage_path = '10000000-0000-0000-0000-000000000001/quarantined-book.epub')
+      AND document.origin = 'user_upload'
+      AND document.uploaded_by = auth.uid()
+  ),
+  true,
+  'an owner cannot delete a quarantined file through storage'
 );
 UPDATE public.documents
 SET visibility = 'private'
