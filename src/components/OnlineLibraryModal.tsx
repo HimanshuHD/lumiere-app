@@ -248,7 +248,7 @@ export function OnlineLibraryModal({ open, onClose, onBookAdded }: OnlineLibrary
         }),
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${anonKey}`,
+          Authorization: `Bearer ${sessionData.session.access_token}`,
           apikey: anonKey,
         },
       });

@@ -637,14 +637,14 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const validation = validateOutboundUrl(feedUrl);
-    if (!validation.ok) {
+    const urlValidation = validateOutboundUrl(feedUrl);
+    if (!urlValidation.ok) {
       return new Response(
-        JSON.stringify({ error: validation.error }),
+        JSON.stringify({ error: urlValidation.error }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
-    const parsedFeedUrl = validation.url;
+    const parsedFeedUrl = urlValidation.url;
 
     let feedResult;
     try {
@@ -697,8 +697,8 @@ Deno.serve(async (req: Request) => {
         { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
-    const validation = XMLValidator.validate(xmlText);
-    if (validation !== true) {
+    const xmlValidation = XMLValidator.validate(xmlText);
+    if (xmlValidation !== true) {
       return new Response(
         JSON.stringify({ error: "Invalid XML returned by catalog" }),
         { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
