@@ -33,6 +33,16 @@ Anonymous users cannot read document rows or document-bucket objects. External c
 The separate avatars bucket remains public-read, with insert, update, and delete constrained to the authenticated owner’s user-ID folder.
 Document owners can also access objects under their own user-ID folder for storage cleanup, including objects left behind before a document row was created or after it was deleted. A privileged reference check prevents cleanup access to any path still referenced by a document, including quarantined legacy rows hidden by row-level security; it does not expose document metadata or another user’s folder. The same protected-reference check is applied to document inserts and updates, so an owner cannot alias a protected file into a new upload. Storage deletion is restricted to genuinely orphaned objects or files attached to the caller’s own upload.
 
+## Privileged catalog maintenance
+
+Authorized catalog maintenance is available at `/admin/catalog`. The page is hidden from ordinary users, and both its Edge Function and database RPC independently require a trusted `app_metadata.role` value of `admin`. The database checks the current `auth.users.raw_app_meta_data`, rather than trusting editable profile or user metadata. A direct URL or client-side role change does not grant access.
+
+Assign or revoke this role only through a trusted server-side Supabase Auth Admin API client, such as `supabase.auth.admin.updateUserById(userId, { app_metadata: { role: 'admin' } })`. That client must use a server-only service-role key; never put the key in the browser or a `VITE_` variable. Have the administrator sign out and back in after a role change so the frontend receives an updated claim.
+
+Global deletion permanently removes the canonical document and cascades its bookmarks, reading progress, Read Later entries, and collection memberships. A confirmation lists distinct affected-user counts. File and cover cleanup is durably queued and retried through the admin Edge Function; a storage path still referenced by another document is retained. Configure the single-page application host to serve `index.html` for `/admin/catalog` so the URL also works when opened directly.
+
+Deploy `20261102000500_add_privileged_catalog_deletion.sql` before the `admin-catalog-maintenance` Edge Function and frontend. The function uses Supabase-provided `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY`; keep all service-role access server-side.
+
 ## OPDS outbound request policy
 
 The OPDS fetch protections delivered for [issue #10](https://github.com/HimanshuHD/lumiere-app/issues/10) are:

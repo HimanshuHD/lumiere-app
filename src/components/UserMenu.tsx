@@ -1,15 +1,18 @@
 import { useState, useRef, useEffect } from 'react';
-import { User, FileEdit, LogOut, ChevronDown } from 'lucide-react';
+import { User, FileEdit, LogOut, ChevronDown, Shield } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
+import { isCatalogAdmin } from '@/lib/catalogAdminAccess';
 
 interface UserMenuProps {
   onProfile: () => void;
   onMyUploads: () => void;
+  onAdminCatalog: () => void;
   onSignOut: () => void;
 }
 
-export function UserMenu({ onProfile, onMyUploads, onSignOut }: UserMenuProps) {
+export function UserMenu({ onProfile, onMyUploads, onAdminCatalog, onSignOut }: UserMenuProps) {
   const { user, profile } = useAuth();
+  const catalogAdmin = isCatalogAdmin(user);
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -62,6 +65,15 @@ export function UserMenu({ onProfile, onMyUploads, onSignOut }: UserMenuProps) {
             <FileEdit className="w-4 h-4 text-stone-400" />
             My Uploads
           </button>
+          {catalogAdmin && (
+            <button
+              onClick={() => { onAdminCatalog(); setOpen(false); }}
+              className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-stone-700 hover:bg-stone-50 transition-colors"
+            >
+              <Shield className="w-4 h-4 text-stone-400" />
+              Catalog Admin
+            </button>
+          )}
           <div className="border-t border-stone-100 my-1" />
           <button
             onClick={() => { onSignOut(); setOpen(false); }}
