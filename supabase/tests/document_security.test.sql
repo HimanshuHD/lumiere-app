@@ -1,7 +1,7 @@
 BEGIN;
 
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
-SELECT plan(20);
+SELECT plan(22);
 
 INSERT INTO auth.users (
   instance_id,
@@ -98,6 +98,26 @@ VALUES
     'user_upload',
     'private',
     NULL
+  ),
+  (
+    '20000000-0000-0000-0000-000000000006',
+    'Duplicate catalog fixture B',
+    'Test Author',
+    'Fiction',
+    NULL,
+    'legacy_unowned',
+    'private',
+    'project-gutenberg:test-duplicate'
+  ),
+  (
+    '20000000-0000-0000-0000-000000000007',
+    'Duplicate catalog fixture C',
+    'Test Author',
+    'Fiction',
+    NULL,
+    'legacy_unowned',
+    'private',
+    'project-gutenberg:test-duplicate'
   );
 
 INSERT INTO storage.objects (bucket_id, name, owner_id, metadata)
@@ -118,6 +138,92 @@ VALUES
 UPDATE public.documents
 SET file_storage_path = '10000000-0000-0000-0000-000000000001/deleted-document.pdf'
 WHERE id = '20000000-0000-0000-0000-000000000005';
+
+CREATE TEMP TABLE duplicate_catalog_documents (
+  duplicate_id uuid PRIMARY KEY,
+  canonical_id uuid NOT NULL
+) ON COMMIT DROP;
+
+INSERT INTO duplicate_catalog_documents (duplicate_id, canonical_id)
+VALUES
+  ('20000000-0000-0000-0000-000000000003', '20000000-0000-0000-0000-000000000003'),
+  ('20000000-0000-0000-0000-000000000006', '20000000-0000-0000-0000-000000000003'),
+  ('20000000-0000-0000-0000-000000000007', '20000000-0000-0000-0000-000000000003');
+
+INSERT INTO bookmarks (id, user_id, document_id)
+VALUES
+  ('30000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000006'),
+  ('30000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000007');
+
+INSERT INTO reading_list (id, user_id, document_id)
+VALUES
+  ('40000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000006'),
+  ('40000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000007');
+
+WITH ranked_bookmarks AS (
+  SELECT
+    bookmark.id,
+    row_number() OVER (
+      PARTITION BY bookmark.user_id, duplicate_map.canonical_id
+      ORDER BY
+        (bookmark.document_id = duplicate_map.canonical_id) DESC,
+        bookmark.created_at NULLS LAST,
+        bookmark.id
+    ) AS position
+  FROM bookmarks AS bookmark
+  JOIN duplicate_catalog_documents AS duplicate_map
+    ON duplicate_map.duplicate_id = bookmark.document_id
+)
+DELETE FROM bookmarks AS duplicate
+USING ranked_bookmarks
+WHERE duplicate.id = ranked_bookmarks.id
+  AND ranked_bookmarks.position > 1;
+
+WITH ranked_reading_list AS (
+  SELECT
+    reading_item.id,
+    row_number() OVER (
+      PARTITION BY reading_item.user_id, duplicate_map.canonical_id
+      ORDER BY
+        (reading_item.document_id = duplicate_map.canonical_id) DESC,
+        reading_item.created_at NULLS LAST,
+        reading_item.id
+    ) AS position
+  FROM reading_list AS reading_item
+  JOIN duplicate_catalog_documents AS duplicate_map
+    ON duplicate_map.duplicate_id = reading_item.document_id
+)
+DELETE FROM reading_list AS duplicate
+USING ranked_reading_list
+WHERE duplicate.id = ranked_reading_list.id
+  AND ranked_reading_list.position > 1;
+
+UPDATE bookmarks AS personal
+SET document_id = duplicate_map.canonical_id
+FROM duplicate_catalog_documents AS duplicate_map
+WHERE personal.document_id = duplicate_map.duplicate_id
+  AND duplicate_map.duplicate_id <> duplicate_map.canonical_id;
+
+UPDATE reading_list AS personal
+SET document_id = duplicate_map.canonical_id
+FROM duplicate_catalog_documents AS duplicate_map
+WHERE personal.document_id = duplicate_map.duplicate_id
+  AND duplicate_map.duplicate_id <> duplicate_map.canonical_id;
+
+SELECT is(
+  (SELECT count(*)::integer FROM bookmarks
+    WHERE user_id = '10000000-0000-0000-0000-000000000001'
+      AND document_id = '20000000-0000-0000-0000-000000000003'),
+  1,
+  'multiple duplicate bookmarks collapse to one canonical bookmark before remapping'
+);
+SELECT is(
+  (SELECT count(*)::integer FROM reading_list
+    WHERE user_id = '10000000-0000-0000-0000-000000000001'
+      AND document_id = '20000000-0000-0000-0000-000000000003'),
+  1,
+  'multiple duplicate reading-list entries collapse before remapping'
+);
 
 SELECT ok(
   EXISTS (

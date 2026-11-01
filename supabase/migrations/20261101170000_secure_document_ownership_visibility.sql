@@ -265,19 +265,43 @@ SET
   epub_cfi = EXCLUDED.epub_cfi
 WHERE EXCLUDED.updated_at > reading_progress.updated_at;
 
+WITH ranked_bookmarks AS (
+  SELECT
+    bookmark.id,
+    row_number() OVER (
+      PARTITION BY bookmark.user_id, duplicate_map.canonical_id
+      ORDER BY
+        (bookmark.document_id = duplicate_map.canonical_id) DESC,
+        bookmark.created_at NULLS LAST,
+        bookmark.id
+    ) AS position
+  FROM bookmarks AS bookmark
+  JOIN duplicate_catalog_documents AS duplicate_map
+    ON duplicate_map.duplicate_id = bookmark.document_id
+)
 DELETE FROM bookmarks AS duplicate
-USING duplicate_catalog_documents AS duplicate_map, bookmarks AS canonical
-WHERE duplicate.document_id = duplicate_map.duplicate_id
-  AND duplicate_map.duplicate_id <> duplicate_map.canonical_id
-  AND canonical.document_id = duplicate_map.canonical_id
-  AND canonical.user_id = duplicate.user_id;
+USING ranked_bookmarks
+WHERE duplicate.id = ranked_bookmarks.id
+  AND ranked_bookmarks.position > 1;
 
+WITH ranked_reading_list AS (
+  SELECT
+    reading_item.id,
+    row_number() OVER (
+      PARTITION BY reading_item.user_id, duplicate_map.canonical_id
+      ORDER BY
+        (reading_item.document_id = duplicate_map.canonical_id) DESC,
+        reading_item.created_at NULLS LAST,
+        reading_item.id
+    ) AS position
+  FROM reading_list AS reading_item
+  JOIN duplicate_catalog_documents AS duplicate_map
+    ON duplicate_map.duplicate_id = reading_item.document_id
+)
 DELETE FROM reading_list AS duplicate
-USING duplicate_catalog_documents AS duplicate_map, reading_list AS canonical
-WHERE duplicate.document_id = duplicate_map.duplicate_id
-  AND duplicate_map.duplicate_id <> duplicate_map.canonical_id
-  AND canonical.document_id = duplicate_map.canonical_id
-  AND canonical.user_id = duplicate.user_id;
+USING ranked_reading_list
+WHERE duplicate.id = ranked_reading_list.id
+  AND ranked_reading_list.position > 1;
 
 UPDATE bookmarks AS personal
 SET document_id = duplicate_map.canonical_id
