@@ -1,5 +1,10 @@
 import { XMLParser, XMLValidator } from "npm:fast-xml-parser@4.5.3";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import {
+  MAX_BOOK_DOWNLOAD_BYTES,
+  MAX_REDIRECTS,
+  validateOutboundUrl,
+} from "./security.ts";
 
 type XmlRecord = Record<string, unknown>;
 
@@ -101,17 +106,13 @@ async function importCatalogBook(req: Request): Promise<Response> {
     "aleph.gutenberg.org",
   ]);
   const isAllowedUrl = (url: URL) =>
-    url.protocol === "https:" &&
-    !url.username &&
-    !url.password &&
-    (!url.port || url.port === "443") &&
-    allowedHosts.has(url.hostname.toLowerCase());
+    validateOutboundUrl(url).ok && allowedHosts.has(url.hostname.toLowerCase());
   if (!isAllowedUrl(catalogUrl) || !requestedBookId) {
     return fail("Only verified Project Gutenberg catalog entries can be imported.", 400);
   }
 
   let feedResponse: Response | null = null;
-  for (let redirectCount = 0; redirectCount <= 5; redirectCount += 1) {
+  for (let redirectCount = 0; redirectCount <= MAX_REDIRECTS; redirectCount += 1) {
     feedResponse = await fetch(catalogUrl, {
       headers: {
         "Accept": "application/atom+xml, application/xml, text/xml",
@@ -121,7 +122,7 @@ async function importCatalogBook(req: Request): Promise<Response> {
     });
     if (![301, 302, 303, 307, 308].includes(feedResponse.status)) break;
     const location = feedResponse.headers.get("Location");
-    if (!location || redirectCount === 5) {
+    if (!location || redirectCount === MAX_REDIRECTS) {
       return fail("The Project Gutenberg catalog redirected too many times.", 502);
     }
     try {
@@ -228,7 +229,7 @@ async function importCatalogBook(req: Request): Promise<Response> {
   }
   if (!fileResponse?.ok) return fail(`Project Gutenberg returned status ${fileResponse?.status ?? 502}.`, 502);
 
-  const maxFileSize = 30 * 1024 * 1024;
+  const maxFileSize = MAX_BOOK_DOWNLOAD_BYTES;
   const declaredSize = Number(fileResponse.headers.get("Content-Length") || 0);
   if (declaredSize > maxFileSize) return fail("Book files must be smaller than 30 MB.", 413);
   const reader = fileResponse.body?.getReader();
@@ -434,10 +435,7 @@ Deno.serve(async (req: Request) => {
         "archive.org",
       ];
       const isAllowedHost = (url: URL) =>
-        url.protocol === "https:" &&
-        !url.username &&
-        !url.password &&
-        (!url.port || url.port === "443") &&
+        validateOutboundUrl(url).ok &&
         allowedHosts.some((host) => url.hostname === host || url.hostname.endsWith(`.${host}`));
       const errorResponse = (message: string, status: number) =>
         new Response(JSON.stringify({ error: message }), {
@@ -456,7 +454,7 @@ Deno.serve(async (req: Request) => {
       }
 
       let fileResponse: Response | null = null;
-      for (let redirectCount = 0; redirectCount <= 5; redirectCount += 1) {
+      for (let redirectCount = 0; redirectCount <= MAX_REDIRECTS; redirectCount += 1) {
         fileResponse = await fetch(currentUrl, {
           headers: {
             "Accept": "application/epub+zip, application/pdf, application/octet-stream, */*",
@@ -466,7 +464,7 @@ Deno.serve(async (req: Request) => {
         });
         if (![301, 302, 303, 307, 308].includes(fileResponse.status)) break;
         const location = fileResponse.headers.get("Location");
-        if (!location || redirectCount === 5) {
+        if (!location || redirectCount === MAX_REDIRECTS) {
           return errorResponse("Book download redirected too many times", 502);
         }
         const nextUrl = new URL(location, currentUrl);
@@ -480,7 +478,7 @@ Deno.serve(async (req: Request) => {
         return errorResponse(`Book source returned status ${fileResponse?.status ?? 502}`, 502);
       }
 
-      const maxFileSize = 30 * 1024 * 1024;
+      const maxFileSize = MAX_BOOK_DOWNLOAD_BYTES;
       const contentLength = Number(fileResponse.headers.get("Content-Length") || 0);
       if (contentLength > maxFileSize) {
         return errorResponse("Book files must be smaller than 30 MB", 413);
@@ -543,19 +541,16 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    try {
-      const parsed = new URL(feedUrl);
-      if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-        throw new Error("Invalid protocol");
-      }
-    } catch {
+    const validation = validateOutboundUrl(feedUrl);
+    if (!validation.ok) {
       return new Response(
-        JSON.stringify({ error: "Invalid URL provided" }),
+        JSON.stringify({ error: validation.error }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
+    const parsedFeedUrl = validation.url;
 
-    const response = await fetch(feedUrl, {
+    const response = await fetch(parsedFeedUrl, {
       headers: {
         "Accept": "application/atom+xml, application/xml, text/xml, */*",
         "User-Agent": "Lumiere/1.0 OPDS Reader",

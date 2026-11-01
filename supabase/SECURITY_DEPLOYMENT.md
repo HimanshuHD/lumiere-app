@@ -33,6 +33,10 @@ Anonymous users cannot read document rows or document-bucket objects. External c
 The separate avatars bucket remains public-read, with insert, update, and delete constrained to the authenticated owner’s user-ID folder.
 Document owners can also access objects under their own user-ID folder for storage cleanup, including objects left behind before a document row was created or after it was deleted. A privileged reference check prevents cleanup access to any path still referenced by a document, including quarantined legacy rows hidden by row-level security; it does not expose document metadata or another user’s folder. The same protected-reference check is applied to document inserts and updates, so an owner cannot alias a protected file into a new upload. Storage deletion is restricted to genuinely orphaned objects or files attached to the caller’s own upload.
 
+## OPDS outbound request policy
+
+Custom RSS/Atom feeds are supported only over HTTPS, on the standard HTTPS port, without URL credentials. IP-literal hosts, unqualified hostnames, and local or special-use hostname suffixes are not supported. Curated catalog browsing and the Project Gutenberg import flow remain supported. The outbound request policy specifies a 15-second timeout, a 2 MiB feed response limit, a 30 MiB book-download limit, and at most five redirects; these limits must be enforced for every request and redirect. DNS resolution must also be checked before connecting so a public-looking hostname cannot resolve to a prohibited address.
+
 Run the database policy checks in `supabase/tests/document_security.test.sql` with `npx supabase test db` against a disposable local Supabase database after all migrations, including the cleanup, legacy-file protection, and protected-path association migrations, have been applied. The tests verify that owners can still access genuinely orphaned objects but cannot alias, sign, mutate, or delete an object referenced by a quarantined document. The test command does not apply pending migrations. Do not reset a local database that contains data you need to keep.
 
 ## Recovery and review
