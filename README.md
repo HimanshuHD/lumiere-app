@@ -70,4 +70,8 @@ Supabase Studio is available at `http://127.0.0.1:54323`; the local PostgreSQL s
 
 `.env.local` is excluded from Git. Only use the local anon key in this client-side app; never put a Supabase `service_role` or secret key in client-side code or environment variables prefixed with `VITE_`.
 
+### Document access security
+
+Document ownership, visibility, private storage, deployment order, URL expiry, and recovery guidance are documented in [supabase/SECURITY_DEPLOYMENT.md](./supabase/SECURITY_DEPLOYMENT.md).
+
 The later Node.js backend can be a separate project and connect to this local PostgreSQL instance. Before building it, decide whether it should replace Supabase Auth/Storage too or only provide a custom API over the same database.
