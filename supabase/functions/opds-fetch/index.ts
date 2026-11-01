@@ -5,6 +5,7 @@ import {
   MAX_FEED_RESPONSE_BYTES,
   OutboundResponseError,
   detectSupportedBookFormat,
+  DEFAULT_TURNSTILE_ACTION,
   fetchWithValidatedRedirects,
   DEFAULT_REQUESTS_PER_IP_PER_MINUTE,
   getClientIp,
@@ -105,8 +106,9 @@ async function authorizeCatalogBrowse(
 
   const turnstileSecret = Deno.env.get("TURNSTILE_SECRET_KEY");
   const expectedHostname = Deno.env.get("TURNSTILE_EXPECTED_HOSTNAME");
+  const expectedAction = Deno.env.get("TURNSTILE_EXPECTED_ACTION") ?? DEFAULT_TURNSTILE_ACTION;
   const turnstileToken = req.headers.get("X-Turnstile-Token") || "";
-  if (!turnstileSecret || !expectedHostname) {
+  if (!turnstileSecret || !expectedHostname || !expectedAction) {
     logInternalError("Turnstile configuration", "Missing Turnstile environment variables.");
     return jsonError("Public catalog browsing is temporarily unavailable.", 503, corsHeaders);
   }
@@ -116,6 +118,8 @@ async function authorizeCatalogBrowse(
       turnstileSecret,
       clientIp,
       expectedHostname,
+      fetch,
+      expectedAction,
     );
     if (!verified) return jsonError("Complete the security check before browsing catalogs.", 403, corsHeaders);
   } catch (error) {

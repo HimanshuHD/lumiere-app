@@ -5,6 +5,7 @@ export const MAX_BOOK_DOWNLOAD_BYTES = 30 * 1024 * 1024;
 export const DEFAULT_REQUESTS_PER_IP_PER_MINUTE = 5;
 export const MAX_REQUESTS_PER_IP_PER_MINUTE = 100;
 export const TURNSTILE_VERIFY_TIMEOUT_MS = 10_000;
+export const DEFAULT_TURNSTILE_ACTION = "opds_browse";
 
 const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
 
@@ -260,6 +261,7 @@ export async function verifyTurnstileToken(
   clientIp: string,
   allowedHostname: string,
   fetcher: typeof fetch = fetch,
+  expectedAction = DEFAULT_TURNSTILE_ACTION,
 ): Promise<boolean> {
   if (!token || token.length > 2048) return false;
   const controller = new AbortController();
@@ -278,7 +280,7 @@ export async function verifyTurnstileToken(
     if (!response.ok) return false;
     const result = await response.json() as TurnstileVerification;
     return result.success === true &&
-      result.action === "opds_browse" &&
+      result.action === expectedAction &&
       result.hostname?.toLowerCase() === allowedHostname.toLowerCase();
   } finally {
     clearTimeout(timeout);

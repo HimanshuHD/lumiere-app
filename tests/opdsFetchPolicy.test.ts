@@ -7,6 +7,7 @@ import {
   MAX_REQUESTS_PER_IP_PER_MINUTE,
   REQUEST_TIMEOUT_MS,
   DEFAULT_REQUESTS_PER_IP_PER_MINUTE,
+  DEFAULT_TURNSTILE_ACTION,
   OutboundResponseError,
   detectSupportedBookFormat,
   fetchWithValidatedRedirects,
@@ -71,6 +72,7 @@ describe('OPDS request limits', () => {
     assert.equal(MAX_BOOK_DOWNLOAD_BYTES, 30 * 1024 * 1024);
     assert.equal(DEFAULT_REQUESTS_PER_IP_PER_MINUTE, 5);
     assert.equal(MAX_REQUESTS_PER_IP_PER_MINUTE, 100);
+    assert.equal(DEFAULT_TURNSTILE_ACTION, 'opds_browse');
   });
 });
 
@@ -105,6 +107,32 @@ describe('browse abuse controls', () => {
     assert.equal(
       await verifyTurnstileToken('valid-token', 'secret', '203.0.113.42', 'reader.example.org', validResponse),
       true,
+    );
+    const testActionResponse = async () => Response.json({
+      success: true,
+      hostname: 'localhost',
+      action: 'test',
+    });
+    assert.equal(
+      await verifyTurnstileToken(
+        'XXXX.DUMMY.TOKEN.XXXX',
+        'test-secret',
+        '127.0.0.1',
+        'localhost',
+        testActionResponse,
+        'test',
+      ),
+      true,
+    );
+    assert.equal(
+      await verifyTurnstileToken(
+        'XXXX.DUMMY.TOKEN.XXXX',
+        'test-secret',
+        '127.0.0.1',
+        'localhost',
+        testActionResponse,
+      ),
+      false,
     );
     assert.equal(
       await verifyTurnstileToken('valid-token', 'secret', '203.0.113.42', 'other.example.org', validResponse),
