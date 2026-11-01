@@ -4,15 +4,20 @@ import {
   MAX_BOOK_DOWNLOAD_BYTES,
   MAX_FEED_RESPONSE_BYTES,
   MAX_REDIRECTS,
+  MAX_REQUESTS_PER_IP_PER_MINUTE,
   REQUEST_TIMEOUT_MS,
+  DEFAULT_REQUESTS_PER_IP_PER_MINUTE,
   OutboundResponseError,
   detectSupportedBookFormat,
   fetchWithValidatedRedirects,
+  getClientIp,
+  hashClientIp,
   isPublicIpAddress,
   readResponseBytes,
   readResponseText,
   validateResolvedOutboundUrl,
   validateOutboundUrl,
+  verifyTurnstileToken,
 } from '../supabase/functions/opds-fetch/security.ts';
 
 describe('validateOutboundUrl', () => {
@@ -64,6 +69,56 @@ describe('OPDS request limits', () => {
     assert.equal(REQUEST_TIMEOUT_MS, 15_000);
     assert.equal(MAX_FEED_RESPONSE_BYTES, 2 * 1024 * 1024);
     assert.equal(MAX_BOOK_DOWNLOAD_BYTES, 30 * 1024 * 1024);
+    assert.equal(DEFAULT_REQUESTS_PER_IP_PER_MINUTE, 5);
+    assert.equal(MAX_REQUESTS_PER_IP_PER_MINUTE, 100);
+  });
+});
+
+describe('browse abuse controls', () => {
+  it('extracts a client IP from platform forwarding headers and rejects malformed values', () => {
+    assert.equal(getClientIp(new Headers({ 'cf-connecting-ip': '203.0.113.42' })), '203.0.113.42');
+    assert.equal(getClientIp(new Headers({ 'x-forwarded-for': '198.51.100.10, 10.0.0.4' })), '198.51.100.10');
+    assert.equal(getClientIp(new Headers({ 'cf-connecting-ip': '300.1.1.1' })), null);
+    assert.equal(getClientIp(new Headers()), null);
+  });
+
+  it('creates stable, opaque per-IP rate-limit keys', async () => {
+    const first = await hashClientIp('203.0.113.42', 'service-role-secret');
+    const second = await hashClientIp('203.0.113.42', 'service-role-secret');
+    const otherIp = await hashClientIp('203.0.113.43', 'service-role-secret');
+    const otherSecret = await hashClientIp('203.0.113.42', 'other-secret');
+    assert.match(first, /^[0-9a-f]{64}$/);
+    assert.equal(first, second);
+    assert.notEqual(first, otherIp);
+    assert.notEqual(first, otherSecret);
+  });
+
+  it('accepts only successful Turnstile tokens bound to the expected host and action', async () => {
+    const validResponse = async (_url: string | URL | Request, init?: RequestInit) => {
+      assert.equal(new URLSearchParams(String(init?.body)).get('remoteip'), '203.0.113.42');
+      return Response.json({
+        success: true,
+        hostname: 'reader.example.org',
+        action: 'opds_browse',
+      });
+    };
+    assert.equal(
+      await verifyTurnstileToken('valid-token', 'secret', '203.0.113.42', 'reader.example.org', validResponse),
+      true,
+    );
+    assert.equal(
+      await verifyTurnstileToken('valid-token', 'secret', '203.0.113.42', 'other.example.org', validResponse),
+      false,
+    );
+    assert.equal(
+      await verifyTurnstileToken('valid-token', 'secret', '203.0.113.42', 'reader.example.org', async () =>
+        Response.json({ success: true, hostname: 'reader.example.org', action: 'other' })),
+      false,
+    );
+    assert.equal(
+      await verifyTurnstileToken('', 'secret', '203.0.113.42', 'reader.example.org', validResponse),
+      false,
+    );
   });
 });
 

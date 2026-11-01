@@ -2,6 +2,9 @@ export const MAX_REDIRECTS = 5;
 export const REQUEST_TIMEOUT_MS = 15_000;
 export const MAX_FEED_RESPONSE_BYTES = 2 * 1024 * 1024;
 export const MAX_BOOK_DOWNLOAD_BYTES = 30 * 1024 * 1024;
+export const DEFAULT_REQUESTS_PER_IP_PER_MINUTE = 5;
+export const MAX_REQUESTS_PER_IP_PER_MINUTE = 100;
+export const TURNSTILE_VERIFY_TIMEOUT_MS = 10_000;
 
 const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
 
@@ -211,6 +214,75 @@ export async function validateResolvedOutboundUrl(
     return { ok: false, error: "Catalog host resolves to a prohibited address." };
   }
   return validation;
+}
+
+export function getClientIp(headers: Headers): string | null {
+  const forwardedIp = headers.get("cf-connecting-ip") ??
+    headers.get("x-forwarded-for")?.split(",")[0]?.trim();
+  if (!forwardedIp || forwardedIp.length > 64) return null;
+
+  if (/^\d{1,3}(?:\.\d{1,3}){3}$/.test(forwardedIp)) {
+    const octets = forwardedIp.split(".").map(Number);
+    return octets.every((octet) => octet >= 0 && octet <= 255)
+      ? octets.join(".")
+      : null;
+  }
+
+  try {
+    const hostname = new URL(`http://[${forwardedIp}]/`).hostname;
+    return hostname.slice(1, -1).toLowerCase();
+  } catch {
+    return null;
+  }
+}
+
+export async function hashClientIp(ip: string, secret: string): Promise<string> {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const signature = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(ip));
+  return Array.from(new Uint8Array(signature), (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+export interface TurnstileVerification {
+  success: boolean;
+  hostname?: string;
+  action?: string;
+}
+
+export async function verifyTurnstileToken(
+  token: string,
+  secret: string,
+  clientIp: string,
+  allowedHostname: string,
+  fetcher: typeof fetch = fetch,
+): Promise<boolean> {
+  if (!token || token.length > 2048) return false;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), TURNSTILE_VERIFY_TIMEOUT_MS);
+  try {
+    const response = await fetcher("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        secret,
+        response: token,
+        remoteip: clientIp,
+      }),
+      signal: controller.signal,
+    });
+    if (!response.ok) return false;
+    const result = await response.json() as TurnstileVerification;
+    return result.success === true &&
+      result.action === "opds_browse" &&
+      result.hostname?.toLowerCase() === allowedHostname.toLowerCase();
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 export async function fetchWithValidatedRedirects(

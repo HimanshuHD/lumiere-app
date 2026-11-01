@@ -6,15 +6,123 @@ import {
   OutboundResponseError,
   detectSupportedBookFormat,
   fetchWithValidatedRedirects,
+  DEFAULT_REQUESTS_PER_IP_PER_MINUTE,
+  getClientIp,
+  hashClientIp,
+  MAX_REQUESTS_PER_IP_PER_MINUTE,
   readResponseBytes,
   readResponseText,
   validateOutboundUrl,
+  verifyTurnstileToken,
 } from "./security.ts";
 
 type XmlRecord = Record<string, unknown>;
 
 function logInternalError(operation: string, error: unknown): void {
   console.error(`[opds-fetch] ${operation} failed`, error);
+}
+
+function jsonError(
+  message: string,
+  status: number,
+  corsHeaders: Record<string, string>,
+  extraHeaders: Record<string, string> = {},
+): Response {
+  return new Response(JSON.stringify({ error: message }), {
+    status,
+    headers: { ...corsHeaders, ...extraHeaders, "Content-Type": "application/json" },
+  });
+}
+
+async function authorizeCatalogBrowse(
+  req: Request,
+  corsHeaders: Record<string, string>,
+): Promise<Response | null> {
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!supabaseUrl || !anonKey || !serviceRoleKey) {
+    logInternalError("browse rate-limit configuration", "Missing Supabase environment variables.");
+    return jsonError("Catalog browsing is temporarily unavailable.", 503, corsHeaders);
+  }
+
+  const clientIp = getClientIp(req.headers);
+  if (!clientIp) {
+    return jsonError("Catalog browsing could not verify the request source.", 400, corsHeaders);
+  }
+
+  const quotaValue = Deno.env.get("OPDS_REQUESTS_PER_IP_PER_MINUTE") ??
+    String(DEFAULT_REQUESTS_PER_IP_PER_MINUTE);
+  const quota = Number(quotaValue);
+  if (
+    !Number.isInteger(quota) ||
+    quota < 1 ||
+    quota > MAX_REQUESTS_PER_IP_PER_MINUTE
+  ) {
+    logInternalError("browse rate-limit configuration", "Invalid request quota.");
+    return jsonError("Catalog browsing is temporarily unavailable.", 503, corsHeaders);
+  }
+
+  const admin = createClient(supabaseUrl, serviceRoleKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+  let ipHash: string;
+  try {
+    ipHash = await hashClientIp(clientIp, serviceRoleKey);
+  } catch (error) {
+    logInternalError("browse client identifier", error);
+    return jsonError("Catalog browsing is temporarily unavailable.", 503, corsHeaders);
+  }
+  const { data: withinQuota, error: rateLimitError } = await admin.rpc(
+    "consume_opds_feed_rate_limit",
+    { p_client_ip_hash: ipHash, p_max_requests: quota },
+  );
+  if (rateLimitError) {
+    logInternalError("browse rate-limit check", rateLimitError);
+    return jsonError("Catalog browsing is temporarily unavailable.", 503, corsHeaders);
+  }
+  if (withinQuota !== true) {
+    return jsonError("Catalog request limit reached. Try again in a minute.", 429, corsHeaders, {
+      "Retry-After": "60",
+    });
+  }
+
+  const authorization = req.headers.get("Authorization");
+  let isAuthenticated = false;
+  if (authorization) {
+    const accessToken = authorization.match(/^Bearer\s+(.+)$/i)?.[1];
+    if (!accessToken) return jsonError("A valid sign-in session is required.", 401, corsHeaders);
+
+    const userClient = createClient(supabaseUrl, anonKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+    const { data, error } = await userClient.auth.getUser(accessToken);
+    if (error || !data.user) return jsonError("Your sign-in session is invalid or expired.", 401, corsHeaders);
+    isAuthenticated = true;
+  }
+
+  if (isAuthenticated) return null;
+
+  const turnstileSecret = Deno.env.get("TURNSTILE_SECRET_KEY");
+  const expectedHostname = Deno.env.get("TURNSTILE_EXPECTED_HOSTNAME");
+  const turnstileToken = req.headers.get("X-Turnstile-Token") || "";
+  if (!turnstileSecret || !expectedHostname) {
+    logInternalError("Turnstile configuration", "Missing Turnstile environment variables.");
+    return jsonError("Public catalog browsing is temporarily unavailable.", 503, corsHeaders);
+  }
+  try {
+    const verified = await verifyTurnstileToken(
+      turnstileToken,
+      turnstileSecret,
+      clientIp,
+      expectedHostname,
+    );
+    if (!verified) return jsonError("Complete the security check before browsing catalogs.", 403, corsHeaders);
+  } catch (error) {
+    logInternalError("Turnstile verification", error);
+    return jsonError("The security check is temporarily unavailable.", 503, corsHeaders);
+  }
+  return null;
 }
 
 const parser = new XMLParser({
@@ -88,9 +196,7 @@ async function importCatalogBook(req: Request): Promise<Response> {
   }
 
   const authorization = req.headers.get("Authorization");
-  const accessToken = typeof requestBody.accessToken === "string"
-    ? requestBody.accessToken
-    : authorization?.match(/^Bearer\s+(.+)$/i)?.[1];
+  const accessToken = authorization?.match(/^Bearer\s+(.+)$/i)?.[1];
   if (!accessToken) return fail("Sign in to import catalog books.", 401);
 
   const userClient = createClient(supabaseUrl, anonKey, {
@@ -417,7 +523,7 @@ Deno.serve(async (req: Request) => {
   const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey, X-Turnstile-Token",
   };
 
   if (req.method === "OPTIONS") {
@@ -432,6 +538,9 @@ Deno.serve(async (req: Request) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    const browseAuthorization = await authorizeCatalogBrowse(req, corsHeaders);
+    if (browseAuthorization) return browseAuthorization;
 
     const requestUrl = new URL(req.url);
     const downloadUrl = requestUrl.searchParams.get("download");

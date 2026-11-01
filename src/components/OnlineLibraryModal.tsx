@@ -1,8 +1,9 @@
-import { useState, useCallback, type FormEvent } from 'react';
+import { useState, useCallback, useRef, type FormEvent } from 'react';
 import { X, Globe, ExternalLink, BookOpen, Search, ArrowLeft, Loader2, Download, AlertCircle, BookMarked, BookPlus } from 'lucide-react';
 import { supabase, type Document } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
+import { requestTurnstileToken } from '@/lib/turnstile';
 
 interface OnlineLibraryModalProps {
   open: boolean;
@@ -136,8 +137,10 @@ export function OnlineLibraryModal({ open, onClose, onBookAdded }: OnlineLibrary
   const [books, setBooks] = useState<OpdsBook[]>([]);
   const [feedTitle, setFeedTitle] = useState('');
   const [loading, setLoading] = useState(false);
+  const [checkingSecurity, setCheckingSecurity] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [addingBookId, setAddingBookId] = useState<string | null>(null);
+  const turnstileContainerRef = useRef<HTMLDivElement>(null);
 
   const loadCatalog = useCallback(async (catalog: OpdsCatalog) => {
     setSelectedCatalog(catalog);
@@ -145,17 +148,32 @@ export function OnlineLibraryModal({ open, onClose, onBookAdded }: OnlineLibrary
     setFeedTitle(catalog.name);
     setError(null);
     setLoading(true);
+    setCheckingSecurity(false);
     try {
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
       const endpoint = new URL('/functions/v1/opds-fetch', supabaseUrl);
       endpoint.searchParams.set('url', catalog.url);
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError) throw new Error('Could not verify the sign-in session.');
+      const headers: Record<string, string> = {
+        apikey: anonKey,
+        'Content-Type': 'application/json',
+      };
+      if (sessionData.session) {
+        headers.Authorization = `Bearer ${sessionData.session.access_token}`;
+      } else {
+        const container = turnstileContainerRef.current;
+        if (!container) throw new Error('The security check is unavailable. Please try again.');
+        setCheckingSecurity(true);
+        headers['X-Turnstile-Token'] = await requestTurnstileToken(
+          container,
+          import.meta.env.VITE_TURNSTILE_SITE_KEY,
+        );
+        setCheckingSecurity(false);
+      }
       const res = await fetch(endpoint, {
-        headers: {
-          Authorization: `Bearer ${anonKey}`,
-          apikey: anonKey,
-          'Content-Type': 'application/json',
-        },
+        headers,
       });
       if (!res.ok) {
         const errBody = await res.json().catch(() => ({}));
@@ -167,6 +185,7 @@ export function OnlineLibraryModal({ open, onClose, onBookAdded }: OnlineLibrary
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load catalog books');
     } finally {
+      setCheckingSecurity(false);
       setLoading(false);
     }
   }, []);
@@ -226,7 +245,6 @@ export function OnlineLibraryModal({ open, onClose, onBookAdded }: OnlineLibrary
           action: 'import',
           catalogUrl: selectedCatalog.url,
           bookId,
-          accessToken: sessionData.session.access_token,
         }),
         headers: {
           'Content-Type': 'application/json',
@@ -344,13 +362,23 @@ export function OnlineLibraryModal({ open, onClose, onBookAdded }: OnlineLibrary
           </button>
         </div>
 
+        <div
+          ref={turnstileContainerRef}
+          className="flex justify-center px-6 empty:hidden"
+          aria-label="Public feed security check"
+        />
+
         {selectedCatalog ? (
           /* Book List View */
           <div className="flex-1 overflow-y-auto">
             {loading ? (
               <div className="flex flex-col items-center justify-center py-20">
                 <Loader2 className="w-8 h-8 text-amber-600 animate-spin mb-3" />
-                <p className="text-sm text-stone-500">Loading feed entries from {selectedCatalog.name}...</p>
+                <p className="text-sm text-stone-500">
+                  {checkingSecurity
+                    ? 'Complete the security check to browse this feed...'
+                    : `Loading feed entries from ${selectedCatalog.name}...`}
+                </p>
               </div>
             ) : error ? (
               <div className="flex flex-col items-center justify-center py-20 px-6">
