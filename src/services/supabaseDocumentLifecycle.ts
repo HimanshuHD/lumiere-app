@@ -33,8 +33,8 @@ function toRecoveryRecord(row: RecoveryRow): UserUploadRecovery {
 
 export const supabaseDocumentLifecycleDependencies: DocumentLifecycleDependencies = {
   storage: {
-    async upload(path, file) {
-      const { error } = await supabase.storage.from('documents').upload(path, file);
+    async upload(path, file, contentType) {
+      const { error } = await supabase.storage.from('documents').upload(path, file, { contentType });
       throwOnError(error, 'Could not upload storage object');
     },
     async remove(paths) {

@@ -22,6 +22,13 @@ import {
   recoverPendingUserUploadFiles,
   uploadUserDocument,
 } from '@/services/documentLifecycle';
+import {
+  DocumentValidationError,
+  MAX_COVER_SIZE_BYTES,
+  MAX_DOCUMENT_SIZE_BYTES,
+  validateCoverFile,
+  validateDocumentFile,
+} from '@/services/documentValidation';
 import { supabaseDocumentLifecycleDependencies } from '@/services/supabaseDocumentLifecycle';
 
 interface UploadPanelProps {
@@ -33,7 +40,7 @@ const CATEGORIES = ['Fiction', 'Non-Fiction', 'Science', 'History', 'Technology'
 const ACCEPTED_FORMATS = '.pdf,.txt,.epub';
 
 interface PdfDetails {
-  pageCount: number;
+  pageCount: number | null;
   title: string;
   author: string;
   description: string;
@@ -42,7 +49,7 @@ interface PdfDetails {
 
 async function extractPdfDetails(file: File): Promise<PdfDetails> {
   const details: PdfDetails = {
-    pageCount: 0,
+    pageCount: null,
     title: '',
     author: '',
     description: '',
@@ -95,7 +102,7 @@ async function extractPdfDetails(file: File): Promise<PdfDetails> {
 
     return details;
   } catch {
-    return details;
+    throw new DocumentValidationError('The PDF could not be opened. Check that the file is a valid, readable PDF.');
   } finally {
     canvas.width = 0;
     canvas.height = 0;
@@ -112,14 +119,13 @@ async function extractPdfDetails(file: File): Promise<PdfDetails> {
 function estimateTxtPageCount(file: File): Promise<number> {
   return file.text().then((content) => {
     const charsPerPage = 3000;
-    return Math.max(1, Math.ceil(content.length / charsPerPage));
+    return Math.ceil(content.length / charsPerPage);
   });
 }
 
-async function extractPageCount(file: File): Promise<number> {
-  const ext = file.name.split('.').pop()?.toLowerCase();
-  if (ext === 'txt') return estimateTxtPageCount(file);
-  return 0;
+async function extractPageCount(file: File, format: string): Promise<number | null> {
+  if (format === 'txt') return estimateTxtPageCount(file);
+  return null;
 }
 
 function estimateReadingTime(pageCount: number): number {
@@ -221,8 +227,9 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
     setPdfCoverPreview(null);
 
     try {
-      const fileExtension = file.name.split('.').pop()?.toLowerCase();
-      if (fileExtension === 'pdf') {
+      const fileFormat = await validateDocumentFile(file);
+      if (documentSelectionRef.current !== selection) return;
+      if (fileFormat === 'pdf') {
         setExtractingPdfDetails(true);
         const details = await extractPdfDetails(file);
         if (documentSelectionRef.current !== selection) return;
@@ -234,26 +241,39 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
         if (details.author) setAuthor((current) => current.trim() ? current : details.author);
         if (details.description) setSummary((current) => current.trim() ? current : details.description);
       } else {
-        const count = await extractPageCount(file);
+        const count = await extractPageCount(file, fileFormat);
         if (documentSelectionRef.current !== selection) return;
         setPageCount(count);
         const filenameTitle = file.name.replace(/\.[^.]+$/, '').replace(/[_-]/g, ' ');
         setTitle((current) => current.trim() ? current : filenameTitle);
       }
-    } catch {
+    } catch (selectionError) {
       if (documentSelectionRef.current === selection) {
-        setPageCount(0);
-        const filenameTitle = file.name.replace(/\.[^.]+$/, '').replace(/[_-]/g, ' ');
-        setTitle((current) => current.trim() ? current : filenameTitle);
+        setDocFile(null);
+        setPageCount(null);
+        setPdfCoverFile(null);
+        setPdfCoverPreview(null);
+        setError(selectionError instanceof Error
+          ? selectionError.message
+          : 'Could not validate this document file.');
       }
     } finally {
       if (documentSelectionRef.current === selection) setExtractingPdfDetails(false);
     }
   }, []);
 
-  const handleCoverSelect = useCallback((file: File) => {
+  const handleCoverSelect = useCallback(async (file: File) => {
+    try {
+      await validateCoverFile(file);
+    } catch (selectionError) {
+      setError(selectionError instanceof Error
+        ? selectionError.message
+        : 'Could not validate this cover image.');
+      return;
+    }
     operationIdRef.current = null;
     setCoverFile(file);
+    setError(null);
     const url = URL.createObjectURL(file);
     setCoverPreview(url);
   }, []);
@@ -279,8 +299,9 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
     setError(null);
     setSuccess(false);
     try {
-      const docExt = docFile.name.split('.').pop()?.toLowerCase();
+      const docExt = await validateDocumentFile(docFile);
       const coverToUpload = coverFile || pdfCoverFile;
+      if (coverToUpload) await validateCoverFile(coverToUpload);
       const operationId = operationIdRef.current ?? crypto.randomUUID();
       operationIdRef.current = operationId;
 
@@ -295,8 +316,7 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
         }];
       }
 
-      const pages = pageCount || 1;
-      const readingTime = estimateReadingTime(pages);
+      const readingTime = pageCount === null ? 1 : estimateReadingTime(pageCount);
       const uploadedDocument = await uploadUserDocument(supabaseDocumentLifecycleDependencies, {
         operationId,
         userId: user.id,
@@ -311,7 +331,7 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
           reading_time: readingTime,
           chapters,
           is_featured: false,
-          page_count: pages,
+          page_count: pageCount,
           visibility,
           file_format: docExt || null,
           file_name: docFile.name,
@@ -417,7 +437,11 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
                 ref={docInputRef}
                 type="file"
                 accept={ACCEPTED_FORMATS}
-                onChange={(e) => e.target.files?.[0] && handleDocSelect(e.target.files[0])}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  e.target.value = '';
+                  if (file) void handleDocSelect(file);
+                }}
                 className="hidden"
               />
               {docFile ? (
@@ -437,7 +461,9 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
                     <Upload className="w-6 h-6 text-stone-400 group-hover:text-amber-600 transition-colors" />
                   </div>
                   <p className="text-sm text-stone-600">Click or drag to upload</p>
-                  <p className="text-xs text-stone-400">PDF, TXT, or EPUB</p>
+                  <p className="text-xs text-stone-400">
+                    PDF, TXT, or EPUB · up to {MAX_DOCUMENT_SIZE_BYTES / 1024 / 1024} MB
+                  </p>
                 </div>
               )}
             </div>
@@ -445,8 +471,8 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
               <button
                 onClick={() => {
                   documentSelectionRef.current += 1;
-                    operationIdRef.current = null;
-                    setDocFile(null);
+                  operationIdRef.current = null;
+                  setDocFile(null);
                   setPageCount(null);
                   setPdfCoverFile(null);
                   setPdfCoverPreview(null);
@@ -473,8 +499,12 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
               <input
                 ref={coverInputRef}
                 type="file"
-                accept="image/*"
-                onChange={(e) => e.target.files?.[0] && handleCoverSelect(e.target.files[0])}
+                accept=".jpg,.jpeg,.png,.webp,.gif,image/jpeg,image/png,image/webp,image/gif"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  e.target.value = '';
+                  if (file) void handleCoverSelect(file);
+                }}
                 className="hidden"
               />
               {coverPreview ? (
@@ -539,6 +569,9 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
                 </div>
               )}
             </div>
+            <p className="mt-2 text-xs text-stone-400">
+              JPEG, PNG, WebP, or GIF · up to {MAX_COVER_SIZE_BYTES / 1024 / 1024} MB
+            </p>
           </div>
         </div>
 

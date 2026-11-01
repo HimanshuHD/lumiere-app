@@ -13,8 +13,10 @@ import {
 
 const operationId = 'operation-123';
 const userId = 'user-123';
-const documentFile = { name: 'book.pdf' } as File;
-const coverFile = { name: 'cover.jpg' } as File;
+const documentFile = new File(['%PDF-1.7'], 'book.pdf', { type: 'application/pdf' });
+const coverFile = new File([new Uint8Array([
+  0xff, 0xd8, 0xff, 0xd8,
+])], 'cover.jpg', { type: 'image/jpeg' });
 const metadata = {
   title: 'Book',
   author: 'Author',

@@ -1,4 +1,10 @@
 import type { Document } from '@/lib/supabase';
+import {
+  getCoverContentType,
+  getDocumentContentType,
+  validateCoverFile,
+  validateDocumentFile,
+} from './documentValidation.ts';
 
 export type UserUploadStage =
   | 'document-lookup'
@@ -32,7 +38,7 @@ export type UserDocumentInsert = UserDocumentMetadata & {
 };
 
 export interface DocumentLifecycleStorage {
-  upload(path: string, file: File): Promise<void>;
+  upload(path: string, file: File, contentType: string): Promise<void>;
   remove(paths: string[]): Promise<void>;
 }
 
@@ -177,6 +183,9 @@ export async function uploadUserDocument(
   let stage: UserUploadStage = 'document-lookup';
   const createdPaths: string[] = [];
 
+  const documentFormat = await validateDocumentFile(documentFile);
+  const coverFormat = coverFile ? await validateCoverFile(coverFile) : null;
+
   try {
     const existing = await dependencies.database.findById(operationId);
     if (existing) {
@@ -189,12 +198,20 @@ export async function uploadUserDocument(
     }
 
     stage = 'document-upload';
-    await dependencies.storage.upload(documentPath, documentFile);
+    await dependencies.storage.upload(
+      documentPath,
+      documentFile,
+      getDocumentContentType(documentFormat),
+    );
     createdPaths.push(documentPath);
 
-    if (coverFile && coverPath) {
+    if (coverFile && coverPath && coverFormat) {
       stage = 'cover-upload';
-      await dependencies.storage.upload(coverPath, coverFile);
+      await dependencies.storage.upload(
+        coverPath,
+        coverFile,
+        getCoverContentType(coverFormat),
+      );
       createdPaths.push(coverPath);
     }
 
