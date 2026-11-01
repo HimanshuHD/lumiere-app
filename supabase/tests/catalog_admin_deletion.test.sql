@@ -1,7 +1,7 @@
 BEGIN;
 
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
-SELECT plan(19);
+SELECT plan(20);
 
 INSERT INTO auth.users (
   instance_id,
@@ -195,6 +195,20 @@ SELECT throws_ok(
   '42501',
   NULL,
   'ordinary users cannot forge privileged catalog cleanup records'
+);
+SELECT throws_ok(
+  $$INSERT INTO public.document_lifecycle_recovery (
+      user_id, operation_id, storage_path, failure_stage, status
+    ) VALUES (
+      '61000000-0000-0000-0000-000000000002',
+      '66000000-0000-0000-0000-000000000002',
+      'catalog/forged-import.epub',
+      'catalog-import',
+      'cleanup_pending'
+    )$$,
+  '42501',
+  NULL,
+  'ordinary users cannot forge privileged catalog import recovery records'
 );
 SELECT is(
   (SELECT count(*)::integer FROM public.documents

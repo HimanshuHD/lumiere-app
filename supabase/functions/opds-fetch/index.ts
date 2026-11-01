@@ -1,5 +1,6 @@
 import { XMLParser, XMLValidator } from "npm:fast-xml-parser@4.5.3";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { reconcileCatalogImportFailure } from "../_shared/catalog_import_recovery.ts";
 import {
   MAX_BOOK_DOWNLOAD_BYTES,
   MAX_FEED_RESPONSE_BYTES,
@@ -415,6 +416,7 @@ async function importCatalogBook(req: Request): Promise<Response> {
   }
 
   const storagePath = `catalog/${crypto.randomUUID()}.${format}`;
+  const documentId = crypto.randomUUID();
   const contentType = format === "epub" ? "application/epub+zip" : "application/pdf";
   const { error: uploadError } = await admin.storage.from("documents").upload(storagePath, bytes, {
     contentType,
@@ -422,10 +424,31 @@ async function importCatalogBook(req: Request): Promise<Response> {
   });
   if (uploadError) {
     logInternalError("catalog file upload", uploadError);
+    const { error: cleanupError } = await admin.storage.from("documents").remove([storagePath]);
+    if (cleanupError) {
+      logInternalError("catalog file cleanup after upload failure", cleanupError);
+      const { error: recoveryError } = await admin.from("document_lifecycle_recovery").upsert({
+        user_id: authData.user.id,
+        operation_id: documentId,
+        storage_path: storagePath,
+        failure_stage: "catalog-import",
+        status: "cleanup_pending",
+        last_error: cleanupError.message,
+      }, { onConflict: "user_id,operation_id,storage_path" });
+      if (recoveryError) {
+        logInternalError("catalog upload cleanup recovery record", recoveryError);
+        return fail(
+          "Could not save the catalog file, and cleanup failed. Recovery tracking also failed; an administrator must inspect storage.",
+          500,
+        );
+      }
+      return fail("Could not save the catalog file. The incomplete object was queued for cleanup.", 500);
+    }
     return fail("Could not save the catalog file.", 500);
   }
 
   const documentValues = {
+    id: documentId,
     title,
     author,
     category,
@@ -446,6 +469,37 @@ async function importCatalogBook(req: Request): Promise<Response> {
     file_name: `${title}.${format}`,
   };
 
+  const reconcileFailedWrite = () => reconcileCatalogImportFailure(storagePath, {
+    async findCanonical() {
+      const { data, error } = await admin
+        .from("documents")
+        .select("*")
+        .eq("source_identity", sourceIdentity)
+        .eq("origin", "catalog_import")
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    getFileStoragePath(document) {
+      return document.file_storage_path ?? null;
+    },
+    async removeUploadedFile() {
+      const { error } = await admin.storage.from("documents").remove([storagePath]);
+      if (error) throw error;
+    },
+    async recordRecovery(status, errorMessage) {
+      const { error } = await admin.from("document_lifecycle_recovery").upsert({
+        user_id: authData.user.id,
+        operation_id: documentId,
+        storage_path: storagePath,
+        failure_stage: "catalog-import",
+        status,
+        last_error: errorMessage,
+      }, { onConflict: "user_id,operation_id,storage_path" });
+      if (error) throw error;
+    },
+  });
+
   if (legacyDocument) {
     const { error: auditError } = await admin.from("document_security_migration_audit").insert({
       document_id: legacyDocument.id,
@@ -455,9 +509,13 @@ async function importCatalogBook(req: Request): Promise<Response> {
       reason: "Previous storage paths were recorded before a validated legacy catalog restoration attempt",
     });
     if (auditError) {
-      const { error: cleanupError } = await admin.storage.from("documents").remove([storagePath]);
+      const recovery = await reconcileFailedWrite();
       logInternalError("legacy catalog audit", auditError);
-      if (cleanupError) logInternalError("catalog file cleanup after audit failure", cleanupError);
+      if (recovery.kind === "reused") return respond(recovery.document);
+      if (recovery.kind === "pending") {
+        logInternalError("catalog file cleanup after audit failure", recovery.error);
+        return fail(`Could not restore the verified legacy catalog record. ${recovery.error}`, 500);
+      }
       return fail("Could not restore the verified legacy catalog record.", 500);
     }
 
@@ -469,44 +527,22 @@ async function importCatalogBook(req: Request): Promise<Response> {
       .select("*")
       .maybeSingle();
     if (restoreError) {
-      const { error: cleanupError } = await admin.storage.from("documents").remove([storagePath]);
-      const { data: concurrentBook, error: concurrentLookupError } = await admin
-        .from("documents")
-        .select("*")
-        .eq("source_identity", sourceIdentity)
-        .eq("origin", "catalog_import")
-        .maybeSingle();
-      if (concurrentLookupError) {
-        logInternalError("concurrent catalog restoration lookup", concurrentLookupError);
-        if (cleanupError) logInternalError("catalog file cleanup after restore failure", cleanupError);
-        return fail("Could not resolve the catalog restoration.", 500);
-      }
-      if (concurrentBook && !cleanupError) return respond(concurrentBook);
-      if (cleanupError) logInternalError("catalog file cleanup after restore failure", cleanupError);
-      if (concurrentBook) {
-        return fail("The book is available, but temporary file cleanup failed.", 500);
+      const recovery = await reconcileFailedWrite();
+      if (recovery.kind === "reused") return respond(recovery.document);
+      if (recovery.kind === "pending") {
+        logInternalError("concurrent catalog restoration recovery", recovery.error);
+        return fail(`Could not resolve the catalog restoration. ${recovery.error}`, 500);
       }
       logInternalError("legacy catalog restoration", restoreError);
       return fail("Could not restore the verified legacy catalog record.", 500);
     }
     if (restoredBook) return respond(restoredBook);
 
-    const { error: cleanupError } = await admin.storage.from("documents").remove([storagePath]);
-    const { data: concurrentBook, error: concurrentLookupError } = await admin
-      .from("documents")
-      .select("*")
-      .eq("source_identity", sourceIdentity)
-      .eq("origin", "catalog_import")
-      .maybeSingle();
-    if (concurrentLookupError) {
-      logInternalError("concurrent catalog restoration lookup", concurrentLookupError);
-      if (cleanupError) logInternalError("catalog file cleanup after restore race", cleanupError);
-      return fail("Could not resolve the catalog restoration.", 500);
-    }
-    if (concurrentBook && !cleanupError) return respond(concurrentBook);
-    if (cleanupError) logInternalError("catalog file cleanup after restore race", cleanupError);
-    if (concurrentBook) {
-      return fail("The book is available, but temporary file cleanup failed.", 500);
+    const recovery = await reconcileFailedWrite();
+    if (recovery.kind === "reused") return respond(recovery.document);
+    if (recovery.kind === "pending") {
+      logInternalError("catalog file cleanup after restore race", recovery.error);
+      return fail(`The legacy catalog record changed during import. ${recovery.error}`, 500);
     }
     return fail("The legacy catalog record changed during import.", 409);
   }
@@ -518,21 +554,11 @@ async function importCatalogBook(req: Request): Promise<Response> {
     .single();
 
   if (insertError) {
-    const { error: cleanupError } = await admin.storage.from("documents").remove([storagePath]);
-    const { data: canonical, error: canonicalError } = await admin
-      .from("documents")
-      .select("*")
-      .eq("source_identity", sourceIdentity)
-      .maybeSingle();
-    if (canonicalError) {
-      logInternalError("concurrent catalog import lookup", canonicalError);
-      if (cleanupError) logInternalError("catalog file cleanup after insert failure", cleanupError);
-      return fail("Could not resolve the catalog import.", 500);
-    }
-    if (canonical && !cleanupError) return respond(canonical);
-    if (cleanupError) logInternalError("catalog file cleanup after insert failure", cleanupError);
-    if (canonical) {
-      return fail("The book is available, but temporary file cleanup failed.", 500);
+    const recovery = await reconcileFailedWrite();
+    if (recovery.kind === "reused") return respond(recovery.document);
+    if (recovery.kind === "pending") {
+      logInternalError("concurrent catalog import recovery", recovery.error);
+      return fail(`Could not resolve the catalog import. ${recovery.error}`, 500);
     }
     logInternalError("shared catalog insert", insertError);
     return fail("Could not save the shared catalog record.", 500);

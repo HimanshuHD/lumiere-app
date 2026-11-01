@@ -1,4 +1,5 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { shouldDeferCatalogImportCleanup } from "../_shared/catalog_import_recovery.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -23,21 +24,22 @@ function isUuid(value: unknown): value is string {
 }
 
 interface RecoveryRow {
+  user_id: string;
   operation_id: string;
   storage_path: string;
+  failure_stage: "catalog-delete" | "catalog-import";
+  status: "cleanup_pending" | "reconciliation_pending";
   attempts: number;
 }
 
 async function processPendingCleanup(
   adminClient: ReturnType<typeof createClient>,
-  userId: string,
 ): Promise<{ completed: number; pending: number }> {
   const { data: rows, error: listError } = await adminClient
     .from("document_lifecycle_recovery")
-    .select("operation_id, storage_path, attempts")
-    .eq("user_id", userId)
-    .eq("failure_stage", "catalog-delete")
-    .eq("status", "cleanup_pending")
+    .select("user_id, operation_id, storage_path, failure_stage, status, attempts")
+    .in("failure_stage", ["catalog-delete", "catalog-import"])
+    .in("status", ["cleanup_pending", "reconciliation_pending"])
     .order("created_at", { ascending: true });
 
   if (listError) throw new Error(`Could not load catalog cleanup records: ${listError.message}`);
@@ -45,9 +47,60 @@ async function processPendingCleanup(
   let completed = 0;
   let pending = 0;
   for (const row of (rows ?? []) as RecoveryRow[]) {
-    const { error: removeError } = await adminClient.storage
-      .from("documents")
-      .remove([row.storage_path]);
+    const [fileReference, coverReference] = await Promise.all([
+      adminClient.from("documents").select("id").eq("file_storage_path", row.storage_path).limit(1),
+      adminClient.from("documents").select("id").eq("cover_storage_path", row.storage_path).limit(1),
+    ]);
+    if (fileReference.error || coverReference.error) {
+      const error = fileReference.error ?? coverReference.error;
+      console.error("[admin-catalog-maintenance] Could not reconcile cleanup reference", error);
+      const { error: updateError } = await adminClient
+        .from("document_lifecycle_recovery")
+        .update({
+          last_error: error.message,
+          attempts: row.attempts + 1,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("user_id", row.user_id)
+        .eq("operation_id", row.operation_id)
+        .eq("storage_path", row.storage_path)
+        .eq("failure_stage", row.failure_stage)
+        .eq("status", row.status);
+      if (updateError) {
+        console.error("[admin-catalog-maintenance] Could not record reconciliation failure", updateError);
+      }
+      pending += 1;
+      continue;
+    }
+
+    const isReferenced = (fileReference.data?.length ?? 0) > 0
+      || (coverReference.data?.length ?? 0) > 0;
+    if (
+      !isReferenced
+      && shouldDeferCatalogImportCleanup(row.status, row.attempts)
+    ) {
+      const { error: deferError } = await adminClient
+        .from("document_lifecycle_recovery")
+        .update({
+          last_error: "No document references this path yet; delayed cleanup is required to resolve the in-flight import safely.",
+          attempts: row.attempts + 1,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("user_id", row.user_id)
+        .eq("operation_id", row.operation_id)
+        .eq("storage_path", row.storage_path)
+        .eq("failure_stage", row.failure_stage)
+        .eq("status", row.status);
+      if (deferError) {
+        console.error("[admin-catalog-maintenance] Could not defer uncertain import cleanup", deferError);
+      }
+      pending += 1;
+      continue;
+    }
+
+    const removeError = isReferenced
+      ? null
+      : (await adminClient.storage.from("documents").remove([row.storage_path])).error;
 
     const { error: updateError } = await adminClient
       .from("document_lifecycle_recovery")
@@ -62,11 +115,11 @@ async function processPendingCleanup(
           last_error: null,
           updated_at: new Date().toISOString(),
         })
-      .eq("user_id", userId)
+        .eq("user_id", row.user_id)
       .eq("operation_id", row.operation_id)
       .eq("storage_path", row.storage_path)
-      .eq("failure_stage", "catalog-delete")
-      .eq("status", "cleanup_pending");
+        .eq("failure_stage", row.failure_stage)
+        .eq("status", row.status);
 
     if (updateError) {
       console.error("[admin-catalog-maintenance] Could not update cleanup record", updateError);
@@ -133,9 +186,8 @@ Deno.serve(async (request) => {
     const { count, error } = await adminClient
       .from("document_lifecycle_recovery")
       .select("storage_path", { count: "exact", head: true })
-      .eq("user_id", authData.user.id)
-      .eq("failure_stage", "catalog-delete")
-      .eq("status", "cleanup_pending");
+      .in("failure_stage", ["catalog-delete", "catalog-import"])
+      .in("status", ["cleanup_pending", "reconciliation_pending"]);
     if (error) {
       console.error("[admin-catalog-maintenance] Could not count cleanup records", error);
       return respond({ error: "Could not load pending catalog cleanup." }, 500);
@@ -161,7 +213,7 @@ Deno.serve(async (request) => {
   }
 
   try {
-    const cleanup = await processPendingCleanup(adminClient, authData.user.id);
+    const cleanup = await processPendingCleanup(adminClient);
     return respond({ deleted: body.action === "delete", impact, cleanup });
   } catch (error) {
     console.error("[admin-catalog-maintenance] Catalog storage cleanup failed", error);
