@@ -19,6 +19,25 @@ function throwOnError(error: { message: string } | null, action: string): void {
   if (error) throw new Error(`${action}: ${error.message}`);
 }
 
+async function getFunctionErrorMessage(error: { message: string; context?: unknown }): Promise<string> {
+  if (error.context instanceof Response) {
+    try {
+      const body: unknown = await error.context.clone().json();
+      if (
+        typeof body === 'object'
+        && body !== null
+        && !Array.isArray(body)
+      ) {
+        if ('error' in body && typeof body.error === 'string') return body.error;
+        if ('message' in body && typeof body.message === 'string') return body.message;
+      }
+    } catch {
+      // Fall back to the SDK error when the response is not JSON.
+    }
+  }
+  return error.message;
+}
+
 function toRecoveryRecord(row: RecoveryRow): UserUploadRecovery {
   return {
     userId: row.user_id,
@@ -60,7 +79,9 @@ export const supabaseDocumentLifecycleDependencies: DocumentLifecycleDependencie
         { body: { document: payload } },
       );
       if (finalizeError) {
-        throw new Error(`Could not validate and finalize the uploaded document: ${finalizeError.message}`);
+        throw new Error(
+          `Could not validate and finalize the uploaded document: ${await getFunctionErrorMessage(finalizeError)}`,
+        );
       }
       if (finalized?.id !== document.id) {
         throw new Error('The upload service did not confirm document finalization.');
