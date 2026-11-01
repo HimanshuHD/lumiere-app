@@ -1,7 +1,7 @@
 BEGIN;
 
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
-SELECT plan(22);
+SELECT plan(25);
 
 INSERT INTO auth.users (
   instance_id,
@@ -118,6 +118,16 @@ VALUES
     'legacy_unowned',
     'private',
     'project-gutenberg:test-duplicate'
+  ),
+  (
+    '20000000-0000-0000-0000-000000000008',
+    'Quarantined legacy file fixture',
+    'Test Author',
+    'Fiction',
+    NULL,
+    'legacy_unowned',
+    'private',
+    'legacy-source:private-file'
   );
 
 INSERT INTO storage.objects (bucket_id, name, owner_id, metadata)
@@ -133,11 +143,21 @@ VALUES
     '10000000-0000-0000-0000-000000000001/deleted-document.pdf',
     '10000000-0000-0000-0000-000000000001',
     '{"mimetype":"application/pdf","size":1}'
+  ),
+  (
+    'documents',
+    '10000000-0000-0000-0000-000000000001/quarantined-book.epub',
+    '10000000-0000-0000-0000-000000000001',
+    '{"mimetype":"application/epub+zip","size":1}'
   );
 
 UPDATE public.documents
 SET file_storage_path = '10000000-0000-0000-0000-000000000001/deleted-document.pdf'
 WHERE id = '20000000-0000-0000-0000-000000000005';
+
+UPDATE public.documents
+SET file_storage_path = '10000000-0000-0000-0000-000000000001/quarantined-book.epub'
+WHERE id = '20000000-0000-0000-0000-000000000008';
 
 CREATE TEMP TABLE duplicate_catalog_documents (
   duplicate_id uuid PRIMARY KEY,
@@ -254,6 +274,19 @@ SELECT ok(
   ),
   'owners can select their own storage objects for cleanup'
 );
+SELECT ok(
+  has_function_privilege(
+    'authenticated',
+    'public.can_cleanup_document_storage_object(text)',
+    'EXECUTE'
+  )
+  AND NOT has_function_privilege(
+    'anon',
+    'public.can_cleanup_document_storage_object(text)',
+    'EXECUTE'
+  ),
+  'the privileged storage-reference check is only executable by signed-in users'
+);
 
 SET LOCAL ROLE anon;
 SELECT set_config('request.jwt.claim.sub', '30000000-0000-0000-0000-000000000003', true);
@@ -271,6 +304,13 @@ SELECT is(
       AND name = '10000000-0000-0000-0000-000000000001/orphan-cover.jpg'),
   0,
   'another user cannot select an owner’s orphaned storage object'
+);
+SELECT is(
+  (SELECT count(*)::integer FROM storage.objects
+    WHERE bucket_id = 'documents'
+      AND name = '10000000-0000-0000-0000-000000000001/quarantined-book.epub'),
+  0,
+  'another user cannot select a storage object referenced by a quarantined legacy document'
 );
 SELECT is(
   (SELECT count(*)::integer FROM public.documents WHERE id = '20000000-0000-0000-0000-000000000001'),
@@ -370,6 +410,13 @@ SELECT is(
       AND name = '10000000-0000-0000-0000-000000000001/orphan-cover.jpg'),
   1,
   'an owner can select an orphaned upload for cleanup'
+);
+SELECT is(
+  (SELECT count(*)::integer FROM storage.objects
+    WHERE bucket_id = 'documents'
+      AND name = '10000000-0000-0000-0000-000000000001/quarantined-book.epub'),
+  0,
+  'an owner cannot select a quarantined legacy file for a new signed URL'
 );
 UPDATE public.documents
 SET visibility = 'private'

@@ -31,9 +31,9 @@ The frontend requests authenticated signed links that expire after 15 minutes an
 
 Anonymous users cannot read document rows or document-bucket objects. External cover images that were already stored as external URLs remain external; uploaded covers use the private bucket and the same document visibility policy.
 The separate avatars bucket remains public-read, with insert, update, and delete constrained to the authenticated owner’s user-ID folder.
-Document owners can also access objects under their own user-ID folder for storage cleanup, including objects left behind before a document row was created or after it was deleted. This cleanup access excludes paths referenced by catalog-import records and does not expose another user’s folder.
+Document owners can also access objects under their own user-ID folder for storage cleanup, including objects left behind before a document row was created or after it was deleted. A privileged reference check prevents cleanup access to any path still referenced by a document, including quarantined legacy rows hidden by row-level security; it does not expose document metadata or another user’s folder.
 
-Run the database policy checks in `supabase/tests/document_security.test.sql` with `npx supabase test db` against a disposable local Supabase database after all migrations, including this one, have been applied. The test command does not apply pending migrations. Do not reset a local database that contains data you need to keep.
+Run the database policy checks in `supabase/tests/document_security.test.sql` with `npx supabase test db` against a disposable local Supabase database after all migrations, including the cleanup and legacy-file protection migrations, have been applied. The tests verify that owners can still access genuinely orphaned objects but cannot obtain a signed URL for an object referenced by a quarantined document. The test command does not apply pending migrations. Do not reset a local database that contains data you need to keep.
 
 ## Recovery and review
 
