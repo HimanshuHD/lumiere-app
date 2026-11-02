@@ -14,6 +14,15 @@ export type UserUploadStage =
   | 'reconciliation'
   | 'document-delete';
 
+export const USER_UPLOAD_RECOVERY_STAGES: readonly UserUploadStage[] = [
+  'document-lookup', 'document-upload', 'cover-upload', 'document-insert',
+  'reconciliation', 'document-delete',
+];
+
+export function isUserUploadRecoveryStage(stage: unknown): stage is UserUploadStage {
+  return typeof stage === 'string' && USER_UPLOAD_RECOVERY_STAGES.includes(stage as UserUploadStage);
+}
+
 export type UserDocumentMetadata = Pick<
   Document,
   | 'title'
@@ -143,9 +152,13 @@ export async function recoverPendingUserUploadFiles(
   operationId?: string,
 ): Promise<UserUploadRecoveryResult> {
   const allPendingRecords = await dependencies.database.listPendingRecoveryRecords(userId);
-  const pendingRecords = operationId
-    ? allPendingRecords.filter((record) => record.operationId === operationId)
-    : allPendingRecords;
+  // The catalog maintenance service owns catalog-import/catalog-delete records.
+  // Defend here as well as in the query, so mixed/older adapters cannot route
+  // privileged cleanup into a regular user's storage client.
+  const pendingRecords = allPendingRecords.filter((record) =>
+    isUserUploadRecoveryStage(record.stage)
+    && (!operationId || record.operationId === operationId)
+  );
   let recovered = 0;
   let pending = 0;
 
@@ -169,7 +182,13 @@ export async function recoverPendingUserUploadFiles(
       recovered += 1;
     } catch (error) {
       pending += 1;
-      await dependencies.database.recordRecoveryAttempt(record, errorMessage(error));
+      try {
+        await dependencies.database.recordRecoveryAttempt(record, errorMessage(error));
+      } catch (trackingError) {
+        // A failure to update one record must not skip unrelated pending files.
+        // It is still counted as pending and remains available for a later retry.
+        console.error('Could not record upload recovery attempt:', trackingError);
+      }
     }
   }
 

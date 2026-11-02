@@ -1,4 +1,5 @@
 import { supabase, type Document } from '@/lib/supabase';
+import { USER_UPLOAD_RECOVERY_STAGES } from '@/services/documentLifecycle';
 import type {
   DocumentLifecycleDependencies,
   UserDocumentInsert,
@@ -116,6 +117,7 @@ export const supabaseDocumentLifecycleDependencies: DocumentLifecycleDependencie
         .select('user_id, operation_id, storage_path, failure_stage, status, last_error, attempts')
         .eq('user_id', userId)
         .in('status', ['cleanup_pending', 'reconciliation_pending'])
+        .in('failure_stage', [...USER_UPLOAD_RECOVERY_STAGES])
         .order('created_at', { ascending: true });
       throwOnError(error, 'Could not load upload recovery details');
       return ((data ?? []) as RecoveryRow[]).map(toRecoveryRecord);

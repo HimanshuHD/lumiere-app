@@ -79,3 +79,5 @@ Apply `20261102000800_redact_locked_document_references.sql` before deploying th
 Apply `20261102000900_migrate_legacy_catalog_edition_identities.sql` before the edition-aware importer. Known Gutenberg EPUB/PDF legacy identities are normalized in place; their document IDs and saved references are retained. The records stay private/quarantined until a validated import replaces their content. Unknown sources or formats still require privileged review.
 
 Upload retries keep the same operation ID. Before reusing its paths, the lifecycle service reconciles saved rows and retries that operation's pending cleanup. A lost document/cover upload response therefore does not leave the retry stuck on an existing object; failed cleanup blocks new writes and keeps its recovery record pending.
+
+Personal upload recovery selects only user-upload/deletion stages and ignores catalog records defensively. Catalog-import and catalog-delete recovery stays in `admin-catalog-maintenance`. Failure to persist an attempt for one personal record leaves it pending and does not skip cleanup of other personal records.

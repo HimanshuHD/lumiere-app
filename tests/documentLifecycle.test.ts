@@ -435,3 +435,49 @@ describe('retrying an ambiguous storage upload', () => {
     assert.equal(harness.recoveryAttempts.length, 1);
   });
 });
+
+
+describe('personal upload recovery isolation', () => {
+  it('never processes catalog records even if an adapter returns mixed pending rows', async () => {
+    const records = ['catalog-import', 'catalog-delete', 'document-upload'].map((stage) => ({
+      operationId: stage === 'document-upload' ? operationId : `catalog-${stage}`,
+      userId,
+      storagePath: stage === 'document-upload' ? `${userId}/${operationId}.pdf` : `catalog/${stage}.epub`,
+      stage,
+      status: 'cleanup_pending',
+      lastError: 'Previous failure',
+      attempts: 0,
+    })) as UserUploadRecovery[];
+    const harness = createHarness({
+      async listPendingRecoveryRecords() { return records; },
+      async markRecoveryRecordCompleted(record) {
+        assert.equal(record.stage, 'document-upload');
+      },
+      async recordRecoveryAttempt() { assert.fail('Catalog RLS must never be reached'); },
+    });
+    assert.deepEqual(await recoverPendingUserUploadFiles(harness, userId), { recovered: 1, pending: 0 });
+    assert.deepEqual(harness.removals, [[`${userId}/${operationId}.pdf`]]);
+    assert.equal(harness.completedRecoveryRecords.length, 1);
+  });
+
+  it('continues later personal recovery when recording an earlier failure also fails', async () => {
+    const records = ['first', 'second'].map((suffix): UserUploadRecovery => ({
+      operationId: suffix, userId, storagePath: `${userId}/${suffix}.pdf`,
+      stage: 'document-upload', status: 'cleanup_pending', lastError: 'Previous failure', attempts: 0,
+    }));
+    const harness = createHarness({
+      async listPendingRecoveryRecords() { return records; },
+      async remove(paths) { if (paths[0].endsWith('first.pdf')) throw new Error('Storage unavailable'); },
+      async recordRecoveryAttempt() { throw new Error('Recovery tracking unavailable'); },
+    });
+    const originalError = console.error;
+    const logged: unknown[] = [];
+    console.error = (...args: unknown[]) => { logged.push(args); };
+    try {
+      assert.deepEqual(await recoverPendingUserUploadFiles(harness, userId), { recovered: 1, pending: 1 });
+    } finally { console.error = originalError; }
+    assert.equal(harness.removals.length, 2);
+    assert.equal(harness.completedRecoveryRecords[0].operationId, 'second');
+    assert.equal(logged.length, 1);
+  });
+});
