@@ -1,6 +1,9 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState } from 'react';
 import { AlertTriangle, FileEdit, Trash2, X, Loader2, BookOpen, Download, Pencil, Save } from 'lucide-react';
-import { supabase, Document } from '@/lib/supabase';
+import type { DocumentSummary as Document } from '@/features/data/document-summary';
+import { useDocuments } from '@/hooks/useData';
+import { getAccountStore } from '@/features/data/account-store';
+import { QueryNotice } from '@/components/QueryNotice';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import { DocumentCover } from '@/components/DocumentCover';
@@ -16,33 +19,15 @@ const CATEGORIES = ['Fiction', 'Non-Fiction', 'Science', 'History', 'Technology'
 export function MyUploads() {
   const { user } = useAuth();
   const { showToast } = useToast();
-  const [docs, setDocs] = useState<Document[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { documents, loading, error, refetch } = useDocuments();
+  const docs = documents.filter(document => document.origin === 'user_upload' && document.uploaded_by === user?.id)
+    .sort((a,b) => b.created_at.localeCompare(a.created_at));
   const [editDoc, setEditDoc] = useState<Document | null>(null);
   const [deleteDoc, setDeleteDoc] = useState<Document | null>(null);
   const [deletionImpact, setDeletionImpact] = useState<UserDocumentDeletionImpact | null>(null);
   const [deletionImpactError, setDeletionImpactError] = useState<string | null>(null);
   const [loadingDeletionImpact, setLoadingDeletionImpact] = useState(false);
   const [deleting, setDeleting] = useState(false);
-
-  const fetchMyUploads = useCallback(async () => {
-    if (!user) return;
-    const { data, error } = await supabase
-      .from('documents')
-      .select('*')
-      .eq('uploaded_by', user.id)
-      .order('created_at', { ascending: false });
-    if (error) {
-      showToast(`Could not load your uploads: ${error.message}`, 'error');
-    } else if (data) {
-      setDocs(data as Document[]);
-    }
-    setLoading(false);
-  }, [showToast, user]);
-
-  useEffect(() => {
-    fetchMyUploads();
-  }, [fetchMyUploads]);
 
   const prepareDelete = async (document: Document) => {
     setDeleteDoc(document);
@@ -69,7 +54,7 @@ export function MyUploads() {
         user.id,
         deleteDoc.id,
       );
-      setDocs((prev) => prev.filter((d) => d.id !== deleteDoc.id));
+      getAccountStore(user.id).changedDocument(deleteDoc.id, true);
       setDeleteDoc(null);
       if (result.cleanup.status === 'pending') {
         const detail = result.cleanup.error
@@ -85,7 +70,9 @@ export function MyUploads() {
     }
   };
 
-  if (loading) {
+  if (error && docs.length === 0) return <QueryNotice error={error} retry={refetch} label="uploads" />;
+
+  if (loading && docs.length === 0) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center">
         <Loader2 className="w-8 h-8 text-amber-600 animate-spin" />
@@ -95,6 +82,7 @@ export function MyUploads() {
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <QueryNotice error={error} retry={refetch} label="uploads" />
       <div className="flex items-center gap-3 mb-8">
         <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center">
           <FileEdit className="w-5 h-5 text-amber-700" />
@@ -184,7 +172,8 @@ export function MyUploads() {
           doc={editDoc}
           onClose={() => setEditDoc(null)}
           onSaved={(updated) => {
-            setDocs((prev) => prev.map((d) => (d.id === updated.id ? updated : d)));
+            if (user) getAccountStore(user.id).changedDocument(updated.id);
+            void refetch();
             setEditDoc(null);
           }}
         />

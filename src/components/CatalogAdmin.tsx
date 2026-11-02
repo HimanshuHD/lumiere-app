@@ -1,6 +1,7 @@
+import { DOCUMENT_SUMMARY_FIELDS } from '@/features/data/document-summary';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, ArrowLeft, Loader2, Search, Shield, Trash2 } from 'lucide-react';
-import { Document } from '@/lib/supabase';
+import type { DocumentSummary as Document } from '@/features/data/document-summary';
 import { DocumentCover } from '@/components/DocumentCover';
 import { useToast } from '@/context/ToastContext';
 import {
@@ -44,14 +45,14 @@ export function CatalogAdmin({ onBack }: CatalogAdminProps) {
       const [documentsResult, pendingCount] = await Promise.all([
         supabase
           .from('documents')
-          .select('*')
+          .select(DOCUMENT_SUMMARY_FIELDS)
           .eq('origin', 'catalog_import')
           .order('title', { ascending: true })
           .limit(1000),
         getCatalogCleanupCount(supabaseCatalogMaintenanceStore),
       ]);
       if (documentsResult.error) throw new Error(documentsResult.error.message);
-      setDocuments((documentsResult.data ?? []) as Document[]);
+      setDocuments((documentsResult.data ?? []) as unknown as Document[]);
       setPendingCleanup(pendingCount);
     } catch (error) {
       setLoadError(error instanceof Error ? error.message : 'Could not load catalog maintenance data.');

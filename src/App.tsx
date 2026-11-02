@@ -5,7 +5,10 @@ import { ToastProvider } from '@/context/ToastContext';
 import { AuthScreen } from '@/components/AuthScreen';
 import { Library } from '@/components/Library';
 import { BookmarksView } from '@/components/BookmarksView';
-import { Reader } from '@/components/Reader';
+import { ReaderLoader } from '@/components/ReaderLoader';
+import { QueryNotice } from '@/components/QueryNotice';
+import type { DocumentSummary } from '@/features/data/document-summary';
+import { summarizeDocument } from '@/features/data/document-summary';
 import { UploadPanel } from '@/components/UploadPanel';
 import { Profile } from '@/components/Profile';
 import { MyUploads } from '@/components/MyUploads';
@@ -27,10 +30,11 @@ function getViewFromLocation(): View {
 
 function AppContent() {
   const { user, loading, signOut } = useAuth();
-  const { documents, loading: docsLoading, refetch } = useDocuments();
+  const { documents, loading: docsLoading, error: docsError, refetch } = useDocuments();
   const [view, setView] = useState<View>(getViewFromLocation);
-  const [activeDoc, setActiveDoc] = useState<Document | null>(null);
+  const [activeDoc, setActiveDoc] = useState<DocumentSummary | null>(null);
   const [showOnlineLibrary, setShowOnlineLibrary] = useState(false);
+  const openDocument = useCallback((doc: DocumentSummary | Document) => setActiveDoc('chapters' in doc ? summarizeDocument(doc) : doc), []);
   const catalogAdmin = isCatalogAdmin(user);
 
   const navigateToView = useCallback((nextView: View) => {
@@ -140,6 +144,7 @@ function AppContent() {
       </nav>
 
       {/* Main content */}
+      {!activeDoc && (view === 'library' || view === 'all-documents') && <QueryNotice error={docsError} retry={refetch} label="library" />}
       <main>
         {view === 'admin-catalog' ? (
           catalogAdmin ? (
@@ -157,27 +162,27 @@ function AppContent() {
             </div>
           )
         ) : activeDoc ? (
-          <Reader document={activeDoc} onBack={() => setActiveDoc(null)} />
+          <ReaderLoader document={activeDoc} onBack={() => setActiveDoc(null)} />
         ) : (
           <>
-            {view === 'library' && (
+            {view === 'library' && !(docsError && documents.length === 0) && (
               <Library
                 documents={documents}
-                loading={docsLoading}
-                onOpenDoc={setActiveDoc}
+                loading={docsLoading && documents.length === 0}
+                onOpenDoc={openDocument}
                 onViewAll={() => navigateToView('all-documents')}
               />
             )}
-            {view === 'bookmarks' && <BookmarksView onOpenDoc={setActiveDoc} />}
-            {view === 'reading-list' && <ReadingListView onOpenDoc={setActiveDoc} />}
+            {view === 'bookmarks' && <BookmarksView onOpenDoc={openDocument} />}
+            {view === 'reading-list' && <ReadingListView onOpenDoc={openDocument} />}
             {view === 'upload' && <UploadPanel onUploaded={handleUploaded} />}
             {view === 'profile' && <Profile />}
             {view === 'my-uploads' && <MyUploads />}
-            {view === 'all-documents' && (
+            {view === 'all-documents' && !(docsError && documents.length === 0) && (
               <AllDocuments
                 documents={documents}
-                loading={docsLoading}
-                onOpenDoc={setActiveDoc}
+                loading={docsLoading && documents.length === 0}
+                onOpenDoc={openDocument}
                 onBack={() => navigateToView('library')}
                 onCollectionChanged={async () => { await refetch(); }}
               />
@@ -204,19 +209,22 @@ function AppContent() {
         onBookAdded={(doc) => {
           refetch();
           setShowOnlineLibrary(false);
-          setActiveDoc(doc);
+          openDocument(doc);
         }}
       />
     </div>
   );
 }
 
+function AccountContent() {
+  const { user } = useAuth();
+  return <ToastProvider key={user?.id ?? 'signed-out'}><AppContent /></ToastProvider>;
+}
+
 export default function App() {
   return (
     <AuthProvider>
-      <ToastProvider>
-        <AppContent />
-      </ToastProvider>
+      <AccountContent />
     </AuthProvider>
   );
 }

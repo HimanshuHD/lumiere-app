@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, useCallback, useRef, ReactNode } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 
@@ -22,6 +22,7 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const accountRef = useRef<string | undefined>(undefined);
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
@@ -34,6 +35,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .select('full_name, avatar_url')
       .eq('id', user.id)
       .maybeSingle();
+    if (accountRef.current !== user.id) return;
     const googleName = [user.user_metadata.full_name, user.user_metadata.name]
       .find((value): value is string => typeof value === 'string' && value.trim().length > 0)
       ?.trim() ?? '';
@@ -44,21 +46,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [user]);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
-      setUser(data.session?.user ?? null);
-      setLoading(false);
-    });
-
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
-
-    return () => {
-      listener.subscription.unsubscribe();
+    let active = true;
+    let eventObserved = false;
+    const apply = (next: Session | null) => {
+      if (!active) return;
+      const id = next?.user.id;
+      if (accountRef.current !== id) setProfile({ fullName: '', avatarUrl: null });
+      accountRef.current = id;
+      setSession(next); setUser(next?.user ?? null); setLoading(false);
     };
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, next) => {
+      eventObserved = true; apply(next);
+    });
+    void supabase.auth.getSession().then(({ data }) => { if (!eventObserved) apply(data.session); });
+    return () => { active = false; listener.subscription.unsubscribe(); };
   }, []);
 
   useEffect(() => {

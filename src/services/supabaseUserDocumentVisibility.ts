@@ -1,3 +1,5 @@
+import { cachedAccountStore } from '@/features/data/account-store';
+import { DOCUMENT_SUMMARY_FIELDS } from '@/features/data/document-summary';
 import { supabase } from '@/lib/supabase';
 import type { UserDocumentVisibilityStore } from '@/services/userDocumentVisibility';
 
@@ -9,10 +11,11 @@ export const supabaseUserDocumentVisibilityStore: UserDocumentVisibilityStore = 
       .eq('id', documentId)
       .eq('uploaded_by', userId)
       .eq('origin', 'user_upload')
-      .select('*')
+      .select(DOCUMENT_SUMMARY_FIELDS)
       .single();
     if (error) throw new Error(`Could not update document: ${error.message}`);
     if (!data) throw new Error('The updated document was not returned.');
-    return data;
+    cachedAccountStore(userId)?.changedDocument(documentId);
+    return data as unknown as import('@/features/data/document-summary').DocumentSummary;
   },
 };
