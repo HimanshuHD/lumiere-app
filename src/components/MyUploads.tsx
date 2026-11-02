@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { AlertTriangle, FileEdit, Trash2, X, Loader2, BookOpen, Download, Pencil, Save } from 'lucide-react';
 import type { DocumentSummary as Document } from '@/features/data/document-summary';
 import { useDocuments } from '@/hooks/useData';
-import { getAccountStore } from '@/features/data/account-store';
+import { cachedAccountStore } from '@/features/data/account-store';
 import { QueryNotice } from '@/components/QueryNotice';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
@@ -54,7 +54,7 @@ export function MyUploads() {
         user.id,
         deleteDoc.id,
       );
-      getAccountStore(user.id).changedDocument(deleteDoc.id, true);
+      cachedAccountStore(user.id)?.changedDocument(deleteDoc.id, true);
       setDeleteDoc(null);
       if (result.cleanup.status === 'pending') {
         const detail = result.cleanup.error
@@ -172,7 +172,7 @@ export function MyUploads() {
           doc={editDoc}
           onClose={() => setEditDoc(null)}
           onSaved={(updated) => {
-            if (user) getAccountStore(user.id).changedDocument(updated.id);
+            if (user) cachedAccountStore(user.id)?.changedDocument(updated.id);
             void refetch();
             setEditDoc(null);
           }}
