@@ -64,6 +64,9 @@ export interface ReadingProgress {
   chapter_index: number;
   scroll_percent: number;
   epub_cfi?: string | null;
+  position?: unknown;
+  revision?: number;
+  mutation_id?: string | null;
   updated_at: string;
 }
 
