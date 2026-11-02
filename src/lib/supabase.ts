@@ -32,7 +32,7 @@ export interface Document {
   chapters: Chapter[];
   is_featured: boolean;
   created_at: string;
-  origin: 'user_upload' | 'catalog_import' | 'legacy_unowned';
+  origin: 'user_upload' | 'catalog_import' | 'legacy_unowned' | 'demo';
   visibility: 'private' | 'shared';
   uploaded_by?: string | null;
   page_count?: number | null;
