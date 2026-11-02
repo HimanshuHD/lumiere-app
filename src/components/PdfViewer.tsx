@@ -1,7 +1,8 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, Loader2, ZoomIn, ZoomOut } from 'lucide-react';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 import { PdfSession } from '@/features/reader/pdf/pdf-session';
+import { PdfRenderQueue } from '@/features/reader/pdf/pdf-render-queue';
 
 interface PdfViewerProps {
   url: string;
@@ -14,6 +15,7 @@ export function PdfViewer({ url, title, initialProgress = 0, onProgress }: PdfVi
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const pdfDocRef = useRef<PDFDocumentProxy | null>(null);
+  const renderQueueRef = useRef<PdfRenderQueue | null>(null);
   const onProgressRef = useRef(onProgress);
   const initialProgressRef = useRef(initialProgress);
   const currentPageRef = useRef(1);
@@ -33,6 +35,8 @@ export function PdfViewer({ url, title, initialProgress = 0, onProgress }: PdfVi
   useEffect(() => {
     let active = true;
     const session = new PdfSession((error) => console.error('PDF cleanup failed:', error));
+    const renderQueue = new PdfRenderQueue();
+    renderQueueRef.current = renderQueue;
 
     (async () => {
       setLoading(true);
@@ -46,7 +50,7 @@ export function PdfViewer({ url, title, initialProgress = 0, onProgress }: PdfVi
         ).toString();
 
         const pdf = await session.load(() => pdfjsLib.getDocument(url));
-        if (!pdf) return;
+        if (!pdf || !active) return;
         pdfDocRef.current = pdf;
         setTotalPages(pdf.numPages);
         const boundedCurrentPage = Math.min(Math.max(1, currentPageRef.current), pdf.numPages);
@@ -70,6 +74,8 @@ export function PdfViewer({ url, title, initialProgress = 0, onProgress }: PdfVi
     return () => {
       active = false;
       pdfDocRef.current = null;
+      renderQueueRef.current = null;
+      void renderQueue.dispose();
       void session.dispose();
     };
   }, [url]);
@@ -80,37 +86,21 @@ export function PdfViewer({ url, title, initialProgress = 0, onProgress }: PdfVi
     onProgressRef.current?.(percent);
   }, [pageNum, totalPages]);
 
-  // Render current page
-  const renderPage = useCallback(async (num: number, currentScale: number) => {
-    if (!pdfDocRef.current || !canvasRef.current) return;
-    setRendering(true);
-    try {
-      const page = await pdfDocRef.current.getPage(num);
-      const viewport = page.getViewport({ scale: currentScale });
-      const canvas = canvasRef.current;
-      const context = canvas.getContext('2d');
-      if (!context) return;
-
-      const outputScale = window.devicePixelRatio || 1;
-      canvas.width = Math.floor(viewport.width * outputScale);
-      canvas.height = Math.floor(viewport.height * outputScale);
-      canvas.style.width = `${Math.floor(viewport.width)}px`;
-      canvas.style.height = `${Math.floor(viewport.height)}px`;
-
-      const transform = outputScale !== 1 ? [outputScale, 0, 0, outputScale, 0, 0] : undefined;
-      await page.render({ canvasContext: context, viewport, transform }).promise;
-    } catch {
-      // page render can fail during teardown — ignore
-    } finally {
-      setRendering(false);
-    }
-  }, []);
-
+  // Queue ownership prevents overlapping writes and obsolete getPage results.
   useEffect(() => {
-    if (!loading && totalPages > 0) {
-      renderPage(pageNum, scale);
-    }
-  }, [pageNum, scale, loading, totalPages, renderPage]);
+    const document = pdfDocRef.current;
+    const canvas = canvasRef.current;
+    const queue = renderQueueRef.current;
+    if (loading || !document || !canvas || !queue) return;
+    void queue.request({
+      document, canvas, page: pageNum, scale,
+      pixelRatio: window.devicePixelRatio || 1,
+    }, {
+      onStart: () => setRendering(true),
+      onError: (error) => console.error('PDF page rendering failed:', error),
+      onFinish: () => setRendering(false),
+    });
+  }, [pageNum, scale, loading, totalPages]);
 
   useEffect(() => {
     currentPageRef.current = pageNum;
