@@ -45,6 +45,25 @@ The migrations create the database schema, row-level security policies, and stor
 
 New local databases have no documents, bookmarks, or reading progress until you add them through the app. The `supabase/snippets/` directory is for manual SQL queries and is not automatically run as seed data.
 
+### Optional demo stories (no database reset)
+
+Generated demo content is opt-in. After starting local Supabase, apply migrations and seed:
+
+```sh
+npx supabase migration up --local
+npm run supabase:seed:demo
+```
+
+This adds the eight shared text demo stories for all signed-in users. Running it again does not
+create duplicates or replace existing stories, bookmarks, or reading progress. It imports no
+accounts, personal activity, legacy PDF, or original-project storage references. Production demo
+loading remains an explicit deployment decision.
+
+For missing/misclassified records, run `supabase/snippets/demo_data_status.sql` in local Studio.
+See [demo content and recovery](docs/development/demo-content.md) for classification, authorization,
+validation, and manual browser checks. Do not import the complete historical dump or reset the
+database to restore these stories.
+
 ### Local Google sign-in
 
 Google sign-in requires OAuth credentials from a Google Cloud OAuth client; Supabase migrations do not create these credentials. Create a **Web application** OAuth client in Google Cloud Console and add this authorized redirect URI:

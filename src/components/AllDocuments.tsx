@@ -1,3 +1,4 @@
+import { DemoBadge } from '@/components/DemoBadge';
 import { useState, useMemo } from 'react';
 import { ArrowLeft, ChevronLeft, ChevronRight, Clock, User, Hash, Search, BookMinus } from 'lucide-react';
 import { Document } from '@/lib/supabase';
@@ -148,6 +149,7 @@ export function AllDocuments({
                         <DocumentCover document={doc} className="w-8 h-11 object-cover rounded flex-shrink-0" />
                         <div className="min-w-0 overflow-hidden">
                           <p className="text-sm font-medium text-stone-800 truncate group-hover:text-amber-700 transition-colors">{doc.title}</p>
+                          <DemoBadge document={doc} />
                           {locked && <div className="mt-1 max-w-xs"><DocumentAccessNotice /></div>}
                           <p className="text-xs text-stone-400 sm:hidden truncate">{doc.author}</p>
                           <div className="flex items-center gap-1.5 mt-0.5">
@@ -170,7 +172,7 @@ export function AllDocuments({
                           Member
                         </span>
                       ) : (
-                        <span className="text-stone-400 text-xs">Curated</span>
+                        <span className="text-stone-400 text-xs">{doc.origin === 'demo' ? 'Demo' : 'Curated'}</span>
                       )}
                     </td>
                     <td className="px-4 py-3 text-sm text-stone-500 hidden lg:table-cell">{timeLabel}</td>

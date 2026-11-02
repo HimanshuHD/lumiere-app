@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { supabase, Document, Bookmark, ReadingProgress, ReadingListItem } from '@/lib/supabase';
+import { selectLibraryDocuments } from '@/lib/libraryDocuments';
 import { useAuth } from '@/context/AuthContext';
 import { getProgressStore } from '@/features/reader/progress/progress-store';
 import type { ReaderPosition } from '@/features/reader/progress/position';
@@ -204,8 +205,9 @@ export function useDocuments() {
 
     if (membershipsResult.error) {
       console.error('Failed to load catalog collection memberships:', membershipsResult.error);
-      setDocuments([...((documentsResult.data || []) as Document[]), ...lockedDocuments]
-        .filter((document) => document.origin !== 'catalog_import'));
+      setDocuments(selectLibraryDocuments(
+        [...((documentsResult.data || []) as Document[]), ...lockedDocuments], new Set(),
+      ));
       setLoading(false);
       return;
     }
@@ -213,8 +215,8 @@ export function useDocuments() {
     const membershipIds = new Set(
       (membershipsResult.data || []).map((membership) => membership.document_id),
     );
-    setDocuments([...((documentsResult.data || []) as Document[]), ...lockedDocuments].filter((document) =>
-      document.origin !== 'catalog_import' || membershipIds.has(document.id)
+    setDocuments(selectLibraryDocuments(
+      [...((documentsResult.data || []) as Document[]), ...lockedDocuments], membershipIds,
     ));
     setLoading(false);
   }, [user]);

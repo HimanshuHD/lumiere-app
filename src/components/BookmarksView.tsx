@@ -1,3 +1,4 @@
+import { DemoBadge } from '@/components/DemoBadge';
 import { BookOpen, BookMarked } from 'lucide-react';
 import { Document } from '@/lib/supabase';
 import { useBookmarks, useReadingProgress } from '@/hooks/useData';
@@ -79,6 +80,7 @@ export function BookmarksView({ onOpenDoc }: BookmarksViewProps) {
                 <h3 className="font-serif font-semibold text-stone-800 text-sm leading-snug line-clamp-2 group-hover:text-amber-700 transition-colors">
                   {doc.title}
                 </h3>
+                <DemoBadge document={doc} />
                 <p className="text-xs text-stone-500 mt-0.5">{doc.author}</p>
               </div>
             );
