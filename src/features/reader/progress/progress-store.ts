@@ -21,6 +21,7 @@ export class ProgressStore {
   error: string | null = null;
   private request?: Promise<void>;
   private loaded = false;
+  private disposed = false;
   private readonly userId: string;
   private listeners = new Set<() => void>();
   constructor(userId: string) {
@@ -39,15 +40,18 @@ export class ProgressStore {
   }
   subscribe = (listener: () => void) => { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; };
   private notify() { this.listeners.forEach(listener => listener()); }
-  load = (): Promise<void> => {
+  dispose() { this.disposed = true; this.coordinator.dispose(); this.listeners.clear(); }
+  load = (force = false): Promise<void> => {
+    if (this.disposed) return Promise.resolve();
     if (this.request) return this.request;
-    if (this.loaded) return Promise.resolve();
+    if (this.loaded && !force) return Promise.resolve();
     this.loading = true; this.error = null; this.notify();
     this.request = (async () => {
       try {
         const { data, error } = await supabase.from('reading_progress').select('*').eq('user_id', this.userId);
         if (error) throw error;
-        this.coordinator.hydrate((data || []) as ProgressRow[]);
+        if (this.disposed) return;
+        this.coordinator.reconcile((data || []) as ProgressRow[]);
         this.loaded = true;
         this.coordinator.retryFailed();
       } catch (error) {
@@ -58,6 +62,9 @@ export class ProgressStore {
   };
 }
 const stores = new Map<string, ProgressStore>();
+export function discardProgressStore(userId: string) {
+  const store = stores.get(userId); store?.dispose(); stores.delete(userId);
+}
 export function getProgressStore(userId: string) {
   let store = stores.get(userId);
   if (!store) { store = new ProgressStore(userId); stores.set(userId, store); }
@@ -66,7 +73,7 @@ export function getProgressStore(userId: string) {
 // Flush only the active account. The RPC also verifies the expected user ID.
 let activeUserId: string | undefined;
 supabase.auth.onAuthStateChange((_event, session) => {
-  if (activeUserId && activeUserId !== session?.user.id) stores.delete(activeUserId);
+  if (activeUserId && activeUserId !== session?.user.id) discardProgressStore(activeUserId);
   activeUserId = session?.user.id;
 });
 if (typeof window !== 'undefined') {

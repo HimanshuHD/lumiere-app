@@ -7,7 +7,7 @@ import { isDocumentLockedForUser } from '@/lib/documentAccess';
 const FALLBACK_COVER_URL = '/lumiere-book-cover.svg?v=2';
 
 export function DocumentCover({ document, className, alt = '' }: {
-  document: Document;
+  document: Omit<Document, 'chapters'>;
   className?: string;
   alt?: string;
 }) {

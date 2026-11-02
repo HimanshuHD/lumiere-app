@@ -13,12 +13,14 @@ export class QueryCache<T> {
   private controller?: AbortController;
   private request?: Promise<T>;
   private disposed = false;
+  private loaded = false;
   private readonly initial: T;
   private readonly fetcher: (signal: AbortSignal) => Promise<T>;
   constructor(initial: T, fetcher: (signal: AbortSignal) => Promise<T>) {
     this.initial = initial;
     this.value = { data: initial, status: 'idle', error: null }; this.fetcher = fetcher;
   }
+  hasData() { return this.loaded; }
   getSnapshot = () => this.value;
   subscribe = (listener: () => void) => { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; };
   private publish(value: QuerySnapshot<T>) { this.value = value; this.listeners.forEach(listener => listener()); }
@@ -31,6 +33,7 @@ export class QueryCache<T> {
     this.publish({ ...this.value, status: 'loading', error: null });
     const request = Promise.resolve().then(() => this.fetcher(controller.signal)).then(data => {
       if (this.disposed || generation !== this.generation) throw new Error('The request was superseded.');
+      this.loaded = true;
       this.publish({ data, status: 'success', error: null }); return data;
     }, error => {
       if (!this.disposed && generation === this.generation) this.publish({ ...this.value, status: 'error', error: errorMessage(error) });
@@ -41,6 +44,7 @@ export class QueryCache<T> {
   set(data: T) {
     if (this.disposed) return;
     this.controller?.abort(); this.generation++; this.request = undefined;
+    this.loaded = true;
     this.publish({ data, status: 'success', error: null });
   }
   invalidate() {
@@ -48,5 +52,5 @@ export class QueryCache<T> {
     this.controller?.abort(); this.generation++; this.request = undefined;
     this.publish({ ...this.value, status: 'idle', error: null });
   }
-  dispose() { this.disposed = true; this.generation++; this.controller?.abort(); this.publish({data:this.initial,status:'idle',error:null}); this.listeners.clear(); }
+  dispose() { this.disposed = true; this.loaded = false; this.generation++; this.controller?.abort(); this.publish({data:this.initial,status:'idle',error:null}); this.listeners.clear(); }
 }

@@ -1,7 +1,7 @@
 import { DemoBadge } from '@/components/DemoBadge';
 import { useState, useMemo } from 'react';
 import { ArrowLeft, ChevronLeft, ChevronRight, Clock, User, Hash, Search, BookMinus } from 'lucide-react';
-import { Document } from '@/lib/supabase';
+import type { DocumentSummary as Document } from '@/features/data/document-summary';
 import { ReadLaterButton } from '@/components/ReadLaterButton';
 import { useReadingProgress } from '@/hooks/useData';
 import { DocumentCover } from '@/components/DocumentCover';

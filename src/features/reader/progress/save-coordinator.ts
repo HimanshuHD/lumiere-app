@@ -39,6 +39,8 @@ export class SaveCoordinator {
   private entries = new Map<string, Entry>();
   private listeners = new Set<() => void>();
   private ready = false;
+  private disposed = false;
+  private forgotten = new Set<string>();
   private readonly storage: PendingStorage;
   private readonly send: (documentId: string, pending: PendingSave) => Promise<SaveResult>;
   constructor(storage: PendingStorage, send: (documentId: string, pending: PendingSave) => Promise<SaveResult>) {
@@ -52,6 +54,7 @@ export class SaveCoordinator {
     return entry;
   }
   hydrate(rows: ProgressRow[]) {
+    if (this.disposed) return;
     // Never let a repeated/stale fetch overwrite this session's newer state.
     if (this.ready) return;
     rows.forEach(row => { const e = this.entry(row.document_id); e.row = row; e.revision = Number(row.revision || 0); });
@@ -68,10 +71,22 @@ export class SaveCoordinator {
     }
     this.ready = true; this.notify();
   }
+  reconcile(rows: ProgressRow[]) {
+    if (!this.ready) { this.hydrate(rows); return; }
+    if (this.disposed) return;
+    for (const row of rows) {
+      if (this.forgotten.has(row.document_id)) continue;
+      const e = this.entry(row.document_id);
+      if (!e.pending && !e.running && Number(row.revision || 0) >= e.revision) {
+        e.row = row; e.revision = Number(row.revision || 0);
+      }
+    }
+    this.notify();
+  }
   snapshot(id: string) { return this.entry(id); }
   rows(): ProgressRow[] { return [...this.entries.values()].flatMap(e => e.row ? [e.row] : []); }
   record(id: string, position: ReaderPosition, chapterIndex: number, progress: number) {
-    if (!this.ready) return;
+    if (!this.ready || this.disposed || this.forgotten.has(id)) return;
     const e = this.entry(id);
     // A conflict requires an explicit retry before choosing this device over remote progress.
     const conflict = e.status === 'conflict';
@@ -97,11 +112,12 @@ export class SaveCoordinator {
     await e.running;
   }
   private async drain(id: string, e: Entry) {
-    while (e.pending) {
+    while (e.pending && !this.disposed && !this.forgotten.has(id)) {
       const sent = e.pending;
       e.status = 'saving'; this.notify();
       try {
         const result = await this.send(id, sent);
+        if (this.disposed || this.forgotten.has(id)) return;
         if (!result.row) throw new Error('The reading position could not be saved.');
         e.row = result.row; e.revision = Number(result.row.revision || 0);
         if (!result.accepted) {
@@ -128,6 +144,18 @@ export class SaveCoordinator {
     }
     e.status = e.pending ? 'pending' : 'saved'; e.error = undefined;
     this.notify(); return this.flush(id);
+  }
+  forget(id: string) {
+    this.forgotten.add(id);
+    const e = this.entries.get(id);
+    if (e?.timer) clearTimeout(e.timer);
+    if (e?.pending) { try { this.storage.remove(id, e.pending.mutationId); } catch { /* No authenticated write can restore a deleted document. */ } }
+    this.entries.delete(id); this.notify();
+  }
+  dispose() {
+    this.disposed = true;
+    for (const e of this.entries.values()) if (e.timer) clearTimeout(e.timer);
+    this.entries.clear(); this.listeners.clear();
   }
   flushAll() { return Promise.all([...this.entries.keys()].map(id => this.flush(id))); }
   retryFailed() {

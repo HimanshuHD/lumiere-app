@@ -30,6 +30,7 @@ import {
 } from '@/lib/settings';
 import { PdfViewer } from '@/components/PdfViewer';
 import { useDocumentStorageUrl } from '@/hooks/useDocumentStorageUrl';
+import { useToast } from '@/context/ToastContext';
 import { useAuth } from '@/context/AuthContext';
 import { DocumentAccessNotice } from '@/components/DocumentAccessNotice';
 import { isDocumentLockedForUser } from '@/lib/documentAccess';
@@ -85,7 +86,7 @@ function ReaderSession({ document: doc, onBack }: ReaderProps) {
   const [scrollPercent, setScrollPercent] = useState(0);
   const [showSettings, setShowSettings] = useState(false);
   const [showToc, setShowToc] = useState(false);
-  const [localBookmarked, setLocalBookmarked] = useState(false);
+
   const [epubLoading, setEpubLoading] = useState(false);
   const [epubError, setEpubError] = useState<string | null>(null);
   const [epubLoadAttempt, setEpubLoadAttempt] = useState(0);
@@ -106,11 +107,12 @@ function ReaderSession({ document: doc, onBack }: ReaderProps) {
   const initialPositionRef = useRef<ReaderPosition | null>(null);
   const initialLegacyProgressRef = useRef(0);
 
-  const { toggleBookmark, isBookmarked } = useBookmarks();
+  const { toggleBookmark, isBookmarked, isBookmarkPending } = useBookmarks();
   const { savePosition, getProgress, loading: progressLoading, error: progressError,
     refetch: retryLoadProgress, flushProgress, getSaveState, retryProgress } = useReadingProgress();
   const { removeFromReadingList } = useReadingList();
   const { user } = useAuth();
+  const { showToast } = useToast();
   const locked = isDocumentLockedForUser(doc, user?.id);
   const { url: fileUrl, error: fileAccessError } = useDocumentStorageUrl(doc.file_storage_path, doc.file_url, !locked);
 
@@ -130,16 +132,13 @@ function ReaderSession({ document: doc, onBack }: ReaderProps) {
     textRestoreRef.current = text;
     setChapterIndex(text.chapterIndex);
     setScrollPercent(text.chapterProgress);
-    if (!row && !pending) void removeFromReadingList(doc.id);
+    if (!row && !pending) void removeFromReadingList(doc.id).catch(error => showToast(error instanceof Error ? error.message : 'Could not update the reading list.', 'error'));
     setPositionReady(true);
   }, [doc.id, doc.file_format, doc.chapters.length, getProgress, getSaveState, locked,
-    progressLoading, progressError, positionReady, removeFromReadingList]);
+    progressLoading, progressError, positionReady, removeFromReadingList, showToast]);
 
   useEffect(() => () => { void flushProgress(doc.id); }, [doc.id, flushProgress]);
 
-  useEffect(() => {
-    setLocalBookmarked(isBookmarked(doc.id));
-  }, [doc.id, isBookmarked]);
 
   // Persist settings
   useEffect(() => {
@@ -287,7 +286,7 @@ function ReaderSession({ document: doc, onBack }: ReaderProps) {
   const handleBookmark = async () => {
     if (locked) return;
     const result = await toggleBookmark(doc.id);
-    setLocalBookmarked(result);
+    if (!result.ok) showToast(result.message, 'error');
   };
 
   const goToChapter = useCallback((idx: number) => {
@@ -374,9 +373,11 @@ function ReaderSession({ document: doc, onBack }: ReaderProps) {
           <div className="flex items-center gap-1">
             <button
               onClick={handleBookmark}
+              disabled={isBookmarkPending(doc.id)}
+              aria-label={isBookmarked(doc.id) ? "Remove bookmark" : "Bookmark document"}
               className={`p-1.5 rounded-lg hover:bg-stone-200/50 ${theme.text} transition-colors`}
             >
-              {localBookmarked ? (
+              {isBookmarked(doc.id) ? (
                 <BookmarkCheck className="w-4 h-4 text-amber-600" />
               ) : (
                 <Bookmark className="w-4 h-4" />
