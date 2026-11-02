@@ -55,3 +55,12 @@ it('cleanup errors are handled without an unhandled rejection', async () => {
   await session.load(() => ({ promise: Promise.resolve(document), destroy: async () => { throw new Error('cleanup'); } }) as PDFDocumentLoadingTask);
   await session.dispose(); assert.equal(errors.length, 1);
 });
+it('a new load after failure disposes the failed task before succeeding', async () => {
+  const failed = task(); const next = task(); const session = new PdfSession();
+  const attempt = session.load(() => failed.value); failed.result.reject(new Error('Network error'));
+  await assert.rejects(attempt, /Network error/);
+  const retried = session.load(() => next.value);
+  const document = { numPages: 10 } as PDFDocumentProxy; next.result.resolve(document);
+  assert.equal(await retried, document); assert.equal(failed.destructions, 1);
+  await session.dispose();
+});

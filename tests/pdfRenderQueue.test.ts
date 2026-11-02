@@ -55,3 +55,25 @@ it('disposal cancels active rendering and suppresses its callbacks', async () =>
   assert.equal(h.finished, 0); assert.deepEqual(h.errors, []);
   await queue.request(h.request, h.callbacks); assert.equal(h.renders.length, 1);
 });
+it('reports genuine render failure and can retry the same page without reloading the PDF', async () => {
+  const h = harness(); const queue = new PdfRenderQueue();
+  const failed = queue.request(h.request, h.callbacks); await flush();
+  h.renders[0].result.reject(new Error('Page painting failed')); await failed;
+  assert.equal((h.errors[0] as Error).message, 'Page painting failed');
+  assert.equal(h.finished, 1);
+  const retried = queue.request(h.request, h.callbacks); await flush();
+  h.renders[1].result.resolve(); await retried;
+  assert.equal(h.finished, 2); assert.equal(h.errors.length, 1);
+});
+it('reports a current page lookup error rather than hiding it as cancellation', async () => {
+  const h = harness(); const queue = new PdfRenderQueue();
+  const document = { getPage: async () => { throw new Error('Page unavailable'); } } as unknown as PDFDocumentProxy;
+  await queue.request({ ...h.request, document }, h.callbacks);
+  assert.equal((h.errors[0] as Error).message, 'Page unavailable'); assert.equal(h.finished, 1);
+});
+it('reports a missing canvas context as a retryable current failure', async () => {
+  const h = harness(); const queue = new PdfRenderQueue();
+  const canvas = { getContext: () => null } as unknown as HTMLCanvasElement;
+  await queue.request({ ...h.request, canvas }, h.callbacks);
+  assert.match((h.errors[0] as Error).message, /drawing context/);
+});

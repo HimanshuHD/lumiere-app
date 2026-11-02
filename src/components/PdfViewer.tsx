@@ -26,6 +26,9 @@ export function PdfViewer({ url, title, initialProgress = 0, onProgress }: PdfVi
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [rendering, setRendering] = useState(false);
+  const [renderError, setRenderError] = useState<string | null>(null);
+  const [loadAttempt, setLoadAttempt] = useState(0);
+  const [renderAttempt, setRenderAttempt] = useState(0);
 
   useEffect(() => {
     onProgressRef.current = onProgress;
@@ -41,6 +44,8 @@ export function PdfViewer({ url, title, initialProgress = 0, onProgress }: PdfVi
     (async () => {
       setLoading(true);
       setError(null);
+      setRenderError(null);
+      setRendering(false);
       try {
         const pdfjsLib = await import('pdfjs-dist');
         // Set worker path
@@ -78,7 +83,7 @@ export function PdfViewer({ url, title, initialProgress = 0, onProgress }: PdfVi
       void renderQueue.dispose();
       void session.dispose();
     };
-  }, [url]);
+  }, [url, loadAttempt]);
 
   useEffect(() => {
     if (totalPages === 0) return;
@@ -96,11 +101,11 @@ export function PdfViewer({ url, title, initialProgress = 0, onProgress }: PdfVi
       document, canvas, page: pageNum, scale,
       pixelRatio: window.devicePixelRatio || 1,
     }, {
-      onStart: () => setRendering(true),
-      onError: (error) => console.error('PDF page rendering failed:', error),
+      onStart: () => { setRendering(true); setRenderError(null); },
+      onError: (error) => setRenderError(error instanceof Error ? error.message : 'Failed to render this PDF page.'),
       onFinish: () => setRendering(false),
     });
-  }, [pageNum, scale, loading, totalPages]);
+  }, [pageNum, scale, loading, totalPages, renderAttempt]);
 
   useEffect(() => {
     currentPageRef.current = pageNum;
@@ -117,7 +122,7 @@ export function PdfViewer({ url, title, initialProgress = 0, onProgress }: PdfVi
   }, [loading, totalPages]);
 
   const goToPage = (n: number) => {
-    if (n < 1 || n > totalPages || rendering) return;
+    if (n < 1 || n > totalPages) return;
     currentPageRef.current = n;
     setPageNum(n);
   };
@@ -137,8 +142,14 @@ export function PdfViewer({ url, title, initialProgress = 0, onProgress }: PdfVi
     return (
       <div className="flex items-center justify-center h-[calc(100vh-7rem)] px-4">
         <div className="text-center max-w-md">
-          <p className="text-red-600 text-sm font-medium mb-2">Failed to load PDF</p>
+          <p role="alert" className="text-red-600 text-sm font-medium mb-2">Failed to load PDF</p>
           <p className="text-stone-500 text-xs">{error}</p>
+          <button
+            onClick={() => setLoadAttempt((attempt) => attempt + 1)}
+            className="block mx-auto mt-4 px-4 py-2 rounded-lg bg-amber-600 text-white text-sm hover:bg-amber-500"
+          >
+            Retry loading PDF
+          </button>
           <a
             href={url}
             target="_blank"
@@ -157,13 +168,14 @@ export function PdfViewer({ url, title, initialProgress = 0, onProgress }: PdfVi
       className="flex flex-col h-[calc(100vh-7rem)]"
       ref={containerRef}
       role="region"
+      aria-busy={rendering}
       aria-label={`${title} PDF reader`}
     >
       {/* PDF controls bar */}
       <div className="flex items-center justify-center gap-4 py-2 bg-white border-b border-stone-200 flex-shrink-0">
         <button
           onClick={() => goToPage(pageNum - 1)}
-          disabled={pageNum <= 1 || rendering}
+          disabled={pageNum <= 1}
           className="p-1.5 rounded-lg text-stone-600 hover:bg-stone-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
         >
           <ChevronLeft className="w-4 h-4" />
@@ -173,7 +185,7 @@ export function PdfViewer({ url, title, initialProgress = 0, onProgress }: PdfVi
         </span>
         <button
           onClick={() => goToPage(pageNum + 1)}
-          disabled={pageNum >= totalPages || rendering}
+          disabled={pageNum >= totalPages}
           className="p-1.5 rounded-lg text-stone-600 hover:bg-stone-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
         >
           <ChevronRight className="w-4 h-4" />
@@ -193,6 +205,19 @@ export function PdfViewer({ url, title, initialProgress = 0, onProgress }: PdfVi
           <ZoomIn className="w-4 h-4" />
         </button>
       </div>
+
+      {renderError && (
+        <div role="alert" className="bg-red-50 border-b border-red-200 p-3 text-sm text-red-800 text-center">
+          <p>Could not render this PDF page: {renderError}</p>
+          <button
+            onClick={() => setRenderAttempt((attempt) => attempt + 1)}
+            className="mt-2 rounded-lg bg-red-700 px-3 py-1.5 text-white hover:bg-red-600"
+          >
+            Retry rendering page
+          </button>
+        </div>
+      )}
+      {rendering && <p role="status" className="text-center text-xs py-1 text-stone-500">Rendering page…</p>}
 
       {/* PDF canvas area */}
       <div className="flex-1 overflow-auto bg-stone-100 flex justify-center p-4">
