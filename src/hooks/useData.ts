@@ -1,6 +1,8 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { supabase, Document, Bookmark, ReadingProgress, ReadingListItem } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
+import { getProgressStore } from '@/features/reader/progress/progress-store';
+import type { ReaderPosition } from '@/features/reader/progress/position';
 import { attachLockedDocumentReferences } from '@/services/lockedDocumentReferences';
 
 async function fetchLockedDocumentReferences(): Promise<Document[]> {
@@ -12,7 +14,6 @@ async function fetchLockedDocumentReferences(): Promise<Document[]> {
   return (data ?? []) as Document[];
 }
 
-const readingProgressFetches = new Map<string, Promise<ReadingProgress[]>>();
 
 export function useBookmarks() {
   const { user } = useAuth();
@@ -79,78 +80,27 @@ export function useBookmarks() {
 
 export function useReadingProgress() {
   const { user } = useAuth();
-  const [progress, setProgress] = useState<ReadingProgress[]>([]);
-  const progressRef = useRef(progress);
-  progressRef.current = progress;
-  const [loading, setLoading] = useState(true);
-
-  const fetchProgress = useCallback(async () => {
-    if (!user) return;
-    let request = readingProgressFetches.get(user.id);
-    if (!request) {
-      request = (async () => {
-        const { data, error } = await supabase
-          .from('reading_progress')
-          .select('*')
-          .eq('user_id', user.id);
-        if (error) throw error;
-        return (data || []) as ReadingProgress[];
-      })();
-      readingProgressFetches.set(user.id, request);
-      void request.finally(() => {
-        if (readingProgressFetches.get(user.id) === request) {
-          readingProgressFetches.delete(user.id);
-        }
-      }).catch(() => {});
-    }
-
-    try {
-      setProgress(await request);
-    } catch (error) {
-      console.error('Failed to load reading progress:', error);
-    } finally {
-      setLoading(false);
-    }
-  }, [user]);
-
+  const store = user ? getProgressStore(user.id) : undefined;
+  const [, refresh] = useState(0);
   useEffect(() => {
-    fetchProgress();
-  }, [fetchProgress]);
-
-  const saveProgress = useCallback(
-    async (documentId: string, chapterIndex: number, scrollPercent: number, epubCfi?: string) => {
-      if (!user) return;
-      const existing = progressRef.current.find((p) => p.document_id === documentId);
-      const { data, error } = await supabase
-        .from('reading_progress')
-        .upsert({
-          document_id: documentId,
-          chapter_index: chapterIndex,
-          scroll_percent: scrollPercent,
-          epub_cfi: epubCfi ?? existing?.epub_cfi ?? null,
-          updated_at: new Date().toISOString(),
-        }, { onConflict: 'user_id,document_id' })
-        .select('*')
-        .single();
-      if (error) {
-        console.error('Failed to save reading progress:', error);
-        return;
-      }
-      setProgress((prev) => [
-        ...prev.filter((item) => item.document_id !== documentId),
-        data as ReadingProgress,
-      ]);
-    },
-    [user]
-  );
-
-  const getProgress = useCallback(
-    (documentId: string): ReadingProgress | undefined =>
-      progress.find((p) => p.document_id === documentId),
-    [progress]
-  );
-
-  return { progress, loading, saveProgress, getProgress, refetch: fetchProgress };
+    if (!store) return;
+    const unsubscribe = store.subscribe(() => refresh(value => value + 1));
+    void store.load();
+    return unsubscribe;
+  }, [store]);
+  const getProgress = useCallback((id: string): ReadingProgress | undefined => store?.coordinator.snapshot(id).row, [store]);
+  const savePosition = useCallback((id: string, position: ReaderPosition, chapter: number, percent: number) => {
+    store?.coordinator.record(id, position, chapter, percent);
+  }, [store]);
+  const flushProgress = useCallback((id: string) => store?.coordinator.flush(id) ?? Promise.resolve(), [store]);
+  const retryProgress = useCallback((id: string) => store?.coordinator.retry(id), [store]);
+  const getSaveState = useCallback((id: string) => store?.coordinator.snapshot(id), [store]);
+  return {
+    progress: store?.coordinator.rows() ?? [], getProgress, savePosition,
+    flushProgress, retryProgress, getSaveState,
+    loading: !store || store.loading, error: store?.error ?? null,
+    refetch: store?.load ?? (() => Promise.resolve()),
+  };
 }
 
 export function useReadingList() {

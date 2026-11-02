@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useLayoutEffect } from 'react';
 import {
   ArrowLeft,
   ChevronLeft,
@@ -13,7 +13,7 @@ import {
   Sun,
   ScrollText,
 } from 'lucide-react';
-import { Document, ReadingProgress } from '@/lib/supabase';
+import { Document } from '@/lib/supabase';
 import type { Location as EpubLocation } from 'epubjs';
 import { useBookmarks, useReadingProgress, useReadingList } from '@/hooks/useData';
 import {
@@ -32,6 +32,9 @@ import { useDocumentStorageUrl } from '@/hooks/useDocumentStorageUrl';
 import { useAuth } from '@/context/AuthContext';
 import { DocumentAccessNotice } from '@/components/DocumentAccessNotice';
 import { isDocumentLockedForUser } from '@/lib/documentAccess';
+import { legacyPosition, textPosition } from '@/features/reader/progress/position';
+import type { ReaderPosition } from '@/features/reader/progress/position';
+import { textScrollRange, textScrollProgress } from '@/features/reader/progress/text-scroll';
 import type EpubBook from 'epubjs/types/book';
 import type EpubRendition from 'epubjs/types/rendition';
 
@@ -70,7 +73,12 @@ function fetchEpubFile(url: string): Promise<ArrayBuffer> {
   return request;
 }
 
-export function Reader({ document: doc, onBack }: ReaderProps) {
+export function Reader(props: ReaderProps) {
+  const { user } = useAuth();
+  return <ReaderSession key={`${user?.id || 'anonymous'}:${props.document.id}`} {...props} />;
+}
+
+function ReaderSession({ document: doc, onBack }: ReaderProps) {
   const [settings, setSettings] = useState<ReaderSettings>(() => loadSettings());
   const [chapterIndex, setChapterIndex] = useState(0);
   const [scrollPercent, setScrollPercent] = useState(0);
@@ -83,14 +91,23 @@ export function Reader({ document: doc, onBack }: ReaderProps) {
   const [epubPosition, setEpubPosition] = useState({ page: 1, total: 1 });
   const [epubAtStart, setEpubAtStart] = useState(true);
   const [epubAtEnd, setEpubAtEnd] = useState(false);
+  const toolbarRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const epubViewerRef = useRef<HTMLDivElement>(null);
   const epubRenditionRef = useRef<EpubRendition | null>(null);
-  const epubProgressRef = useRef<ReadingProgress | undefined>(undefined);
-  const scrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const epubInteractionRef = useRef(false);
+  const epubLocationRef = useRef<Extract<ReaderPosition, { format: 'epub' }> | null>(null);
+  const [epubPositionWarning, setEpubPositionWarning] = useState<string | null>(null);
+  const [positionReady, setPositionReady] = useState(false);
+  const [textReady, setTextReady] = useState(false);
+  const textTrackingRef = useRef(false);
+  const textRestoreRef = useRef({ chapterIndex: 0, chapterProgress: 0 });
+  const initialPositionRef = useRef<ReaderPosition | null>(null);
+  const initialLegacyProgressRef = useRef(0);
 
   const { toggleBookmark, isBookmarked } = useBookmarks();
-  const { saveProgress, getProgress, loading: progressLoading } = useReadingProgress();
+  const { savePosition, getProgress, loading: progressLoading, error: progressError,
+    refetch: retryLoadProgress, flushProgress, getSaveState, retryProgress } = useReadingProgress();
   const { removeFromReadingList } = useReadingList();
   const { user } = useAuth();
   const locked = isDocumentLockedForUser(doc, user?.id);
@@ -99,23 +116,25 @@ export function Reader({ document: doc, onBack }: ReaderProps) {
   const theme = themeMap[settings.theme];
   const textMode = isTextDoc(doc);
 
-  // Load saved progress on mount
+  // Restore once per document session. Save acknowledgements must not re-run restoration.
   useEffect(() => {
-    if (locked) return;
-    if (progressLoading) return;
+    if (locked || progressLoading || progressError || positionReady) return;
+    const row = getProgress(doc.id);
+    const pending = getSaveState(doc.id)?.pending;
+    const position = pending?.position ?? legacyPosition(doc.file_format, row);
+    initialPositionRef.current = position;
+    initialLegacyProgressRef.current = Number(row?.scroll_percent) || 0;
+    epubLocationRef.current = position?.format === 'epub' ? position : null;
+    const text = textPosition(position, doc.chapters.length);
+    textRestoreRef.current = text;
+    setChapterIndex(text.chapterIndex);
+    setScrollPercent(text.chapterProgress);
+    if (!row && !pending) void removeFromReadingList(doc.id);
+    setPositionReady(true);
+  }, [doc.id, doc.file_format, doc.chapters.length, getProgress, getSaveState, locked,
+    progressLoading, progressError, positionReady, removeFromReadingList]);
 
-    const prog = getProgress(doc.id);
-    epubProgressRef.current = prog;
-    if (prog) {
-      setChapterIndex(prog.chapter_index);
-      setScrollPercent(prog.scroll_percent);
-    } else {
-      setChapterIndex(0);
-      setScrollPercent(0);
-      void removeFromReadingList(doc.id);
-    }
-    setLocalBookmarked(isBookmarked(doc.id));
-  }, [doc.id, getProgress, isBookmarked, locked, progressLoading, saveProgress, removeFromReadingList]);
+  useEffect(() => () => { void flushProgress(doc.id); }, [doc.id, flushProgress]);
 
   useEffect(() => {
     setLocalBookmarked(isBookmarked(doc.id));
@@ -128,26 +147,18 @@ export function Reader({ document: doc, onBack }: ReaderProps) {
 
   // EPUB rendering
   useEffect(() => {
-    if (locked || progressLoading || textMode || doc.file_format !== 'epub' || !fileUrl || !epubViewerRef.current) return;
+    if (locked || !positionReady || progressLoading || textMode || doc.file_format !== 'epub' || !fileUrl || !epubViewerRef.current) return;
 
     const container = epubViewerRef.current;
     let cancelled = false;
     let rendition: EpubRendition | undefined;
     let book: EpubBook | undefined;
-    let pendingPosition: { percentage: number; cfi: string } | undefined;
-    let progressSaveTimer: ReturnType<typeof setTimeout> | undefined;
-
-    const savePendingPosition = () => {
-      if (progressSaveTimer) clearTimeout(progressSaveTimer);
-      progressSaveTimer = undefined;
-      if (!pendingPosition) return;
-      const position = pendingPosition;
-      pendingPosition = undefined;
-      void saveProgress(doc.id, 0, position.percentage, position.cfi);
-    };
+    let restorationComplete = false;
+    epubInteractionRef.current = false;
 
     setEpubLoading(true);
     setEpubError(null);
+    setEpubPositionWarning(null);
     setEpubAtStart(true);
     setEpubAtEnd(false);
     setEpubPosition({ page: 1, total: 1 });
@@ -163,13 +174,16 @@ export function Reader({ document: doc, onBack }: ReaderProps) {
         await book.ready;
         if (cancelled) return;
         const spine = await book.loaded.spine;
+        if (cancelled) return;
 
         rendition = book.renderTo(container, {
           width: '100%',
           height: '100%',
         });
         epubRenditionRef.current = rendition;
+        rendition.on('click', () => { epubInteractionRef.current = true; });
         rendition.on('relocated', (location: EpubLocation) => {
+          if (cancelled) return;
           setEpubAtStart(location.atStart);
           setEpubAtEnd(location.atEnd);
           setEpubPosition({
@@ -178,15 +192,23 @@ export function Reader({ document: doc, onBack }: ReaderProps) {
           });
           const pages = Math.max(1, location.start.displayed.total);
           const sectionProgress = Math.max(0, (location.start.displayed.page - 1) / pages);
-          pendingPosition = {
-            percentage: Math.min(1, Math.max(0, (location.start.index + sectionProgress) / Math.max(1, spine.length))),
-            cfi: location.start.cfi,
+          const position: Extract<ReaderPosition, { format: 'epub' }> = {
+            version: 1, format: 'epub', cfi: location.start.cfi,
+            approximateProgress: location.atEnd ? 1 : Math.min(1, Math.max(0, (location.start.index + sectionProgress) / Math.max(1, spine.length))),
           };
-          if (progressSaveTimer) clearTimeout(progressSaveTimer);
-          progressSaveTimer = setTimeout(savePendingPosition, 750);
+          epubLocationRef.current = position;
+          if (restorationComplete && epubInteractionRef.current) savePosition(doc.id, position, 0, position.approximateProgress);
         });
-        window.addEventListener('pagehide', savePendingPosition);
-        await rendition.display(epubProgressRef.current?.epub_cfi || undefined);
+        const savedCfi = epubLocationRef.current?.cfi;
+        try {
+          await rendition.display(savedCfi || undefined);
+        } catch (error) {
+          if (cancelled) return;
+          if (!savedCfi) throw error;
+          setEpubPositionWarning('The saved location is unavailable. Opened the beginning of this book.');
+          await rendition.display();
+        }
+        restorationComplete = true;
         if (!cancelled) setEpubLoading(false);
       } catch (err) {
         if (cancelled) return;
@@ -199,19 +221,18 @@ export function Reader({ document: doc, onBack }: ReaderProps) {
 
     return () => {
       cancelled = true;
-      window.removeEventListener('pagehide', savePendingPosition);
-      if (progressSaveTimer) clearTimeout(progressSaveTimer);
-      savePendingPosition();
+      void flushProgress(doc.id);
       if (epubRenditionRef.current === rendition) epubRenditionRef.current = null;
       rendition?.destroy();
       book?.destroy();
     };
-  }, [doc.id, fileUrl, doc.file_format, locked, textMode, epubLoadAttempt, progressLoading, saveProgress]);
+  }, [doc.id, fileUrl, doc.file_format, locked, textMode, epubLoadAttempt, progressLoading, positionReady, savePosition, flushProgress]);
 
   const turnEpubPage = useCallback(async (direction: 'previous' | 'next') => {
     const rendition = epubRenditionRef.current;
     if (!rendition) return;
     try {
+      epubInteractionRef.current = true;
       if (direction === 'previous') await rendition.prev();
       else await rendition.next();
     } catch (err) {
@@ -219,29 +240,48 @@ export function Reader({ document: doc, onBack }: ReaderProps) {
     }
   }, []);
 
-  // Scroll tracking + progress saving (text mode only)
+  const getTextRange = useCallback(() => {
+    const el = contentRef.current;
+    if (!el) return { start: 0, length: 0 };
+    return textScrollRange(el.getBoundingClientRect().top + window.scrollY, el.scrollHeight,
+      window.innerHeight, window.document.documentElement.scrollHeight, toolbarRef.current?.getBoundingClientRect().bottom ?? 112);
+  }, []);
+
+  // Layout must exist before restoring; suppress scroll-generated saves until finished.
+  useLayoutEffect(() => {
+    if (locked || !textMode || !positionReady || doc.chapters.length === 0) return;
+    let cancelled = false;
+    let frame = 0;
+    textTrackingRef.current = false;
+    setTextReady(false);
+    void window.document.fonts.ready.then(() => {
+      if (cancelled) return;
+      frame = requestAnimationFrame(() => {
+        const range = getTextRange();
+        window.scrollTo({ top: range.start + range.length * textRestoreRef.current.chapterProgress, behavior: 'instant' });
+        frame = requestAnimationFrame(() => {
+          if (cancelled) return;
+          textTrackingRef.current = true;
+          setTextReady(true);
+        });
+      });
+    });
+    return () => { cancelled = true; cancelAnimationFrame(frame); textTrackingRef.current = false; };
+  }, [chapterIndex, doc.chapters.length, getTextRange, locked, positionReady, textMode]);
+
   useEffect(() => {
-    if (locked || !textMode) return;
+    if (locked || !textMode || !textReady || doc.chapters.length === 0) return;
     const handleScroll = () => {
-      const el = contentRef.current;
-      if (!el) return;
-      const scrollTop = window.scrollY;
-      const docHeight = el.scrollHeight - window.innerHeight;
-      const percent = docHeight > 0 ? Math.min(scrollTop / docHeight, 1) : 0;
+      if (!textTrackingRef.current) return;
+      const percent = textScrollProgress(window.scrollY, getTextRange());
+      textRestoreRef.current = { chapterIndex, chapterProgress: percent };
       setScrollPercent(percent);
-
-      if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current);
-      scrollTimerRef.current = setTimeout(() => {
-        saveProgress(doc.id, chapterIndex, percent);
-      }, 2000);
+      savePosition(doc.id, { version: 1, format: 'txt', chapterIndex, chapterProgress: percent },
+        chapterIndex, (chapterIndex + percent) / doc.chapters.length);
     };
-
     window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => {
-      window.removeEventListener('scroll', handleScroll);
-      if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current);
-    };
-  }, [doc.id, chapterIndex, locked, saveProgress, textMode]);
+    return () => { window.removeEventListener('scroll', handleScroll); };
+  }, [doc.id, doc.chapters.length, chapterIndex, getTextRange, locked, savePosition, textMode, textReady]);
 
   const handleBookmark = async () => {
     if (locked) return;
@@ -250,11 +290,16 @@ export function Reader({ document: doc, onBack }: ReaderProps) {
   };
 
   const goToChapter = useCallback((idx: number) => {
+    if (!positionReady || idx < 0 || idx >= doc.chapters.length || idx === chapterIndex) { setShowToc(false); return; }
+    void flushProgress(doc.id);
+    textTrackingRef.current = false;
+    textRestoreRef.current = { chapterIndex: idx, chapterProgress: 0 };
+    setTextReady(false);
     setChapterIndex(idx);
     setScrollPercent(0);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    savePosition(doc.id, { version: 1, format: 'txt', chapterIndex: idx, chapterProgress: 0 }, idx, idx / doc.chapters.length);
     setShowToc(false);
-  }, []);
+  }, [chapterIndex, doc.id, doc.chapters.length, flushProgress, positionReady, savePosition]);
 
   const prevChapter = () => {
     if (chapterIndex > 0) goToChapter(chapterIndex - 1);
@@ -265,7 +310,7 @@ export function Reader({ document: doc, onBack }: ReaderProps) {
   };
 
   const chapter = doc.chapters[chapterIndex];
-  const totalProgress = ((chapterIndex + scrollPercent) / doc.chapters.length) * 100;
+  const totalProgress = doc.chapters.length ? ((chapterIndex + scrollPercent) / doc.chapters.length) * 100 : 0;
 
   if (locked) {
     return (
@@ -281,10 +326,27 @@ export function Reader({ document: doc, onBack }: ReaderProps) {
     );
   }
 
+  if (!positionReady) {
+    return <div className="min-h-[60vh] flex flex-col items-center justify-center gap-3" role="status">
+      <p>{progressError ? 'Could not load your reading position.' : 'Restoring your reading position…'}</p>
+      {progressError && <button className="text-amber-700 underline" onClick={() => void retryLoadProgress()}>Retry loading position</button>}
+      <button className="text-sm underline" onClick={onBack}>Back to library</button>
+    </div>;
+  }
+
+  const saveState = getSaveState(doc.id);
+  const pending = !!saveState?.pending;
+  const saveMessage = saveState?.storageError && pending
+    ? 'Position is not saved on this device. Keep this page open until synced.'
+    : saveState?.status === 'conflict' ? saveState.error
+    : saveState?.status === 'error' ? 'Could not sync. Position saved on this device; waiting to sync.'
+    : saveState?.status === 'saving' ? 'Saving position…'
+    : pending ? 'Position saved on this device; waiting to sync.' : saveState?.row ? 'Position saved' : 'Reading position ready';
+
   return (
     <div className={`${theme.bg} transition-colors duration-300 min-h-screen`}>
       {/* Reader toolbar (sits below main app nav) */}
-      <div className={`sticky top-16 z-30 ${theme.headerBg} backdrop-blur-md border-b ${theme.border} transition-colors duration-300`}>
+      <div ref={toolbarRef} className={`sticky top-16 z-30 ${theme.headerBg} backdrop-blur-md border-b ${theme.border} transition-colors duration-300`}>
         <div className="max-w-4xl mx-auto px-4 h-12 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <button
@@ -327,6 +389,14 @@ export function Reader({ document: doc, onBack }: ReaderProps) {
               </button>
             )}
           </div>
+        </div>
+        <div className="flex flex-wrap justify-center items-center gap-2 px-3 pb-1 text-xs text-stone-500">
+          <span role="status" aria-live="polite">{saveMessage}</span>
+          {(saveState?.status === 'error' || saveState?.status === 'conflict') && (
+            <button className="text-amber-700 underline" onClick={() => void retryProgress(doc.id)}>
+              {saveState.status === 'conflict' ? 'Use this device’s position' : 'Retry saving position'}
+            </button>
+          )}
         </div>
         {/* Progress Bar */}
         <div className={`h-0.5 ${theme.border} border-t`}>
@@ -470,8 +540,9 @@ export function Reader({ document: doc, onBack }: ReaderProps) {
               key={doc.id}
               url={fileUrl}
               title={doc.title}
-              initialProgress={getProgress(doc.id)?.scroll_percent ?? 0}
-              onProgress={(percent) => saveProgress(doc.id, 0, percent)}
+              initialProgress={initialLegacyProgressRef.current}
+              initialPosition={initialPositionRef.current}
+              onPositionChange={(position, percent) => savePosition(doc.id, position, 0, percent)}
             />
           ) : (
             <p className="py-12 text-center text-sm text-stone-500">
@@ -483,6 +554,7 @@ export function Reader({ document: doc, onBack }: ReaderProps) {
         </div>
       )}
 
+      {epubPositionWarning && <p role="status" className="bg-amber-50 p-2 text-center text-sm text-amber-900">{epubPositionWarning}</p>}
       {/* EPUB Reader (epub.js) */}
       {!textMode && doc.file_format === 'epub' && (
         <div className="relative h-[calc(100vh-7rem)]">
@@ -513,7 +585,7 @@ export function Reader({ document: doc, onBack }: ReaderProps) {
                 <ChevronRight className="h-5 w-5" />
               </button>
               <div className="absolute bottom-3 left-1/2 z-10 -translate-x-1/2 rounded-full bg-white/90 px-3 py-1 text-xs text-stone-500 shadow">
-                Page {epubPosition.page} of {epubPosition.total}
+                Page {epubPosition.page} of {epubPosition.total} in this section · Overall progress is approximate
               </div>
             </>
           )}
@@ -540,9 +612,11 @@ export function Reader({ document: doc, onBack }: ReaderProps) {
         </div>
       )}
 
+      {textMode && chapter && !textReady && <p role="status" className="fixed inset-x-0 top-1/2 text-center">Restoring your reading position…</p>}
       {/* Text Content (TXT files) */}
-      {textMode && (
-        <div ref={contentRef} className={`pt-8 pb-24 ${theme.bg} transition-colors duration-300`}>
+      {textMode && !chapter && <p className="p-12 text-center" role="status">This document has no readable chapters.</p>}
+      {textMode && chapter && (
+        <div ref={contentRef} style={{ visibility: textReady ? 'visible' : 'hidden' }} className={`pt-8 pb-24 ${theme.bg} transition-colors duration-300`}>
           <div className="max-w-2xl mx-auto px-6 sm:px-8">
             {/* Title section (only on first chapter) */}
             {chapterIndex === 0 && (
