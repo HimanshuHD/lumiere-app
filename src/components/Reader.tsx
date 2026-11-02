@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useLayoutEffect } from 'react';
 import {
   ArrowLeft,
   ChevronLeft,
@@ -32,6 +32,9 @@ import { useDocumentStorageUrl } from '@/hooks/useDocumentStorageUrl';
 import { useAuth } from '@/context/AuthContext';
 import { DocumentAccessNotice } from '@/components/DocumentAccessNotice';
 import { isDocumentLockedForUser } from '@/lib/documentAccess';
+import { legacyPosition, textPosition } from '@/features/reader/progress/position';
+import type { ReaderPosition } from '@/features/reader/progress/position';
+import { textScrollRange, textScrollProgress } from '@/features/reader/progress/text-scroll';
 import type EpubBook from 'epubjs/types/book';
 import type EpubRendition from 'epubjs/types/rendition';
 
@@ -70,7 +73,12 @@ function fetchEpubFile(url: string): Promise<ArrayBuffer> {
   return request;
 }
 
-export function Reader({ document: doc, onBack }: ReaderProps) {
+export function Reader(props: ReaderProps) {
+  const { user } = useAuth();
+  return <ReaderSession key={`${user?.id || 'anonymous'}:${props.document.id}`} {...props} />;
+}
+
+function ReaderSession({ document: doc, onBack }: ReaderProps) {
   const [settings, setSettings] = useState<ReaderSettings>(() => loadSettings());
   const [chapterIndex, setChapterIndex] = useState(0);
   const [scrollPercent, setScrollPercent] = useState(0);
@@ -87,10 +95,16 @@ export function Reader({ document: doc, onBack }: ReaderProps) {
   const epubViewerRef = useRef<HTMLDivElement>(null);
   const epubRenditionRef = useRef<EpubRendition | null>(null);
   const epubProgressRef = useRef<ReadingProgress | undefined>(undefined);
-  const scrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [positionReady, setPositionReady] = useState(false);
+  const [textReady, setTextReady] = useState(false);
+  const textTrackingRef = useRef(false);
+  const textRestoreRef = useRef({ chapterIndex: 0, chapterProgress: 0 });
+  const initialPositionRef = useRef<ReaderPosition | null>(null);
+  const initialLegacyProgressRef = useRef(0);
 
   const { toggleBookmark, isBookmarked } = useBookmarks();
-  const { saveProgress, getProgress, loading: progressLoading } = useReadingProgress();
+  const { saveProgress, savePosition, getProgress, loading: progressLoading, error: progressError,
+    refetch: retryLoadProgress, flushProgress, getSaveState } = useReadingProgress();
   const { removeFromReadingList } = useReadingList();
   const { user } = useAuth();
   const locked = isDocumentLockedForUser(doc, user?.id);
@@ -99,23 +113,25 @@ export function Reader({ document: doc, onBack }: ReaderProps) {
   const theme = themeMap[settings.theme];
   const textMode = isTextDoc(doc);
 
-  // Load saved progress on mount
+  // Restore once per document session. Save acknowledgements must not re-run restoration.
   useEffect(() => {
-    if (locked) return;
-    if (progressLoading) return;
+    if (locked || progressLoading || progressError || positionReady) return;
+    const row = getProgress(doc.id);
+    const pending = getSaveState(doc.id)?.pending;
+    const position = pending?.position ?? legacyPosition(doc.file_format, row);
+    initialPositionRef.current = position;
+    initialLegacyProgressRef.current = Number(row?.scroll_percent) || 0;
+    epubProgressRef.current = row;
+    const text = textPosition(position, doc.chapters.length);
+    textRestoreRef.current = text;
+    setChapterIndex(text.chapterIndex);
+    setScrollPercent(text.chapterProgress);
+    if (!row && !pending) void removeFromReadingList(doc.id);
+    setPositionReady(true);
+  }, [doc.id, doc.file_format, doc.chapters.length, getProgress, getSaveState, locked,
+    progressLoading, progressError, positionReady, removeFromReadingList]);
 
-    const prog = getProgress(doc.id);
-    epubProgressRef.current = prog;
-    if (prog) {
-      setChapterIndex(prog.chapter_index);
-      setScrollPercent(prog.scroll_percent);
-    } else {
-      setChapterIndex(0);
-      setScrollPercent(0);
-      void removeFromReadingList(doc.id);
-    }
-    setLocalBookmarked(isBookmarked(doc.id));
-  }, [doc.id, getProgress, isBookmarked, locked, progressLoading, saveProgress, removeFromReadingList]);
+  useEffect(() => () => { void flushProgress(doc.id); }, [doc.id, flushProgress]);
 
   useEffect(() => {
     setLocalBookmarked(isBookmarked(doc.id));
@@ -128,7 +144,7 @@ export function Reader({ document: doc, onBack }: ReaderProps) {
 
   // EPUB rendering
   useEffect(() => {
-    if (locked || progressLoading || textMode || doc.file_format !== 'epub' || !fileUrl || !epubViewerRef.current) return;
+    if (locked || !positionReady || progressLoading || textMode || doc.file_format !== 'epub' || !fileUrl || !epubViewerRef.current) return;
 
     const container = epubViewerRef.current;
     let cancelled = false;
@@ -206,7 +222,7 @@ export function Reader({ document: doc, onBack }: ReaderProps) {
       rendition?.destroy();
       book?.destroy();
     };
-  }, [doc.id, fileUrl, doc.file_format, locked, textMode, epubLoadAttempt, progressLoading, saveProgress]);
+  }, [doc.id, fileUrl, doc.file_format, locked, textMode, epubLoadAttempt, progressLoading, positionReady, saveProgress]);
 
   const turnEpubPage = useCallback(async (direction: 'previous' | 'next') => {
     const rendition = epubRenditionRef.current;
@@ -219,29 +235,48 @@ export function Reader({ document: doc, onBack }: ReaderProps) {
     }
   }, []);
 
-  // Scroll tracking + progress saving (text mode only)
+  const getTextRange = useCallback(() => {
+    const el = contentRef.current;
+    if (!el) return { start: 0, length: 0 };
+    return textScrollRange(el.getBoundingClientRect().top + window.scrollY, el.scrollHeight,
+      window.innerHeight, window.document.documentElement.scrollHeight, 112);
+  }, []);
+
+  // Layout must exist before restoring; suppress scroll-generated saves until finished.
+  useLayoutEffect(() => {
+    if (locked || !textMode || !positionReady || doc.chapters.length === 0) return;
+    let cancelled = false;
+    let frame = 0;
+    textTrackingRef.current = false;
+    setTextReady(false);
+    void window.document.fonts.ready.then(() => {
+      if (cancelled) return;
+      frame = requestAnimationFrame(() => {
+        const range = getTextRange();
+        window.scrollTo({ top: range.start + range.length * textRestoreRef.current.chapterProgress, behavior: 'instant' });
+        frame = requestAnimationFrame(() => {
+          if (cancelled) return;
+          textTrackingRef.current = true;
+          setTextReady(true);
+        });
+      });
+    });
+    return () => { cancelled = true; cancelAnimationFrame(frame); textTrackingRef.current = false; };
+  }, [chapterIndex, doc.chapters.length, getTextRange, locked, positionReady, textMode]);
+
   useEffect(() => {
-    if (locked || !textMode) return;
+    if (locked || !textMode || !textReady || doc.chapters.length === 0) return;
     const handleScroll = () => {
-      const el = contentRef.current;
-      if (!el) return;
-      const scrollTop = window.scrollY;
-      const docHeight = el.scrollHeight - window.innerHeight;
-      const percent = docHeight > 0 ? Math.min(scrollTop / docHeight, 1) : 0;
+      if (!textTrackingRef.current) return;
+      const percent = textScrollProgress(window.scrollY, getTextRange());
+      textRestoreRef.current = { chapterIndex, chapterProgress: percent };
       setScrollPercent(percent);
-
-      if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current);
-      scrollTimerRef.current = setTimeout(() => {
-        saveProgress(doc.id, chapterIndex, percent);
-      }, 2000);
+      savePosition(doc.id, { version: 1, format: 'txt', chapterIndex, chapterProgress: percent },
+        chapterIndex, (chapterIndex + percent) / doc.chapters.length);
     };
-
     window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => {
-      window.removeEventListener('scroll', handleScroll);
-      if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current);
-    };
-  }, [doc.id, chapterIndex, locked, saveProgress, textMode]);
+    return () => { window.removeEventListener('scroll', handleScroll); };
+  }, [doc.id, doc.chapters.length, chapterIndex, getTextRange, locked, savePosition, textMode, textReady]);
 
   const handleBookmark = async () => {
     if (locked) return;
@@ -250,11 +285,16 @@ export function Reader({ document: doc, onBack }: ReaderProps) {
   };
 
   const goToChapter = useCallback((idx: number) => {
+    if (!positionReady || idx < 0 || idx >= doc.chapters.length || idx === chapterIndex) { setShowToc(false); return; }
+    void flushProgress(doc.id);
+    textTrackingRef.current = false;
+    textRestoreRef.current = { chapterIndex: idx, chapterProgress: 0 };
+    setTextReady(false);
     setChapterIndex(idx);
     setScrollPercent(0);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    savePosition(doc.id, { version: 1, format: 'txt', chapterIndex: idx, chapterProgress: 0 }, idx, idx / doc.chapters.length);
     setShowToc(false);
-  }, []);
+  }, [chapterIndex, doc.id, doc.chapters.length, flushProgress, positionReady, savePosition]);
 
   const prevChapter = () => {
     if (chapterIndex > 0) goToChapter(chapterIndex - 1);
@@ -265,7 +305,7 @@ export function Reader({ document: doc, onBack }: ReaderProps) {
   };
 
   const chapter = doc.chapters[chapterIndex];
-  const totalProgress = ((chapterIndex + scrollPercent) / doc.chapters.length) * 100;
+  const totalProgress = doc.chapters.length ? ((chapterIndex + scrollPercent) / doc.chapters.length) * 100 : 0;
 
   if (locked) {
     return (
@@ -279,6 +319,14 @@ export function Reader({ document: doc, onBack }: ReaderProps) {
         <DocumentAccessNotice />
       </div>
     );
+  }
+
+  if (!positionReady) {
+    return <div className="min-h-[60vh] flex flex-col items-center justify-center gap-3" role="status">
+      <p>{progressError ? 'Could not load your reading position.' : 'Restoring your reading position…'}</p>
+      {progressError && <button className="text-amber-700 underline" onClick={() => void retryLoadProgress()}>Retry loading position</button>}
+      <button className="text-sm underline" onClick={onBack}>Back to library</button>
+    </div>;
   }
 
   return (
@@ -540,9 +588,11 @@ export function Reader({ document: doc, onBack }: ReaderProps) {
         </div>
       )}
 
+      {textMode && chapter && !textReady && <p role="status" className="fixed inset-x-0 top-1/2 text-center">Restoring your reading position…</p>}
       {/* Text Content (TXT files) */}
-      {textMode && (
-        <div ref={contentRef} className={`pt-8 pb-24 ${theme.bg} transition-colors duration-300`}>
+      {textMode && !chapter && <p className="p-12 text-center" role="status">This document has no readable chapters.</p>}
+      {textMode && chapter && (
+        <div ref={contentRef} style={{ visibility: textReady ? 'visible' : 'hidden' }} className={`pt-8 pb-24 ${theme.bg} transition-colors duration-300`}>
           <div className="max-w-2xl mx-auto px-6 sm:px-8">
             {/* Title section (only on first chapter) */}
             {chapterIndex === 0 && (
