@@ -77,3 +77,17 @@ it('reports a missing canvas context as a retryable current failure', async () =
   await queue.request({ ...h.request, canvas }, h.callbacks);
   assert.match((h.errors[0] as Error).message, /drawing context/);
 });
+it('automatic fit uses page dimensions and keeps CSS size independent of pixel ratio', async () => {
+  const h = harness(); const queue = new PdfRenderQueue(); const scales: number[] = [];
+  const render = queue.request({ ...h.request, fitWidth: 300 }, { ...h.callbacks, onScale: (s) => scales.push(s) });
+  await flush(); assert.equal(h.renders[0].scale, 0.5);
+  assert.equal(h.request.canvas.style.width, '300px');
+  assert.equal(h.request.canvas.width, 600);
+  h.renders[0].result.resolve(); await render; assert.deepEqual(scales, [0.5]);
+});
+it('manual zoom uses the selected scale rather than an automatic fit', async () => {
+  const h = harness(); const queue = new PdfRenderQueue();
+  const render = queue.request({ ...h.request, scale: 2 }, h.callbacks);
+  await flush(); assert.equal(h.request.canvas.style.width, '1200px');
+  h.renders[0].result.resolve(); await render;
+});

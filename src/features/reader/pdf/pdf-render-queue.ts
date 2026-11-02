@@ -1,14 +1,17 @@
 import type { PDFDocumentProxy, RenderTask } from 'pdfjs-dist';
+import { fitPdfPageWidth } from './pdf-fit.ts';
 
 export interface PdfRenderRequest {
   document: PDFDocumentProxy;
   page: number;
   scale: number;
+  fitWidth?: number;
   canvas: HTMLCanvasElement;
   pixelRatio: number;
 }
 export interface PdfRenderCallbacks {
   onStart(): void;
+  onScale?(scale: number): void;
   onError(error: unknown): void;
   onFinish(): void;
 }
@@ -31,13 +34,16 @@ export class PdfRenderQueue {
       try {
         const page = await request.document.getPage(request.page);
         if (!isCurrent()) return;
-        const viewport = page.getViewport({ scale: request.scale });
+        const scale = request.fitWidth === undefined ? request.scale
+          : fitPdfPageWidth(request.fitWidth, page.getViewport({ scale: 1 }).width);
+        const viewport = page.getViewport({ scale });
+        callbacks.onScale?.(scale);
         const canvas = request.canvas;
         const context = canvas.getContext('2d');
         if (!context) throw new Error('A canvas drawing context is unavailable.');
         const ratio = request.pixelRatio;
-        canvas.width = Math.floor(viewport.width * ratio);
-        canvas.height = Math.floor(viewport.height * ratio);
+        canvas.width = Math.max(1, Math.floor(viewport.width * ratio));
+        canvas.height = Math.max(1, Math.floor(viewport.height * ratio));
         canvas.style.width = `${Math.floor(viewport.width)}px`;
         canvas.style.height = `${Math.floor(viewport.height)}px`;
         const task = page.render({
