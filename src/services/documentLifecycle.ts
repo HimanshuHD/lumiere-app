@@ -202,6 +202,28 @@ export async function uploadUserDocument(
       );
     }
 
+    // A previous storage write may have committed before its response was lost.
+    // Reconcile the same operation before reusing its paths (uploads never upsert).
+    const recovery = await recoverPendingUserUploadFiles(dependencies, userId, operationId);
+    if (recovery.pending > 0) {
+      throw new DocumentLifecycleError(
+        'This upload still has pending cleanup. Retry when storage access is available; no new files were uploaded.',
+        operationId,
+        'reconciliation',
+      );
+    }
+    if (recovery.recovered > 0) {
+      const reconciled = await dependencies.database.findById(operationId);
+      if (reconciled) {
+        if (matchesUpload(reconciled, userId, documentPath, coverPath)) return reconciled;
+        throw new DocumentLifecycleError(
+          'This upload operation ID is already associated with a different document.',
+          operationId,
+          'reconciliation',
+        );
+      }
+    }
+
     stage = 'document-upload';
     await dependencies.storage.upload(
       documentPath,

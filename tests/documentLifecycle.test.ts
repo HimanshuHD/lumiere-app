@@ -376,3 +376,62 @@ describe('uploadUserDocument', () => {
     assert.equal(harness.recoveryAttempts[0].error, 'Storage unavailable again.');
   });
 });
+
+
+describe('retrying an ambiguous storage upload', () => {
+  for (const lostStage of ['document', 'cover'] as const) {
+    it(`recovers a committed ${lostStage} write before retrying the same operation`, async () => {
+      const objects = new Set<string>();
+      const pending = new Map<string, UserUploadRecovery>();
+      let loseResponse = true;
+      let saved: Document | null = null;
+      const harness = createHarness({
+        async upload(path) {
+          if (objects.has(path)) throw new Error('The resource already exists.');
+          objects.add(path);
+          if (loseResponse && (path.includes('-cover') === (lostStage === 'cover'))) {
+            loseResponse = false;
+            throw new Error('Write committed but its response was lost.');
+          }
+        },
+        async remove(paths) {
+          for (const path of paths) objects.delete(path);
+        },
+        async saveRecoveryRecords(records) {
+          for (const record of records) pending.set(record.storagePath, record);
+        },
+        async listPendingRecoveryRecords() { return [...pending.values()]; },
+        async markRecoveryRecordCompleted(record) { pending.delete(record.storagePath); },
+        async findById() { return saved; },
+        async insert(input) { saved = savedDocument(input); return saved; },
+      });
+      const input = { operationId, userId, documentFile, coverFile, metadata };
+      await assert.rejects(uploadUserDocument(harness, input), /response was lost/);
+      const result = await uploadUserDocument(harness, input);
+      assert.equal(result.id, operationId);
+      assert.equal(pending.size, 0);
+      assert.deepEqual([...objects].sort(), [
+        `${userId}/${operationId}.pdf`, `${userId}/${operationId}-cover.jpg`,
+      ].sort());
+      const count = harness.uploads.length;
+      assert.equal(await uploadUserDocument(harness, input), result);
+      assert.equal(harness.uploads.length, count, 'completed retries never upload again');
+    });
+  }
+
+  it('does not start another upload while cleanup still fails', async () => {
+    const record: UserUploadRecovery = {
+      operationId, userId, storagePath: `${userId}/${operationId}.pdf`,
+      stage: 'document-upload', status: 'cleanup_pending', attempts: 0, lastError: 'Response lost',
+    };
+    const harness = createHarness({
+      async listPendingRecoveryRecords() { return [record]; },
+      async remove() { throw new Error('Storage unavailable'); },
+    });
+    await assert.rejects(uploadUserDocument(harness, {
+      operationId, userId, documentFile, coverFile, metadata,
+    }), /still has pending cleanup/);
+    assert.deepEqual(harness.uploads, []);
+    assert.equal(harness.recoveryAttempts.length, 1);
+  });
+});
