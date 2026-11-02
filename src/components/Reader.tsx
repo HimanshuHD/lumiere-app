@@ -518,8 +518,9 @@ function ReaderSession({ document: doc, onBack }: ReaderProps) {
               key={doc.id}
               url={fileUrl}
               title={doc.title}
-              initialProgress={getProgress(doc.id)?.scroll_percent ?? 0}
-              onProgress={(percent) => saveProgress(doc.id, 0, percent)}
+              initialProgress={initialLegacyProgressRef.current}
+              initialPosition={initialPositionRef.current}
+              onPositionChange={(position, percent) => savePosition(doc.id, position, 0, percent)}
             />
           ) : (
             <p className="py-12 text-center text-sm text-stone-500">

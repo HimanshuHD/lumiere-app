@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, Loader2, ZoomIn, ZoomOut } from 'lucide-react';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
+import { parsePosition, fraction } from '@/features/reader/progress/position';
+import type { ReaderPosition } from '@/features/reader/progress/position';
 import { PdfSession } from '@/features/reader/pdf/pdf-session';
 import { PdfRenderQueue } from '@/features/reader/pdf/pdf-render-queue';
 
@@ -8,24 +10,29 @@ interface PdfViewerProps {
   url: string;
   title: string;
   initialProgress?: number;
-  onProgress?: (percent: number) => void;
+  initialPosition?: ReaderPosition | null;
+  onPositionChange?: (position: Extract<ReaderPosition, { format: 'pdf' }>, percent: number) => void;
 }
 
-export function PdfViewer({ url, title, initialProgress = 0, onProgress }: PdfViewerProps) {
+export function PdfViewer({ url, title, initialProgress = 0, initialPosition, onPositionChange }: PdfViewerProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const canvasAreaRef = useRef<HTMLDivElement>(null);
   const pdfDocRef = useRef<PDFDocumentProxy | null>(null);
   const renderQueueRef = useRef<PdfRenderQueue | null>(null);
-  const onProgressRef = useRef(onProgress);
+  const initialPositionRef = useRef(parsePosition(initialPosition));
+  const initialPdf = initialPositionRef.current?.format === 'pdf' ? initialPositionRef.current : null;
+  const initialScale = initialPdf?.view.mode === 'manual' ? initialPdf.view.scale : 1.2;
+  const userChangedPositionRef = useRef(false);
+  const onPositionRef = useRef(onPositionChange);
   const initialProgressRef = useRef(initialProgress);
   const currentPageRef = useRef(1);
   const hasLoadedPdfRef = useRef(false);
   const [pageNum, setPageNum] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
-  const [manualScale, setManualScale] = useState(1.2);
-  const [displayScale, setDisplayScale] = useState(1.2);
-  const [fitMode, setFitMode] = useState<'width' | 'manual'>('width');
-  const requestedZoomRef = useRef({ mode: 'width' as 'width' | 'manual', scale: 1.2 });
+  const [manualScale, setManualScale] = useState(initialScale);
+  const [displayScale, setDisplayScale] = useState(initialScale);
+  const [fitMode, setFitMode] = useState<'width' | 'manual'>(initialPdf?.view.mode ?? 'width');
+  const requestedZoomRef = useRef({ mode: (initialPdf?.view.mode ?? 'width') as 'width' | 'manual', scale: initialScale });
   const [availableWidth, setAvailableWidth] = useState(0);
   const fitWidth = fitMode === 'width' ? availableWidth : undefined;
   const [loading, setLoading] = useState(true);
@@ -36,8 +43,8 @@ export function PdfViewer({ url, title, initialProgress = 0, onProgress }: PdfVi
   const [renderAttempt, setRenderAttempt] = useState(0);
 
   useEffect(() => {
-    onProgressRef.current = onProgress;
-  }, [onProgress]);
+    onPositionRef.current = onPositionChange;
+  }, [onPositionChange]);
 
   // Load PDF document
   useEffect(() => {
@@ -64,10 +71,13 @@ export function PdfViewer({ url, title, initialProgress = 0, onProgress }: PdfVi
         pdfDocRef.current = pdf;
         setTotalPages(pdf.numPages);
         const boundedCurrentPage = Math.min(Math.max(1, currentPageRef.current), pdf.numPages);
-        const boundedProgress = Math.min(1, Math.max(0, initialProgressRef.current));
+        const boundedProgress = fraction(initialProgressRef.current);
+        const initialSaved = initialPositionRef.current;
         const restoredPage = hasLoadedPdfRef.current
           ? boundedCurrentPage
-          : pdf.numPages === 1
+          : initialSaved?.format === 'pdf'
+            ? Math.min(initialSaved.page, pdf.numPages)
+            : pdf.numPages === 1
             ? 1
             : Math.round(boundedProgress * (pdf.numPages - 1)) + 1;
         hasLoadedPdfRef.current = true;
@@ -91,10 +101,12 @@ export function PdfViewer({ url, title, initialProgress = 0, onProgress }: PdfVi
   }, [url, loadAttempt]);
 
   useEffect(() => {
-    if (totalPages === 0) return;
+    if (loading || totalPages === 0 || !userChangedPositionRef.current) return;
+    userChangedPositionRef.current = false;
     const percent = totalPages === 1 ? 1 : (pageNum - 1) / (totalPages - 1);
-    onProgressRef.current?.(percent);
-  }, [pageNum, totalPages]);
+    onPositionRef.current?.({ version: 1, format: 'pdf', page: pageNum,
+      view: fitMode === 'width' ? { mode: 'width' } : { mode: 'manual', scale: manualScale } }, percent);
+  }, [pageNum, totalPages, loading, fitMode, manualScale]);
 
   // Queue ownership prevents overlapping writes and obsolete getPage results.
   useEffect(() => {
@@ -140,6 +152,7 @@ export function PdfViewer({ url, title, initialProgress = 0, onProgress }: PdfVi
   }, [loading, totalPages]);
 
   const adjustZoom = (delta: number) => {
+    userChangedPositionRef.current = true;
     // Base repeated clicks on the latest requested zoom, not an older painting.
     const previous = requestedZoomRef.current.scale;
     const next = Math.min(Math.max(3, previous), Math.max(Math.min(0.4, previous), previous + delta));
@@ -151,6 +164,7 @@ export function PdfViewer({ url, title, initialProgress = 0, onProgress }: PdfVi
 
   const goToPage = (n: number) => {
     if (n < 1 || n > totalPages) return;
+    userChangedPositionRef.current = true;
     currentPageRef.current = n;
     setPageNum(n);
   };
@@ -236,7 +250,7 @@ export function PdfViewer({ url, title, initialProgress = 0, onProgress }: PdfVi
           <ZoomIn className="w-4 h-4" />
         </button>
         <button
-          onClick={() => { requestedZoomRef.current.mode = 'width'; setFitMode('width'); }}
+          onClick={() => { userChangedPositionRef.current = true; requestedZoomRef.current.mode = 'width'; setFitMode('width'); }}
           aria-pressed={fitMode === 'width'}
           className="px-2 py-1 rounded text-xs text-stone-700 hover:bg-stone-100 aria-pressed:bg-stone-200"
         >
