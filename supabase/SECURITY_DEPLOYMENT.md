@@ -75,3 +75,5 @@ Run the database policy checks in `supabase/tests/document_security.test.sql` wi
 ### Locked saved references
 
 Apply `20261102000800_redact_locked_document_references.sql` before deploying the frontend. Private rows remain owner-only, including TXT chapters. Saved bookmarks, progress and Read Later entries use `get_locked_user_upload_references()` for a redacted locked entry; it exposes only ID, title, author, category, format, ownership/visibility and creation date. Content, summaries, file names, source URLs, covers and storage paths are omitted.
+
+Apply `20261102000900_migrate_legacy_catalog_edition_identities.sql` before the edition-aware importer. Known Gutenberg EPUB/PDF legacy identities are normalized in place; their document IDs and saved references are retained. The records stay private/quarantined until a validated import replaces their content. Unknown sources or formats still require privileged review.
