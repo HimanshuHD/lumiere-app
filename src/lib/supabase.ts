@@ -30,6 +30,7 @@ export interface Document {
   reading_time: number;
   summary: string;
   chapters: Chapter[];
+  chapter_count?: number;
   is_featured: boolean;
   created_at: string;
   origin: 'user_upload' | 'catalog_import' | 'legacy_unowned' | 'demo';
