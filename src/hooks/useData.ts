@@ -92,16 +92,11 @@ export function useReadingProgress() {
   const savePosition = useCallback((id: string, position: ReaderPosition, chapter: number, percent: number) => {
     store?.coordinator.record(id, position, chapter, percent);
   }, [store]);
-  const saveProgress = useCallback((id: string, chapter: number, percent: number, cfi?: string) => {
-    savePosition(id, cfi
-      ? { version: 1, format: 'epub', cfi, approximateProgress: percent }
-      : { version: 1, format: 'txt', chapterIndex: chapter, chapterProgress: percent }, chapter, percent);
-  }, [savePosition]);
   const flushProgress = useCallback((id: string) => store?.coordinator.flush(id) ?? Promise.resolve(), [store]);
   const retryProgress = useCallback((id: string) => store?.coordinator.retry(id), [store]);
   const getSaveState = useCallback((id: string) => store?.coordinator.snapshot(id), [store]);
   return {
-    progress: store?.coordinator.rows() ?? [], getProgress, saveProgress, savePosition,
+    progress: store?.coordinator.rows() ?? [], getProgress, savePosition,
     flushProgress, retryProgress, getSaveState,
     loading: !store || store.loading, error: store?.error ?? null,
     refetch: store?.load ?? (() => Promise.resolve()),
