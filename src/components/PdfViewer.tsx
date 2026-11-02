@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { ChevronLeft, ChevronRight, Loader2, ZoomIn, ZoomOut } from 'lucide-react';
-import type { PDFDocumentProxy } from 'pdfjs-dist/types/src/display/api';
+import type { PDFDocumentProxy } from 'pdfjs-dist';
+import { PdfSession } from '@/features/reader/pdf/pdf-session';
 
 interface PdfViewerProps {
   url: string;
@@ -30,7 +31,8 @@ export function PdfViewer({ url, title, initialProgress = 0, onProgress }: PdfVi
 
   // Load PDF document
   useEffect(() => {
-    let cancelled = false;
+    let active = true;
+    const session = new PdfSession((error) => console.error('PDF cleanup failed:', error));
 
     (async () => {
       setLoading(true);
@@ -43,9 +45,8 @@ export function PdfViewer({ url, title, initialProgress = 0, onProgress }: PdfVi
           import.meta.url
         ).toString();
 
-        const loadingTask = pdfjsLib.getDocument(url);
-        const pdf = await loadingTask.promise;
-        if (cancelled) return;
+        const pdf = await session.load(() => pdfjsLib.getDocument(url));
+        if (!pdf) return;
         pdfDocRef.current = pdf;
         setTotalPages(pdf.numPages);
         const boundedCurrentPage = Math.min(Math.max(1, currentPageRef.current), pdf.numPages);
@@ -60,18 +61,16 @@ export function PdfViewer({ url, title, initialProgress = 0, onProgress }: PdfVi
         setPageNum(restoredPage);
         setLoading(false);
       } catch (err) {
-        if (cancelled) return;
+        if (!active) return;
         setError(err instanceof Error ? err.message : 'Failed to load PDF');
         setLoading(false);
       }
     })();
 
     return () => {
-      cancelled = true;
-      if (pdfDocRef.current) {
-        pdfDocRef.current.destroy();
-        pdfDocRef.current = null;
-      }
+      active = false;
+      pdfDocRef.current = null;
+      void session.dispose();
     };
   }, [url]);
 
