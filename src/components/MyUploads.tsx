@@ -8,6 +8,8 @@ import { DocumentFileLink } from '@/components/DocumentFileLink';
 import { supabaseDocumentLifecycleDependencies } from '@/services/supabaseDocumentLifecycle';
 import { getUserDocumentDeletionImpact, deleteOwnedUserDocument, type UserDocumentDeletionImpact } from '@/services/userDocumentDeletion';
 import { supabaseUserDocumentDeletionStore } from '@/services/supabaseUserDocumentDeletion';
+import { updateUserDocument } from '@/services/userDocumentVisibility';
+import { supabaseUserDocumentVisibilityStore } from '@/services/supabaseUserDocumentVisibility';
 
 const CATEGORIES = ['Fiction', 'Non-Fiction', 'Science', 'History', 'Technology', 'Philosophy', 'Adventure'];
 
@@ -260,6 +262,7 @@ export function MyUploads() {
 }
 
 function EditDocumentModal({ doc, onClose, onSaved }: { doc: Document; onClose: () => void; onSaved: (doc: Document) => void }) {
+  const { user } = useAuth();
   const { showToast } = useToast();
   const [title, setTitle] = useState(doc.title);
   const [author, setAuthor] = useState(doc.author);
@@ -270,31 +273,34 @@ function EditDocumentModal({ doc, onClose, onSaved }: { doc: Document; onClose: 
   const [confirmPrivate, setConfirmPrivate] = useState(false);
 
   const handleSave = async (visibilityConfirmed = false) => {
+    if (!user) {
+      showToast('Sign in to update this document.', 'error');
+      return;
+    }
     if (doc.visibility === 'shared' && visibility === 'private' && !visibilityConfirmed) {
       setConfirmPrivate(true);
       return;
     }
     setSaving(true);
     try {
-      const { data, error } = await supabase
-        .from('documents')
-        .update({
+      const data = await updateUserDocument(
+        supabaseUserDocumentVisibilityStore,
+        user.id,
+        doc,
+        {
           title: title.trim(),
           author: author.trim(),
           category,
           summary: summary.trim(),
           visibility,
-        })
-        .eq('id', doc.id)
-        .select('*')
-        .single();
-      if (error) throw new Error(error.message);
+        },
+      );
       showToast(visibility === doc.visibility
         ? 'Document updated successfully.'
         : visibility === 'private'
           ? 'Document is private now. Other users can still see their saved reference, but cannot open the document.'
           : 'Document is shared with signed-in Lumiere users.');
-      onSaved(data as Document);
+      onSaved(data);
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Failed to update document.', 'error');
     } finally {

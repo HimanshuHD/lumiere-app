@@ -19,7 +19,7 @@ Review the seed-ID allowlist and ownership classifications against a production 
 
 1. Back up the database and inventory the `documents` bucket before deploying. Record document IDs, `uploaded_by`, `source_url`, `file_url`, `cover_url`, and existing storage object paths.
 2. Deploy the updated `opds-fetch` Edge Function. It requires the Supabase-provided `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` environment values. Never expose the service-role key to the browser.
-3. Apply the database migrations, including the upload-staging policy migration. Storage INSERT authorization only permits unused, owner-folder paths with the expected upload naming pattern. Do not rely on object metadata inside the Storage INSERT policy: Storage sets authoritative size and MIME metadata as part of object creation. The `finalize-user-document-upload` Edge Function downloads the staged bytes, validates their signatures, extension, size, and content format, and only then creates the document row.
+3. Apply the database migrations in order. The lifecycle additions include `20261102000500_add_privileged_catalog_deletion.sql`, `20261102000600_recover_catalog_import_failures.sql`, and `20261102000700_allow_server_validated_upload_staging.sql`. Storage INSERT authorization only permits unused, owner-folder paths with the expected upload naming pattern. Do not rely on object metadata inside the Storage INSERT policy: Storage sets authoritative size and MIME metadata as part of object creation. The `finalize-user-document-upload` Edge Function downloads the staged bytes, validates their signatures, extension, size, and content format, and only then creates the document row.
 4. Deploy the updated frontend immediately after the migration and require users to reload. During this transition, older clients that still depend on public document URLs will stop loading files.
 5. Verify the audit table, object-path references, private/shared reads, owner-only writes, and catalog imports using two test accounts before restoring normal use.
 
@@ -41,7 +41,7 @@ Assign or revoke this role only through a trusted server-side Supabase Auth Admi
 
 Global deletion permanently removes the canonical document and cascades its bookmarks, reading progress, Read Later entries, and collection memberships. A confirmation lists distinct affected-user counts. File and cover cleanup is durably queued and retried through the admin Edge Function; a storage path still referenced by another document is retained. Configure the single-page application host to serve `index.html` for `/admin/catalog` so the URL also works when opened directly.
 
-Deploy `20261102000500_add_privileged_catalog_deletion.sql` before the `admin-catalog-maintenance` Edge Function and frontend. The function uses Supabase-provided `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY`; keep all service-role access server-side.
+Apply `20261102000500_add_privileged_catalog_deletion.sql` and the later lifecycle migrations before deploying the `admin-catalog-maintenance` and updated `opds-fetch` Edge Functions and frontend. These functions use Supabase-provided `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY`; keep all service-role access server-side.
 
 ## OPDS outbound request policy
 

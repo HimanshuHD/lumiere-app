@@ -1,6 +1,7 @@
 import { XMLParser, XMLValidator } from "npm:fast-xml-parser@4.5.3";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { reconcileCatalogImportFailure } from "../_shared/catalog_import_recovery.ts";
+import { getCatalogDocumentWriteValues } from "../_shared/catalog_document_values.ts";
 import {
   MAX_BOOK_DOWNLOAD_BYTES,
   MAX_FEED_RESPONSE_BYTES,
@@ -447,8 +448,7 @@ async function importCatalogBook(req: Request): Promise<Response> {
     return fail("Could not save the catalog file.", 500);
   }
 
-  const documentValues = {
-    id: documentId,
+  const documentValues = getCatalogDocumentWriteValues(documentId, {
     title,
     author,
     category,
@@ -467,7 +467,7 @@ async function importCatalogBook(req: Request): Promise<Response> {
     file_url: null,
     file_format: format,
     file_name: `${title}.${format}`,
-  };
+  });
 
   const reconcileFailedWrite = () => reconcileCatalogImportFailure(storagePath, {
     async findCanonical() {
@@ -521,7 +521,7 @@ async function importCatalogBook(req: Request): Promise<Response> {
 
     const { data: restoredBook, error: restoreError } = await admin
       .from("documents")
-      .update(documentValues)
+      .update(documentValues.update)
       .eq("id", legacyDocument.id)
       .eq("origin", "legacy_unowned")
       .select("*")
@@ -549,7 +549,7 @@ async function importCatalogBook(req: Request): Promise<Response> {
 
   const { data: savedBook, error: insertError } = await admin
     .from("documents")
-    .insert(documentValues)
+    .insert(documentValues.insert)
     .select("*")
     .single();
 

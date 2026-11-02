@@ -4,8 +4,9 @@ import { supabase, type Document } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import { requestTurnstileToken } from '@/lib/turnstile';
-import { addCatalogDocumentToCollection } from '@/services/catalogCollection';
 import { supabaseCatalogCollectionStore } from '@/services/supabaseCatalogCollection';
+import { importCatalogDocumentToCollection } from '@/services/catalogImport';
+import { supabaseCatalogImportStore } from '@/services/supabaseCatalogImport';
 
 interface OnlineLibraryModalProps {
   open: boolean;
@@ -59,23 +60,6 @@ function canImportBook(catalogUrl: string | undefined, book: OpdsBook): boolean 
   } catch {
     return false;
   }
-}
-
-function isSharedCatalogDocument(value: unknown): value is Document {
-  if (typeof value !== 'object' || value === null) return false;
-  const record = value as Record<string, unknown>;
-  return typeof record.id === 'string' &&
-    typeof record.title === 'string' &&
-    typeof record.author === 'string' &&
-    typeof record.category === 'string' &&
-    (typeof record.cover_url === 'string' || record.cover_url === null) &&
-    typeof record.reading_time === 'number' &&
-    typeof record.summary === 'string' &&
-    Array.isArray(record.chapters) &&
-    typeof record.is_featured === 'boolean' &&
-    typeof record.created_at === 'string' &&
-    record.origin === 'catalog_import' &&
-    record.visibility === 'shared';
 }
 
 const OPDS_CATALOGS: OpdsCatalog[] = [
@@ -214,40 +198,16 @@ export function OnlineLibraryModal({ open, onClose, onBookAdded }: OnlineLibrary
     const bookId = book.id;
     setAddingBookId(bookId);
     try {
-      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-      if (sessionError) throw new Error(`Could not verify your sign-in session: ${sessionError.message}`);
-      if (!sessionData.session) throw new Error('Sign in to import catalog books.');
-
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      const endpoint = new URL('/functions/v1/opds-fetch', supabaseUrl);
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        body: JSON.stringify({
-          action: 'import',
+      const collectionDocument = await importCatalogDocumentToCollection(
+        supabaseCatalogImportStore,
+        supabaseCatalogCollectionStore,
+        user.id,
+        {
           catalogUrl: selectedCatalog.url,
           bookId,
           downloadUrl: book.downloadUrl,
           format,
-        }),
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${sessionData.session.access_token}`,
-          apikey: anonKey,
         },
-      });
-      if (!response.ok) {
-        const result = await response.json().catch(() => ({}));
-        throw new Error(result.error || result.message || `Could not import catalog book (${response.status})`);
-      }
-      const importedDocument: unknown = await response.json();
-      if (!isSharedCatalogDocument(importedDocument)) {
-        throw new Error('The catalog import response was invalid.');
-      }
-      const collectionDocument = await addCatalogDocumentToCollection(
-        supabaseCatalogCollectionStore,
-        user.id,
-        importedDocument,
       );
       showToast('Book added to your collection. Opening it now.');
       onBookAdded(collectionDocument);
