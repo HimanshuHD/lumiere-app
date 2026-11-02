@@ -1,6 +1,8 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, Loader2, ZoomIn, ZoomOut } from 'lucide-react';
-import type { PDFDocumentProxy } from 'pdfjs-dist/types/src/display/api';
+import type { PDFDocumentProxy } from 'pdfjs-dist';
+import { PdfSession } from '@/features/reader/pdf/pdf-session';
+import { PdfRenderQueue } from '@/features/reader/pdf/pdf-render-queue';
 
 interface PdfViewerProps {
   url: string;
@@ -11,18 +13,27 @@ interface PdfViewerProps {
 
 export function PdfViewer({ url, title, initialProgress = 0, onProgress }: PdfViewerProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const canvasAreaRef = useRef<HTMLDivElement>(null);
   const pdfDocRef = useRef<PDFDocumentProxy | null>(null);
+  const renderQueueRef = useRef<PdfRenderQueue | null>(null);
   const onProgressRef = useRef(onProgress);
   const initialProgressRef = useRef(initialProgress);
   const currentPageRef = useRef(1);
   const hasLoadedPdfRef = useRef(false);
   const [pageNum, setPageNum] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
-  const [scale, setScale] = useState(1.2);
+  const [manualScale, setManualScale] = useState(1.2);
+  const [displayScale, setDisplayScale] = useState(1.2);
+  const [fitMode, setFitMode] = useState<'width' | 'manual'>('width');
+  const requestedZoomRef = useRef({ mode: 'width' as 'width' | 'manual', scale: 1.2 });
+  const [availableWidth, setAvailableWidth] = useState(0);
+  const fitWidth = fitMode === 'width' ? availableWidth : undefined;
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [rendering, setRendering] = useState(false);
+  const [renderError, setRenderError] = useState<string | null>(null);
+  const [loadAttempt, setLoadAttempt] = useState(0);
+  const [renderAttempt, setRenderAttempt] = useState(0);
 
   useEffect(() => {
     onProgressRef.current = onProgress;
@@ -30,11 +41,16 @@ export function PdfViewer({ url, title, initialProgress = 0, onProgress }: PdfVi
 
   // Load PDF document
   useEffect(() => {
-    let cancelled = false;
+    let active = true;
+    const session = new PdfSession((error) => console.error('PDF cleanup failed:', error));
+    const renderQueue = new PdfRenderQueue();
+    renderQueueRef.current = renderQueue;
 
     (async () => {
       setLoading(true);
       setError(null);
+      setRenderError(null);
+      setRendering(false);
       try {
         const pdfjsLib = await import('pdfjs-dist');
         // Set worker path
@@ -43,9 +59,8 @@ export function PdfViewer({ url, title, initialProgress = 0, onProgress }: PdfVi
           import.meta.url
         ).toString();
 
-        const loadingTask = pdfjsLib.getDocument(url);
-        const pdf = await loadingTask.promise;
-        if (cancelled) return;
+        const pdf = await session.load(() => pdfjsLib.getDocument(url));
+        if (!pdf || !active) return;
         pdfDocRef.current = pdf;
         setTotalPages(pdf.numPages);
         const boundedCurrentPage = Math.min(Math.max(1, currentPageRef.current), pdf.numPages);
@@ -60,20 +75,20 @@ export function PdfViewer({ url, title, initialProgress = 0, onProgress }: PdfVi
         setPageNum(restoredPage);
         setLoading(false);
       } catch (err) {
-        if (cancelled) return;
+        if (!active) return;
         setError(err instanceof Error ? err.message : 'Failed to load PDF');
         setLoading(false);
       }
     })();
 
     return () => {
-      cancelled = true;
-      if (pdfDocRef.current) {
-        pdfDocRef.current.destroy();
-        pdfDocRef.current = null;
-      }
+      active = false;
+      pdfDocRef.current = null;
+      renderQueueRef.current = null;
+      void renderQueue.dispose();
+      void session.dispose();
     };
-  }, [url]);
+  }, [url, loadAttempt]);
 
   useEffect(() => {
     if (totalPages === 0) return;
@@ -81,54 +96,61 @@ export function PdfViewer({ url, title, initialProgress = 0, onProgress }: PdfVi
     onProgressRef.current?.(percent);
   }, [pageNum, totalPages]);
 
-  // Render current page
-  const renderPage = useCallback(async (num: number, currentScale: number) => {
-    if (!pdfDocRef.current || !canvasRef.current) return;
-    setRendering(true);
-    try {
-      const page = await pdfDocRef.current.getPage(num);
-      const viewport = page.getViewport({ scale: currentScale });
-      const canvas = canvasRef.current;
-      const context = canvas.getContext('2d');
-      if (!context) return;
-
-      const outputScale = window.devicePixelRatio || 1;
-      canvas.width = Math.floor(viewport.width * outputScale);
-      canvas.height = Math.floor(viewport.height * outputScale);
-      canvas.style.width = `${Math.floor(viewport.width)}px`;
-      canvas.style.height = `${Math.floor(viewport.height)}px`;
-
-      const transform = outputScale !== 1 ? [outputScale, 0, 0, outputScale, 0, 0] : undefined;
-      await page.render({ canvasContext: context, viewport, transform }).promise;
-    } catch {
-      // page render can fail during teardown — ignore
-    } finally {
-      setRendering(false);
-    }
-  }, []);
-
+  // Queue ownership prevents overlapping writes and obsolete getPage results.
   useEffect(() => {
-    if (!loading && totalPages > 0) {
-      renderPage(pageNum, scale);
-    }
-  }, [pageNum, scale, loading, totalPages, renderPage]);
+    const document = pdfDocRef.current;
+    const canvas = canvasRef.current;
+    const queue = renderQueueRef.current;
+    if (loading || !document || !canvas || !queue || (fitWidth !== undefined && fitWidth <= 0)) return;
+    void queue.request({
+      document, canvas, page: pageNum, scale: manualScale, fitWidth,
+      pixelRatio: window.devicePixelRatio || 1,
+    }, {
+      onStart: () => { setRendering(true); setRenderError(null); },
+      onScale: (scale) => {
+        setDisplayScale(scale);
+        if (requestedZoomRef.current.mode === 'width') requestedZoomRef.current.scale = scale;
+      },
+      onError: (error) => setRenderError(error instanceof Error ? error.message : 'Failed to render this PDF page.'),
+      onFinish: () => setRendering(false),
+    });
+  }, [pageNum, manualScale, fitWidth, loading, totalPages, renderAttempt]);
 
   useEffect(() => {
     currentPageRef.current = pageNum;
   }, [pageNum]);
 
-  // Fit scale to container width on initial load
+  // Observe the scroll area's inner width, including scrollbar/padding changes.
   useEffect(() => {
-    if (!loading && containerRef.current && totalPages > 0) {
-      const containerWidth = containerRef.current.clientWidth - 32;
-      if (containerWidth > 0 && containerWidth < 800) {
-        setScale(Math.max(0.5, containerWidth / 612));
-      }
+    const area = canvasAreaRef.current;
+    if (loading || !area) return;
+    const measure = () => {
+      const style = window.getComputedStyle(area);
+      const width = area.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+      if (width > 0) setAvailableWidth(width);
+    };
+    measure();
+    if (typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', measure);
+      return () => window.removeEventListener('resize', measure);
     }
+    const observer = new ResizeObserver(measure);
+    observer.observe(area);
+    return () => observer.disconnect();
   }, [loading, totalPages]);
 
+  const adjustZoom = (delta: number) => {
+    // Base repeated clicks on the latest requested zoom, not an older painting.
+    const previous = requestedZoomRef.current.scale;
+    const next = Math.min(Math.max(3, previous), Math.max(Math.min(0.4, previous), previous + delta));
+    requestedZoomRef.current = { mode: 'manual', scale: next };
+    setFitMode('manual');
+    setManualScale(next);
+    setDisplayScale(next);
+  };
+
   const goToPage = (n: number) => {
-    if (n < 1 || n > totalPages || rendering) return;
+    if (n < 1 || n > totalPages) return;
     currentPageRef.current = n;
     setPageNum(n);
   };
@@ -148,8 +170,14 @@ export function PdfViewer({ url, title, initialProgress = 0, onProgress }: PdfVi
     return (
       <div className="flex items-center justify-center h-[calc(100vh-7rem)] px-4">
         <div className="text-center max-w-md">
-          <p className="text-red-600 text-sm font-medium mb-2">Failed to load PDF</p>
+          <p role="alert" className="text-red-600 text-sm font-medium mb-2">Failed to load PDF</p>
           <p className="text-stone-500 text-xs">{error}</p>
+          <button
+            onClick={() => setLoadAttempt((attempt) => attempt + 1)}
+            className="block mx-auto mt-4 px-4 py-2 rounded-lg bg-amber-600 text-white text-sm hover:bg-amber-500"
+          >
+            Retry loading PDF
+          </button>
           <a
             href={url}
             target="_blank"
@@ -166,15 +194,16 @@ export function PdfViewer({ url, title, initialProgress = 0, onProgress }: PdfVi
   return (
     <div
       className="flex flex-col h-[calc(100vh-7rem)]"
-      ref={containerRef}
       role="region"
+      aria-busy={rendering}
       aria-label={`${title} PDF reader`}
     >
       {/* PDF controls bar */}
-      <div className="flex items-center justify-center gap-4 py-2 bg-white border-b border-stone-200 flex-shrink-0">
+      <div className="flex flex-wrap items-center justify-center gap-3 py-2 bg-white border-b border-stone-200 flex-shrink-0">
         <button
           onClick={() => goToPage(pageNum - 1)}
-          disabled={pageNum <= 1 || rendering}
+          aria-label="Previous PDF page"
+          disabled={pageNum <= 1}
           className="p-1.5 rounded-lg text-stone-600 hover:bg-stone-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
         >
           <ChevronLeft className="w-4 h-4" />
@@ -184,30 +213,55 @@ export function PdfViewer({ url, title, initialProgress = 0, onProgress }: PdfVi
         </span>
         <button
           onClick={() => goToPage(pageNum + 1)}
-          disabled={pageNum >= totalPages || rendering}
+          aria-label="Next PDF page"
+          disabled={pageNum >= totalPages}
           className="p-1.5 rounded-lg text-stone-600 hover:bg-stone-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
         >
           <ChevronRight className="w-4 h-4" />
         </button>
         <div className="w-px h-5 bg-stone-200 mx-1" />
         <button
-          onClick={() => setScale((s) => Math.max(0.4, s - 0.2))}
+          onClick={() => adjustZoom(-0.2)}
+          aria-label="Zoom out"
           className="p-1.5 rounded-lg text-stone-600 hover:bg-stone-100 transition-colors"
         >
           <ZoomOut className="w-4 h-4" />
         </button>
-        <span className="text-xs text-stone-400 min-w-[40px] text-center">{Math.round(scale * 100)}%</span>
+        <span className="text-xs text-stone-400 min-w-[40px] text-center">{Math.round(displayScale * 100)}%</span>
         <button
-          onClick={() => setScale((s) => Math.min(3, s + 0.2))}
+          onClick={() => adjustZoom(0.2)}
+          aria-label="Zoom in"
           className="p-1.5 rounded-lg text-stone-600 hover:bg-stone-100 transition-colors"
         >
           <ZoomIn className="w-4 h-4" />
         </button>
+        <button
+          onClick={() => { requestedZoomRef.current.mode = 'width'; setFitMode('width'); }}
+          aria-pressed={fitMode === 'width'}
+          className="px-2 py-1 rounded text-xs text-stone-700 hover:bg-stone-100 aria-pressed:bg-stone-200"
+        >
+          Fit width
+        </button>
+      </div>
+
+      {renderError && (
+        <div role="alert" className="bg-red-50 border-b border-red-200 p-3 text-sm text-red-800 text-center">
+          <p>Could not render this PDF page: {renderError}</p>
+          <button
+            onClick={() => setRenderAttempt((attempt) => attempt + 1)}
+            className="mt-2 rounded-lg bg-red-700 px-3 py-1.5 text-white hover:bg-red-600"
+          >
+            Retry rendering page
+          </button>
+        </div>
+      )}
+      <div className="h-5 flex-shrink-0">
+        {rendering && <p role="status" className="text-center text-xs text-stone-500">Rendering page…</p>}
       </div>
 
       {/* PDF canvas area */}
-      <div className="flex-1 overflow-auto bg-stone-100 flex justify-center p-4">
-        <canvas ref={canvasRef} className="shadow-lg rounded" />
+      <div ref={canvasAreaRef} className="flex-1 overflow-auto bg-stone-100 p-4" style={{ scrollbarGutter: 'stable' }}>
+        <canvas ref={canvasRef} className="block mx-auto shadow-lg rounded" />
       </div>
     </div>
   );
