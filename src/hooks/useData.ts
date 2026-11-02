@@ -50,6 +50,9 @@ export function useDocuments() {
   const refetch = useCallback(async () => { try { await store?.refresh(); } catch { /* Query snapshots expose each failure. */ } }, [store]);
   return { documents: state.data, loading: state.loading, error: state.error, refetch };
 }
+export function useCatalogDocuments() {
+  const store = useAccountStore(); return useQuery(store?.catalog);
+}
 export function useDocumentContent(id: string) {
   const store = useAccountStore(); const query = store?.contentQuery(id);
   const state = useQuery(query, false);
@@ -88,4 +91,3 @@ export function useReadingProgress() {
     refetch: refetchProgress,
   };
 }
-

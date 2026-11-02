@@ -11,6 +11,7 @@ export type ToggleResult = { ok: true; selected: boolean } | { ok: false; messag
 type Collection = 'bookmarks' | 'reading_list';
 export class AccountDataStore {
   readonly documents: QueryCache<DocumentSummary[]>;
+  readonly catalog: QueryCache<DocumentSummary[]>;
   readonly bookmarks: QueryCache<BookmarkSummary[]>;
   readonly readingList: QueryCache<BookmarkSummary[]>;
   readonly locked: QueryCache<DocumentSummary[]>;
@@ -34,6 +35,12 @@ export class AccountDataStore {
       if (response.error) throw response.error;
       return (response.data as unknown as BookmarkSummary[]).map(reference => ({ ...reference,
         document: reference.document ?? locked.find(d => d.id === reference.document_id) }));
+    });
+    this.catalog = new QueryCache<DocumentSummary[]>([], async signal => {
+      const { data, error } = await supabase.from('documents').select(DOCUMENT_SUMMARY_FIELDS)
+        .eq('origin', 'catalog_import').order('title', { ascending: true }).limit(1000).abortSignal(signal);
+      if (error) throw error;
+      return (data ?? []) as unknown as DocumentSummary[];
     });
     this.bookmarks = references('bookmarks'); this.readingList = references('reading_list');
     this.documents = new QueryCache<DocumentSummary[]>([], async signal => {
@@ -121,13 +128,15 @@ export class AccountDataStore {
       else this.bookmarks.invalidate();
       if (this.readingList.hasData()) this.readingList.set(this.readingList.getSnapshot().data.filter(r => r.document_id !== id));
       else this.readingList.invalidate();
+      if (this.catalog.hasData()) this.catalog.set(this.catalog.getSnapshot().data.filter(d => d.id !== id));
+      else this.catalog.invalidate();
       getProgressStore(this.userId).coordinator.forget(id);
     } else {
-      this.locked.invalidate(); this.documents.invalidate(); this.bookmarks.invalidate(); this.readingList.invalidate();
+      this.catalog.invalidate(); this.locked.invalidate(); this.documents.invalidate(); this.bookmarks.invalidate(); this.readingList.invalidate();
     }
   }
   dispose() {
-    this.disposed = true; this.documents.dispose(); this.bookmarks.dispose(); this.readingList.dispose(); this.locked.dispose();
+    this.disposed = true; this.catalog.dispose(); this.documents.dispose(); this.bookmarks.dispose(); this.readingList.dispose(); this.locked.dispose();
     this.content.forEach(query => query.dispose()); this.content.clear(); this.mutations.dispose();
   }
 }
