@@ -1,3 +1,4 @@
+import { DemoBadge } from '@/components/DemoBadge';
 import { useState, useRef, useEffect, useCallback, useLayoutEffect } from 'react';
 import {
   ArrowLeft,
@@ -365,8 +366,9 @@ function ReaderSession({ document: doc, onBack }: ReaderProps) {
             )}
           </div>
 
-          <div className={`text-sm font-medium ${theme.subText} truncate max-w-[200px]`}>
-            {doc.title}
+          <div className={`flex min-w-0 items-center gap-2 text-sm font-medium ${theme.subText} max-w-[200px]`}>
+            <span className="truncate">{doc.title}</span>
+            <DemoBadge document={doc} />
           </div>
 
           <div className="flex items-center gap-1">
@@ -509,6 +511,7 @@ function ReaderSession({ document: doc, onBack }: ReaderProps) {
               {/* Document info at top */}
               <div className={`px-3 py-3 mb-2 border-b ${theme.border} pb-3`}>
                 <p className={`font-serif font-bold ${theme.text} text-sm`}>{doc.title}</p>
+                <DemoBadge document={doc} />
                 <p className={`text-xs ${theme.subText} mt-0.5`}>{doc.author}</p>
               </div>
               {doc.chapters.map((ch, idx) => (
@@ -627,6 +630,7 @@ function ReaderSession({ document: doc, onBack }: ReaderProps) {
                 <h1 className={`font-serif font-bold ${theme.text} text-3xl sm:text-4xl tracking-tight mb-3`}>
                   {doc.title}
                 </h1>
+                <DemoBadge document={doc} />
                 <p className={`${theme.subText} text-sm`}>by {doc.author}</p>
                 <div className={`w-12 h-px ${theme.border} border-t mx-auto mt-6`} />
               </div>

@@ -1,3 +1,4 @@
+import { DemoBadge } from '@/components/DemoBadge';
 import { useState, useMemo } from 'react';
 import { Search, Clock, BookMarked, Play, Star, Sparkles, User, FileText, Hash, X, Download, ChevronRight } from 'lucide-react';
 import { Document, ReadingProgress } from '@/lib/supabase';
@@ -103,6 +104,7 @@ export function Library({ documents, loading, onOpenDoc, onViewAll }: LibraryPro
             <h1 className="text-3xl sm:text-4xl lg:text-5xl font-serif font-bold text-white tracking-tight mb-3 max-w-2xl">
               {featured.title}
             </h1>
+            <DemoBadge document={featured} />
             <p className="text-stone-300 text-sm sm:text-base max-w-xl mb-4 leading-relaxed">
               {featured.summary}
             </p>
@@ -144,6 +146,7 @@ export function Library({ documents, loading, onOpenDoc, onViewAll }: LibraryPro
                     <h3 className="font-serif font-semibold text-stone-800 text-sm truncate group-hover:text-amber-700 transition-colors">
                       {doc.title}
                     </h3>
+                    <DemoBadge document={doc} />
                     <p className="text-xs text-stone-500 mb-2">{doc.author}</p>
                     {locked && <div className="mb-2"><DocumentAccessNotice /></div>}
                     <div className="w-full h-1.5 bg-stone-200 rounded-full overflow-hidden">
@@ -207,6 +210,7 @@ export function Library({ documents, loading, onOpenDoc, onViewAll }: LibraryPro
                           <DocumentCover document={doc} className="w-8 h-11 object-cover rounded flex-shrink-0" />
                           <div className="min-w-0">
                             <p className="text-sm font-medium text-stone-800 truncate group-hover:text-amber-700 transition-colors">{doc.title}</p>
+                            <DemoBadge document={doc} />
                             {isDocumentLockedForUser(doc, user?.id) && <div className="mt-1 max-w-xs"><DocumentAccessNotice /></div>}
                             <p className="text-xs text-stone-400 sm:hidden">{doc.author}</p>
                             <div className="flex items-center gap-1.5 mt-0.5">
@@ -229,7 +233,7 @@ export function Library({ documents, loading, onOpenDoc, onViewAll }: LibraryPro
                             Member
                           </span>
                         ) : (
-                          <span className="text-stone-400 text-xs">Curated</span>
+                          <span className="text-stone-400 text-xs">{doc.origin === 'demo' ? 'Demo' : 'Curated'}</span>
                         )}
                       </td>
                       <td className="px-4 py-3 text-sm text-stone-500 hidden lg:table-cell">{timeLabel}</td>
@@ -274,6 +278,7 @@ export function Library({ documents, loading, onOpenDoc, onViewAll }: LibraryPro
               <DocumentCover document={selectedDoc} className="w-32 h-44 object-cover rounded-lg shadow-md flex-shrink-0 mx-auto sm:mx-0" />
               <div className="flex-1 min-w-0">
                 <h3 className="text-xl font-serif font-bold text-stone-800 mb-1">{selectedDoc.title}</h3>
+                <DemoBadge document={selectedDoc} />
                 <p className="text-sm text-stone-500 mb-3">by {selectedDoc.author}</p>
                 {isDocumentLockedForUser(selectedDoc, user?.id) && (
                   <div className="mb-4"><DocumentAccessNotice /></div>
@@ -308,7 +313,7 @@ export function Library({ documents, loading, onOpenDoc, onViewAll }: LibraryPro
                 <div className="p-2.5 bg-stone-50 rounded-lg mb-4">
                   <p className="text-xs text-stone-400 mb-0.5">Uploaded</p>
                   <p className="text-sm font-medium text-stone-700">
-                    {selectedDoc.uploaded_by ? 'Community member' : 'Curated content'} · {new Date(selectedDoc.created_at).toLocaleDateString([], { year: 'numeric', month: 'long', day: 'numeric' })}
+                    {selectedDoc.origin === 'demo' ? 'Generated demo story' : selectedDoc.uploaded_by ? 'Community member' : 'Curated content'} · {new Date(selectedDoc.created_at).toLocaleDateString([], { year: 'numeric', month: 'long', day: 'numeric' })}
                   </p>
                 </div>
                 <div className="flex items-center gap-3 flex-wrap">
@@ -416,6 +421,7 @@ export function Library({ documents, loading, onOpenDoc, onViewAll }: LibraryPro
               <h3 className="font-serif font-semibold text-stone-800 text-sm leading-snug line-clamp-2 group-hover:text-amber-700 transition-colors">
                 {doc.title}
               </h3>
+              <DemoBadge document={doc} />
               <p className="text-xs text-stone-500 mt-0.5">{doc.author}</p>
               <div className="flex items-center gap-2 mt-1.5">
                 <span className="text-[10px] px-1.5 py-0.5 bg-stone-100 text-stone-500 rounded font-medium">
