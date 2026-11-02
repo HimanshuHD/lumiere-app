@@ -16,3 +16,6 @@ test('failed refresh retains confirmed data and exposes retry; disposed sessions
  let fail=false;const c=new QueryCache<number[]>([],async()=>{if(fail)throw {message:'offline'};return [1];});await c.load();fail=true;await assert.rejects(c.load(true));assert.equal(c.getSnapshot().error,'offline');assert.deepEqual(c.getSnapshot().data,[1]);fail=false;await c.load();assert.equal(c.getSnapshot().status,'success');
  const d=deferred<number[]>();const old=new QueryCache<number[]>([],()=>d.promise);const request=old.load().catch(()=>{});await Promise.resolve();old.dispose();d.resolve([9]);await request;assert.deepEqual(old.getSnapshot().data,[]);
 });
+test('disposing a loaded account clears its visible snapshot immediately',async()=>{
+ const c=new QueryCache<string[]>([],async()=>['account A private title']);await c.load();assert.equal(c.hasData(),true);c.dispose();assert.deepEqual(c.getSnapshot().data,[]);assert.equal(c.hasData(),false);
+});
