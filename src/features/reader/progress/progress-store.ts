@@ -66,6 +66,7 @@ export function getProgressStore(userId: string) {
 // Flush only the active account. The RPC also verifies the expected user ID.
 let activeUserId: string | undefined;
 supabase.auth.onAuthStateChange((_event, session) => {
+  if (activeUserId && activeUserId !== session?.user.id) stores.delete(activeUserId);
   activeUserId = session?.user.id;
 });
 if (typeof window !== 'undefined') {

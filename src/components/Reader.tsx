@@ -91,9 +91,11 @@ function ReaderSession({ document: doc, onBack }: ReaderProps) {
   const [epubPosition, setEpubPosition] = useState({ page: 1, total: 1 });
   const [epubAtStart, setEpubAtStart] = useState(true);
   const [epubAtEnd, setEpubAtEnd] = useState(false);
+  const toolbarRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const epubViewerRef = useRef<HTMLDivElement>(null);
   const epubRenditionRef = useRef<EpubRendition | null>(null);
+  const epubInteractionRef = useRef(false);
   const epubLocationRef = useRef<Extract<ReaderPosition, { format: 'epub' }> | null>(null);
   const [epubPositionWarning, setEpubPositionWarning] = useState<string | null>(null);
   const [positionReady, setPositionReady] = useState(false);
@@ -105,7 +107,7 @@ function ReaderSession({ document: doc, onBack }: ReaderProps) {
 
   const { toggleBookmark, isBookmarked } = useBookmarks();
   const { savePosition, getProgress, loading: progressLoading, error: progressError,
-    refetch: retryLoadProgress, flushProgress, getSaveState } = useReadingProgress();
+    refetch: retryLoadProgress, flushProgress, getSaveState, retryProgress } = useReadingProgress();
   const { removeFromReadingList } = useReadingList();
   const { user } = useAuth();
   const locked = isDocumentLockedForUser(doc, user?.id);
@@ -152,6 +154,7 @@ function ReaderSession({ document: doc, onBack }: ReaderProps) {
     let rendition: EpubRendition | undefined;
     let book: EpubBook | undefined;
     let restorationComplete = false;
+    epubInteractionRef.current = false;
 
     setEpubLoading(true);
     setEpubError(null);
@@ -178,6 +181,7 @@ function ReaderSession({ document: doc, onBack }: ReaderProps) {
           height: '100%',
         });
         epubRenditionRef.current = rendition;
+        rendition.on('click', () => { epubInteractionRef.current = true; });
         rendition.on('relocated', (location: EpubLocation) => {
           if (cancelled) return;
           setEpubAtStart(location.atStart);
@@ -193,7 +197,7 @@ function ReaderSession({ document: doc, onBack }: ReaderProps) {
             approximateProgress: location.atEnd ? 1 : Math.min(1, Math.max(0, (location.start.index + sectionProgress) / Math.max(1, spine.length))),
           };
           epubLocationRef.current = position;
-          if (restorationComplete) savePosition(doc.id, position, 0, position.approximateProgress);
+          if (restorationComplete && epubInteractionRef.current) savePosition(doc.id, position, 0, position.approximateProgress);
         });
         const savedCfi = epubLocationRef.current?.cfi;
         try {
@@ -228,6 +232,7 @@ function ReaderSession({ document: doc, onBack }: ReaderProps) {
     const rendition = epubRenditionRef.current;
     if (!rendition) return;
     try {
+      epubInteractionRef.current = true;
       if (direction === 'previous') await rendition.prev();
       else await rendition.next();
     } catch (err) {
@@ -239,7 +244,7 @@ function ReaderSession({ document: doc, onBack }: ReaderProps) {
     const el = contentRef.current;
     if (!el) return { start: 0, length: 0 };
     return textScrollRange(el.getBoundingClientRect().top + window.scrollY, el.scrollHeight,
-      window.innerHeight, window.document.documentElement.scrollHeight, 112);
+      window.innerHeight, window.document.documentElement.scrollHeight, toolbarRef.current?.getBoundingClientRect().bottom ?? 112);
   }, []);
 
   // Layout must exist before restoring; suppress scroll-generated saves until finished.
@@ -329,10 +334,19 @@ function ReaderSession({ document: doc, onBack }: ReaderProps) {
     </div>;
   }
 
+  const saveState = getSaveState(doc.id);
+  const pending = !!saveState?.pending;
+  const saveMessage = saveState?.storageError && pending
+    ? 'Position is not saved on this device. Keep this page open until synced.'
+    : saveState?.status === 'conflict' ? saveState.error
+    : saveState?.status === 'error' ? 'Could not sync. Position saved on this device; waiting to sync.'
+    : saveState?.status === 'saving' ? 'Saving position…'
+    : pending ? 'Position saved on this device; waiting to sync.' : saveState?.row ? 'Position saved' : 'Reading position ready';
+
   return (
     <div className={`${theme.bg} transition-colors duration-300 min-h-screen`}>
       {/* Reader toolbar (sits below main app nav) */}
-      <div className={`sticky top-16 z-30 ${theme.headerBg} backdrop-blur-md border-b ${theme.border} transition-colors duration-300`}>
+      <div ref={toolbarRef} className={`sticky top-16 z-30 ${theme.headerBg} backdrop-blur-md border-b ${theme.border} transition-colors duration-300`}>
         <div className="max-w-4xl mx-auto px-4 h-12 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <button
@@ -375,6 +389,14 @@ function ReaderSession({ document: doc, onBack }: ReaderProps) {
               </button>
             )}
           </div>
+        </div>
+        <div className="flex flex-wrap justify-center items-center gap-2 px-3 pb-1 text-xs text-stone-500">
+          <span role="status" aria-live="polite">{saveMessage}</span>
+          {(saveState?.status === 'error' || saveState?.status === 'conflict') && (
+            <button className="text-amber-700 underline" onClick={() => void retryProgress(doc.id)}>
+              {saveState.status === 'conflict' ? 'Use this device’s position' : 'Retry saving position'}
+            </button>
+          )}
         </div>
         {/* Progress Bar */}
         <div className={`h-0.5 ${theme.border} border-t`}>

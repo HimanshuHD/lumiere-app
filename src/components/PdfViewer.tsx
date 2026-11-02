@@ -22,7 +22,6 @@ export function PdfViewer({ url, title, initialProgress = 0, initialPosition, on
   const initialPositionRef = useRef(parsePosition(initialPosition));
   const initialPdf = initialPositionRef.current?.format === 'pdf' ? initialPositionRef.current : null;
   const initialScale = initialPdf?.view.mode === 'manual' ? initialPdf.view.scale : 1.2;
-  const userChangedPositionRef = useRef(false);
   const onPositionRef = useRef(onPositionChange);
   const initialProgressRef = useRef(initialProgress);
   const currentPageRef = useRef(1);
@@ -100,13 +99,12 @@ export function PdfViewer({ url, title, initialProgress = 0, initialPosition, on
     };
   }, [url, loadAttempt]);
 
-  useEffect(() => {
-    if (loading || totalPages === 0 || !userChangedPositionRef.current) return;
-    userChangedPositionRef.current = false;
-    const percent = totalPages === 1 ? 1 : (pageNum - 1) / (totalPages - 1);
-    onPositionRef.current?.({ version: 1, format: 'pdf', page: pageNum,
-      view: fitMode === 'width' ? { mode: 'width' } : { mode: 'manual', scale: manualScale } }, percent);
-  }, [pageNum, totalPages, loading, fitMode, manualScale]);
+  const reportPosition = (page: number, mode: 'width' | 'manual', scale: number) => {
+    if (!totalPages) return;
+    const percent = totalPages === 1 ? 1 : (page - 1) / (totalPages - 1);
+    onPositionRef.current?.({ version: 1, format: 'pdf', page,
+      view: mode === 'width' ? { mode: 'width' } : { mode: 'manual', scale } }, percent);
+  };
 
   // Queue ownership prevents overlapping writes and obsolete getPage results.
   useEffect(() => {
@@ -152,11 +150,11 @@ export function PdfViewer({ url, title, initialProgress = 0, initialPosition, on
   }, [loading, totalPages]);
 
   const adjustZoom = (delta: number) => {
-    userChangedPositionRef.current = true;
     // Base repeated clicks on the latest requested zoom, not an older painting.
     const previous = requestedZoomRef.current.scale;
     const next = Math.min(Math.max(3, previous), Math.max(Math.min(0.4, previous), previous + delta));
     requestedZoomRef.current = { mode: 'manual', scale: next };
+    reportPosition(currentPageRef.current, 'manual', next);
     setFitMode('manual');
     setManualScale(next);
     setDisplayScale(next);
@@ -164,8 +162,8 @@ export function PdfViewer({ url, title, initialProgress = 0, initialPosition, on
 
   const goToPage = (n: number) => {
     if (n < 1 || n > totalPages) return;
-    userChangedPositionRef.current = true;
     currentPageRef.current = n;
+    reportPosition(n, requestedZoomRef.current.mode, requestedZoomRef.current.scale);
     setPageNum(n);
   };
 
@@ -250,7 +248,7 @@ export function PdfViewer({ url, title, initialProgress = 0, initialPosition, on
           <ZoomIn className="w-4 h-4" />
         </button>
         <button
-          onClick={() => { userChangedPositionRef.current = true; requestedZoomRef.current.mode = 'width'; setFitMode('width'); }}
+          onClick={() => { requestedZoomRef.current.mode = 'width'; reportPosition(currentPageRef.current, 'width', requestedZoomRef.current.scale); setFitMode('width'); }}
           aria-pressed={fitMode === 'width'}
           className="px-2 py-1 rounded text-xs text-stone-700 hover:bg-stone-100 aria-pressed:bg-stone-200"
         >

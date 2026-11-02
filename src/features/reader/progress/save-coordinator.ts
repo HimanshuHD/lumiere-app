@@ -105,7 +105,7 @@ export class SaveCoordinator {
         if (!result.row) throw new Error('The reading position could not be saved.');
         e.row = result.row; e.revision = Number(result.row.revision || 0);
         if (!result.accepted) {
-          e.status = 'conflict'; e.error = 'A newer position was saved in another session. Retry to use this device’s position.';
+          e.status = 'conflict'; e.error = 'The server has a newer saved position. Retry to use this device’s position.';
           this.notify(); return;
         }
         if (e.pending.mutationId === sent.mutationId) {
