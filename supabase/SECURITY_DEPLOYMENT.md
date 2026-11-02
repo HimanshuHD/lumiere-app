@@ -71,3 +71,7 @@ Run the database policy checks in `supabase/tests/document_security.test.sql` wi
 - If an object needs recovery, restore it from the storage backup or upload a verified replacement, then update the path through a privileged maintenance operation.
 - If deployment validation fails, pause uploads/imports and restore from the prepared database and storage backups. Keep the bucket private during recovery; do not make all files public to work around an application mismatch.
 - Project Gutenberg imports are accepted only when the server re-fetches the selected OPDS entry and its rights field explicitly says “Public domain in the USA.” Other catalogs remain browse-only for imports until their redistribution terms and per-title eligibility can be validated.
+
+### Locked saved references
+
+Apply `20261102000800_redact_locked_document_references.sql` before deploying the frontend. Private rows remain owner-only, including TXT chapters. Saved bookmarks, progress and Read Later entries use `get_locked_user_upload_references()` for a redacted locked entry; it exposes only ID, title, author, category, format, ownership/visibility and creation date. Content, summaries, file names, source URLs, covers and storage paths are omitted.

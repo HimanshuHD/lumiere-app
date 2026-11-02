@@ -1,6 +1,16 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { supabase, Document, Bookmark, ReadingProgress, ReadingListItem } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
+import { attachLockedDocumentReferences } from '@/services/lockedDocumentReferences';
+
+async function fetchLockedDocumentReferences(): Promise<Document[]> {
+  const { data, error } = await supabase.rpc('get_locked_user_upload_references');
+  if (error) {
+    console.error('Failed to load locked document references:', error);
+    return [];
+  }
+  return (data ?? []) as Document[];
+}
 
 const readingProgressFetches = new Map<string, Promise<ReadingProgress[]>>();
 
@@ -18,7 +28,9 @@ export function useBookmarks() {
       .order('created_at', { ascending: false });
 
     if (!error && data) {
-      setBookmarks(data as unknown as Bookmark[]);
+      setBookmarks(attachLockedDocumentReferences(
+        data as unknown as Bookmark[], await fetchLockedDocumentReferences(),
+      ));
     }
     setLoading(false);
   }, [user]);
@@ -154,7 +166,9 @@ export function useReadingList() {
       .eq('user_id', user.id)
       .order('created_at', { ascending: false });
     if (!error && data) {
-      setReadingList(data as unknown as ReadingListItem[]);
+      setReadingList(attachLockedDocumentReferences(
+        data as unknown as ReadingListItem[], await fetchLockedDocumentReferences(),
+      ));
     }
     setLoading(false);
   }, [user]);
@@ -220,7 +234,7 @@ export function useDocuments() {
 
   const fetchDocuments = useCallback(async () => {
     if (!user) return;
-    const [documentsResult, membershipsResult] = await Promise.all([
+    const [documentsResult, membershipsResult, lockedDocuments] = await Promise.all([
       supabase
         .from('documents')
         .select('*')
@@ -229,6 +243,7 @@ export function useDocuments() {
         .from('document_library_memberships')
         .select('document_id')
         .eq('user_id', user.id),
+      fetchLockedDocumentReferences(),
     ]);
 
     if (documentsResult.error) {
@@ -239,7 +254,7 @@ export function useDocuments() {
 
     if (membershipsResult.error) {
       console.error('Failed to load catalog collection memberships:', membershipsResult.error);
-      setDocuments(((documentsResult.data || []) as Document[])
+      setDocuments([...((documentsResult.data || []) as Document[]), ...lockedDocuments]
         .filter((document) => document.origin !== 'catalog_import'));
       setLoading(false);
       return;
@@ -248,7 +263,7 @@ export function useDocuments() {
     const membershipIds = new Set(
       (membershipsResult.data || []).map((membership) => membership.document_id),
     );
-    setDocuments(((documentsResult.data || []) as Document[]).filter((document) =>
+    setDocuments([...((documentsResult.data || []) as Document[]), ...lockedDocuments].filter((document) =>
       document.origin !== 'catalog_import' || membershipIds.has(document.id)
     ));
     setLoading(false);

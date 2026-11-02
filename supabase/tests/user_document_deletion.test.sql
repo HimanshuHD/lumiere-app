@@ -1,7 +1,7 @@
 BEGIN;
 
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
-SELECT plan(11);
+SELECT plan(17);
 
 INSERT INTO auth.users (
   instance_id,
@@ -83,6 +83,11 @@ VALUES (
   '51000000-0000-0000-0000-000000000001/deletion-cover.jpg'
 );
 
+UPDATE public.documents
+SET chapters = '[{"title":"Secret chapter","content":"Private TXT contents"}]'::jsonb,
+    summary = 'Private summary', file_name = 'private-name.txt', file_format = 'txt'
+WHERE id = '52000000-0000-0000-0000-000000000001';
+
 INSERT INTO storage.objects (bucket_id, name, owner_id, metadata)
 VALUES
   (
@@ -121,8 +126,33 @@ SELECT set_config('request.jwt.claim.sub', '51000000-0000-0000-0000-000000000002
 SELECT is(
   (SELECT count(*)::integer FROM public.documents
     WHERE id = '52000000-0000-0000-0000-000000000001'),
-  1,
-  'a user with a saved reference can read the now-private document metadata'
+  0,
+  'a saved reference does not grant SELECT on the private document row'
+);
+SELECT is(
+  (SELECT chapters::text FROM public.documents
+    WHERE id = '52000000-0000-0000-0000-000000000001'),
+  NULL::text,
+  'direct chapter reads cannot retrieve private TXT content'
+);
+SELECT is(
+  (SELECT title FROM public.get_locked_user_upload_references()
+    WHERE id = '52000000-0000-0000-0000-000000000001'),
+  'Visibility changed upload',
+  'saved references retain a redacted locked display entry'
+);
+SELECT ok(
+  (SELECT chapters = '[]'::jsonb AND summary = ''
+    AND file_url IS NULL AND cover_url IS NULL
+    AND file_storage_path IS NULL AND cover_storage_path IS NULL
+    AND file_name IS NULL AND source_url IS NULL AND source_identity IS NULL
+    FROM public.get_locked_user_upload_references()
+    WHERE id = '52000000-0000-0000-0000-000000000001'),
+  'locked entries expose no content, file names, source URLs or storage paths'
+);
+SELECT ok(
+  NOT has_function_privilege('anon', 'public.get_locked_user_upload_references()', 'EXECUTE'),
+  'anonymous callers cannot request locked references'
 );
 SELECT is(
   (SELECT count(*)::integer FROM storage.objects
@@ -139,6 +169,11 @@ SELECT throws_ok(
 
 SELECT set_config('request.jwt.claim.sub', '51000000-0000-0000-0000-000000000004', true);
 SELECT is(
+  (SELECT count(*)::integer FROM public.get_locked_user_upload_references()),
+  0,
+  'users without a saved reference receive no locked entries'
+);
+SELECT is(
   (SELECT count(*)::integer FROM public.documents
     WHERE id = '52000000-0000-0000-0000-000000000001'),
   0,
@@ -146,6 +181,12 @@ SELECT is(
 );
 
 SELECT set_config('request.jwt.claim.sub', '51000000-0000-0000-0000-000000000001', true);
+SELECT is(
+  (SELECT chapters->0->>'content' FROM public.documents
+    WHERE id = '52000000-0000-0000-0000-000000000001'),
+  'Private TXT contents',
+  'the owner retains access to private TXT content'
+);
 SELECT is(
   (SELECT bookmark_users FROM public.get_user_upload_deletion_impact('52000000-0000-0000-0000-000000000001')),
   2::bigint,
