@@ -81,3 +81,15 @@ Apply `20261102000900_migrate_legacy_catalog_edition_identities.sql` before the 
 Upload retries keep the same operation ID. Before reusing its paths, the lifecycle service reconciles saved rows and retries that operation's pending cleanup. A lost document/cover upload response therefore does not leave the retry stuck on an existing object; failed cleanup blocks new writes and keeps its recovery record pending.
 
 Personal upload recovery selects only user-upload/deletion stages and ignores catalog records defensively. Catalog-import and catalog-delete recovery stays in `admin-catalog-maintenance`. Failure to persist an attempt for one personal record leaves it pending and does not skip cleanup of other personal records.
+
+## Generated demo stories
+
+Migration `20261102001100_classify_generated_demo_stories.sql` introduces ownerless shared TXT
+`demo` documents and reclassifies only the eight verified generated-story IDs. It preserves content
+and references; it does not restore the legacy uploaded PDF or add missing demo rows.
+
+Demo rows are readable only by signed-in users. Existing owner-only upload mutation policies and
+privileged lifecycle functions are not broadened. Manage demos through privileged database/service
+operations; do not use catalog deletion or user-upload endpoints. Catalog membership remains required
+only for genuine catalog imports. The local/production seed is opt-in, not an automatic migration.
+See [demo content and recovery](../docs/development/demo-content.md) for deployment and testing.
