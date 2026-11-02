@@ -14,9 +14,23 @@ import {
   CheckCircle2,
   Hash,
 } from 'lucide-react';
-import { supabase, Document } from '@/lib/supabase';
+import { Document } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
+import {
+  DocumentLifecycleError,
+  recoverPendingUserUploadFiles,
+  uploadUserDocument,
+} from '@/services/documentLifecycle';
+import {
+  DocumentValidationError,
+  MAX_COVER_SIZE_BYTES,
+  MAX_DOCUMENT_SIZE_BYTES,
+  validateCoverFile,
+  validateDocumentFile,
+} from '@/services/documentValidation';
+import { supabaseDocumentLifecycleDependencies } from '@/services/supabaseDocumentLifecycle';
+import { textToChapters } from '@/services/documentText';
 
 interface UploadPanelProps {
   onUploaded: (doc: Document) => void;
@@ -27,7 +41,7 @@ const CATEGORIES = ['Fiction', 'Non-Fiction', 'Science', 'History', 'Technology'
 const ACCEPTED_FORMATS = '.pdf,.txt,.epub';
 
 interface PdfDetails {
-  pageCount: number;
+  pageCount: number | null;
   title: string;
   author: string;
   description: string;
@@ -36,7 +50,7 @@ interface PdfDetails {
 
 async function extractPdfDetails(file: File): Promise<PdfDetails> {
   const details: PdfDetails = {
-    pageCount: 0,
+    pageCount: null,
     title: '',
     author: '',
     description: '',
@@ -89,7 +103,7 @@ async function extractPdfDetails(file: File): Promise<PdfDetails> {
 
     return details;
   } catch {
-    return details;
+    throw new DocumentValidationError('The PDF could not be opened. Check that the file is a valid, readable PDF.');
   } finally {
     canvas.width = 0;
     canvas.height = 0;
@@ -106,46 +120,18 @@ async function extractPdfDetails(file: File): Promise<PdfDetails> {
 function estimateTxtPageCount(file: File): Promise<number> {
   return file.text().then((content) => {
     const charsPerPage = 3000;
-    return Math.max(1, Math.ceil(content.length / charsPerPage));
+    return Math.ceil(content.length / charsPerPage);
   });
 }
 
-async function extractPageCount(file: File): Promise<number> {
-  const ext = file.name.split('.').pop()?.toLowerCase();
-  if (ext === 'txt') return estimateTxtPageCount(file);
-  return 0;
+async function extractPageCount(file: File, format: string): Promise<number | null> {
+  if (format === 'txt') return estimateTxtPageCount(file);
+  return null;
 }
 
 function estimateReadingTime(pageCount: number): number {
   const avgPagesPerMinute = 2;
   return Math.max(1, Math.round(pageCount / avgPagesPerMinute));
-}
-
-function textToChapters(text: string): { title: string; content: string }[] {
-  const normalized = text.replace(/\r\n/g, '\n');
-  const sections = normalized.split(/\n{3,}/);
-  if (sections.length <= 1) {
-    const chunks: string[] = [];
-    const paragraphs = normalized.split(/\n{2,}/);
-    let current = '';
-    for (const para of paragraphs) {
-      if ((current + para).length > 5000 && current) {
-        chunks.push(current);
-        current = para;
-      } else {
-        current = current ? current + '\n\n' + para : para;
-      }
-    }
-    if (current) chunks.push(current);
-    return chunks.map((content, i) => ({
-      title: `Section ${i + 1}`,
-      content,
-    }));
-  }
-  return sections.map((content, i) => ({
-    title: `Section ${i + 1}`,
-    content: content.trim(),
-  }));
 }
 
 export function UploadPanel({ onUploaded }: UploadPanelProps) {
@@ -169,6 +155,8 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
   const docInputRef = useRef<HTMLInputElement>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
   const documentSelectionRef = useRef(0);
+  const operationIdRef = useRef<string | null>(null);
+  const submitLockRef = useRef(false);
 
   useEffect(() => {
     return () => {
@@ -177,9 +165,34 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
     };
   }, [coverPreview, pdfCoverPreview]);
 
+  const userId = user?.id;
+
+  useEffect(() => {
+    if (!userId) return;
+    let active = true;
+    void recoverPendingUserUploadFiles(supabaseDocumentLifecycleDependencies, userId)
+      .then(({ recovered, pending }) => {
+        if (!active) return;
+        if (recovered > 0) {
+          showToast(`Recovered cleanup for ${recovered} incomplete upload file${recovered === 1 ? '' : 's'}.`);
+        }
+        if (pending > 0) {
+          showToast(`${pending} upload cleanup${pending === 1 ? '' : 's'} still need attention.`, 'error');
+        }
+      })
+      .catch((recoveryError: unknown) => {
+        console.error('Could not recover incomplete document uploads:', recoveryError);
+        if (active) showToast('Could not check for incomplete upload cleanup.', 'error');
+      });
+    return () => {
+      active = false;
+    };
+  }, [showToast, userId]);
+
   const handleDocSelect = useCallback(async (file: File) => {
     const selection = documentSelectionRef.current + 1;
     documentSelectionRef.current = selection;
+    operationIdRef.current = null;
     setDocFile(file);
     setError(null);
     setPageCount(null);
@@ -188,8 +201,9 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
     setPdfCoverPreview(null);
 
     try {
-      const fileExtension = file.name.split('.').pop()?.toLowerCase();
-      if (fileExtension === 'pdf') {
+      const fileFormat = await validateDocumentFile(file);
+      if (documentSelectionRef.current !== selection) return;
+      if (fileFormat === 'pdf') {
         setExtractingPdfDetails(true);
         const details = await extractPdfDetails(file);
         if (documentSelectionRef.current !== selection) return;
@@ -201,25 +215,39 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
         if (details.author) setAuthor((current) => current.trim() ? current : details.author);
         if (details.description) setSummary((current) => current.trim() ? current : details.description);
       } else {
-        const count = await extractPageCount(file);
+        const count = await extractPageCount(file, fileFormat);
         if (documentSelectionRef.current !== selection) return;
         setPageCount(count);
         const filenameTitle = file.name.replace(/\.[^.]+$/, '').replace(/[_-]/g, ' ');
         setTitle((current) => current.trim() ? current : filenameTitle);
       }
-    } catch {
+    } catch (selectionError) {
       if (documentSelectionRef.current === selection) {
-        setPageCount(0);
-        const filenameTitle = file.name.replace(/\.[^.]+$/, '').replace(/[_-]/g, ' ');
-        setTitle((current) => current.trim() ? current : filenameTitle);
+        setDocFile(null);
+        setPageCount(null);
+        setPdfCoverFile(null);
+        setPdfCoverPreview(null);
+        setError(selectionError instanceof Error
+          ? selectionError.message
+          : 'Could not validate this document file.');
       }
     } finally {
       if (documentSelectionRef.current === selection) setExtractingPdfDetails(false);
     }
   }, []);
 
-  const handleCoverSelect = useCallback((file: File) => {
+  const handleCoverSelect = useCallback(async (file: File) => {
+    try {
+      await validateCoverFile(file);
+    } catch (selectionError) {
+      setError(selectionError instanceof Error
+        ? selectionError.message
+        : 'Could not validate this cover image.');
+      return;
+    }
+    operationIdRef.current = null;
     setCoverFile(file);
+    setError(null);
     const url = URL.createObjectURL(file);
     setCoverPreview(url);
   }, []);
@@ -239,33 +267,17 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
   const canSubmit = title.trim() && author.trim() && docFile && !uploading && !extractingPdfDetails;
 
   const handleSubmit = async () => {
-    if (!user || !docFile || !title.trim() || !author.trim()) return;
+    if (!user || !docFile || !title.trim() || !author.trim() || submitLockRef.current) return;
+    submitLockRef.current = true;
     setUploading(true);
     setError(null);
     setSuccess(false);
-    const uploadedPaths: string[] = [];
     try {
-      const docExt = docFile.name.split('.').pop()?.toLowerCase();
+      const docExt = await validateDocumentFile(docFile);
       const coverToUpload = coverFile || pdfCoverFile;
-      const docId = crypto.randomUUID();
-      const docPath = `${user.id}/${docId}.${docExt}`;
-
-      const { error: docUploadError } = await supabase.storage
-        .from('documents')
-        .upload(docPath, docFile);
-      if (docUploadError) throw new Error(`Failed to upload document file: ${docUploadError.message}`);
-      uploadedPaths.push(docPath);
-
-      let coverPath: string | null = null;
-      if (coverToUpload) {
-        const coverExt = coverToUpload.name.split('.').pop()?.toLowerCase() || 'jpg';
-        coverPath = `${user.id}/${docId}-cover.${coverExt}`;
-        const { error: coverUploadError } = await supabase.storage
-          .from('documents')
-          .upload(coverPath, coverToUpload);
-        if (coverUploadError) throw new Error(`Failed to upload cover image: ${coverUploadError.message}`);
-        uploadedPaths.push(coverPath);
-      }
+      if (coverToUpload) await validateCoverFile(coverToUpload);
+      const operationId = operationIdRef.current ?? crypto.randomUUID();
+      operationIdRef.current = operationId;
 
       let chapters: { title: string; content: string }[] = [];
       if (docExt === 'txt') {
@@ -278,33 +290,27 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
         }];
       }
 
-      const pages = pageCount || 1;
-      const readingTime = estimateReadingTime(pages);
-
-      const { data: insertData, error: insertError } = await supabase
-        .from('documents')
-        .insert({
+      const readingTime = pageCount === null ? 1 : estimateReadingTime(pageCount);
+      const uploadedDocument = await uploadUserDocument(supabaseDocumentLifecycleDependencies, {
+        operationId,
+        userId: user.id,
+        documentFile: docFile,
+        coverFile: coverToUpload,
+        metadata: {
           title: title.trim(),
           author: author.trim(),
           category,
           summary: summary.trim() || 'No description provided.',
           cover_url: null,
-          cover_storage_path: coverPath,
           reading_time: readingTime,
-          chapters: chapters as unknown as Record<string, unknown>[],
+          chapters,
           is_featured: false,
-          page_count: pages,
-          origin: 'user_upload',
+          page_count: pageCount,
           visibility,
-          file_storage_path: docPath,
-          file_format: docExt,
+          file_format: docExt || null,
           file_name: docFile.name,
-        })
-        .select('*')
-        .single();
-
-      if (insertError) throw new Error(`Failed to save document: ${insertError.message}`);
-      uploadedPaths.length = 0;
+        },
+      });
 
       setSuccess(true);
       setTitle('');
@@ -319,31 +325,32 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
       setPdfCoverPreview(null);
       setPageCount(null);
       setExtractingPdfDetails(false);
+      operationIdRef.current = null;
 
-      if (insertData) {
-        onUploaded(insertData as Document);
-      }
+      onUploaded(uploadedDocument);
       showToast(visibility === 'shared'
         ? 'Document uploaded and shared with signed-in Lumiere users.'
         : 'Document uploaded privately. Only you can access it.');
       setTimeout(() => setSuccess(false), 4000);
     } catch (err) {
       let msg = err instanceof Error ? err.message : 'An unexpected error occurred during upload.';
-      if (uploadedPaths.length > 0) {
-        const { error: cleanupError } = await supabase.storage.from('documents').remove(uploadedPaths);
-        if (cleanupError) {
-          msg = `${msg}. Uploaded file cleanup failed: ${cleanupError.message}`;
+      if (err instanceof DocumentLifecycleError && err.recoveryPaths.length > 0) {
+        msg += ` Check operation ${err.operationId} and these files before retrying: ${err.recoveryPaths.join(', ')}.`;
+        if (err.cleanupPendingPaths.length > 0) {
+          msg += ` Cleanup is still pending for: ${err.cleanupPendingPaths.join(', ')}.`;
         }
       }
       setError(msg);
       showToast(msg, 'error');
     } finally {
+      submitLockRef.current = false;
       setUploading(false);
     }
   };
 
   const resetForm = () => {
     documentSelectionRef.current += 1;
+    operationIdRef.current = null;
     setTitle('');
     setAuthor('');
     setSummary('');
@@ -404,7 +411,11 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
                 ref={docInputRef}
                 type="file"
                 accept={ACCEPTED_FORMATS}
-                onChange={(e) => e.target.files?.[0] && handleDocSelect(e.target.files[0])}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  e.target.value = '';
+                  if (file) void handleDocSelect(file);
+                }}
                 className="hidden"
               />
               {docFile ? (
@@ -424,7 +435,9 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
                     <Upload className="w-6 h-6 text-stone-400 group-hover:text-amber-600 transition-colors" />
                   </div>
                   <p className="text-sm text-stone-600">Click or drag to upload</p>
-                  <p className="text-xs text-stone-400">PDF, TXT, or EPUB</p>
+                  <p className="text-xs text-stone-400">
+                    PDF, TXT, or EPUB · up to {MAX_DOCUMENT_SIZE_BYTES / 1024 / 1024} MB
+                  </p>
                 </div>
               )}
             </div>
@@ -432,6 +445,7 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
               <button
                 onClick={() => {
                   documentSelectionRef.current += 1;
+                  operationIdRef.current = null;
                   setDocFile(null);
                   setPageCount(null);
                   setPdfCoverFile(null);
@@ -459,15 +473,24 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
               <input
                 ref={coverInputRef}
                 type="file"
-                accept="image/*"
-                onChange={(e) => e.target.files?.[0] && handleCoverSelect(e.target.files[0])}
+                accept=".jpg,.jpeg,.png,.webp,.gif,image/jpeg,image/png,image/webp,image/gif"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  e.target.value = '';
+                  if (file) void handleCoverSelect(file);
+                }}
                 className="hidden"
               />
               {coverPreview ? (
                 <div className="relative inline-block">
                   <img src={coverPreview} alt="Cover preview" className="max-h-48 rounded-lg shadow-md mx-auto" />
                   <button
-                    onClick={(e) => { e.stopPropagation(); setCoverFile(null); setCoverPreview(null); }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      operationIdRef.current = null;
+                      setCoverFile(null);
+                      setCoverPreview(null);
+                    }}
                     className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-red-500 text-white flex items-center justify-center shadow-md hover:bg-red-600 transition-colors"
                   >
                     <X className="w-3.5 h-3.5" />
@@ -520,6 +543,9 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
                 </div>
               )}
             </div>
+            <p className="mt-2 text-xs text-stone-400">
+              JPEG, PNG, WebP, or GIF · up to {MAX_COVER_SIZE_BYTES / 1024 / 1024} MB
+            </p>
           </div>
         </div>
 
@@ -533,7 +559,10 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
             <input
               type="text"
               value={title}
-              onChange={(e) => setTitle(e.target.value)}
+              onChange={(e) => {
+                operationIdRef.current = null;
+                setTitle(e.target.value);
+              }}
               placeholder="Enter the book title"
               className="w-full px-4 py-2.5 bg-white border border-stone-200 rounded-lg text-sm text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-600/30 focus:border-amber-600/40 transition-all"
             />
@@ -547,7 +576,10 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
             <input
               type="text"
               value={author}
-              onChange={(e) => setAuthor(e.target.value)}
+              onChange={(e) => {
+                operationIdRef.current = null;
+                setAuthor(e.target.value);
+              }}
               placeholder="Enter the author name"
               className="w-full px-4 py-2.5 bg-white border border-stone-200 rounded-lg text-sm text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-600/30 focus:border-amber-600/40 transition-all"
             />
@@ -562,7 +594,10 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
               {CATEGORIES.map((cat) => (
                 <button
                   key={cat}
-                  onClick={() => setCategory(cat)}
+                  onClick={() => {
+                    operationIdRef.current = null;
+                    setCategory(cat);
+                  }}
                   className={`px-3 py-1.5 text-xs font-medium rounded-full transition-all ${
                     category === cat
                       ? 'bg-stone-900 text-white'
@@ -581,7 +616,10 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
             </label>
             <textarea
               value={summary}
-              onChange={(e) => setSummary(e.target.value)}
+              onChange={(e) => {
+                operationIdRef.current = null;
+                setSummary(e.target.value);
+              }}
               placeholder="A brief summary of the document (optional)"
               rows={3}
               className="w-full px-4 py-2.5 bg-white border border-stone-200 rounded-lg text-sm text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-600/30 focus:border-amber-600/40 transition-all resize-none"
@@ -597,7 +635,10 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
                   name="document-visibility"
                   value="private"
                   checked={visibility === 'private'}
-                  onChange={() => setVisibility('private')}
+                  onChange={() => {
+                    operationIdRef.current = null;
+                    setVisibility('private');
+                  }}
                   className="mt-1 accent-amber-600"
                 />
                 <span>
@@ -611,7 +652,10 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
                   name="document-visibility"
                   value="shared"
                   checked={visibility === 'shared'}
-                  onChange={() => setVisibility('shared')}
+                  onChange={() => {
+                    operationIdRef.current = null;
+                    setVisibility('shared');
+                  }}
                   className="mt-1 accent-amber-600"
                 />
                 <span>

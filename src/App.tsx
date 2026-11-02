@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { BookOpen, BookMarked, Library as LibraryIcon, Loader2, ListTodo } from 'lucide-react';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { ToastProvider } from '@/context/ToastContext';
@@ -14,22 +14,47 @@ import { AllDocuments } from '@/components/AllDocuments';
 import { ReadingListView } from '@/components/ReadingListView';
 import { ImportMenu } from '@/components/ImportMenu';
 import { OnlineLibraryModal } from '@/components/OnlineLibraryModal';
+import { CatalogAdmin } from '@/components/CatalogAdmin';
+import { isCatalogAdmin } from '@/lib/catalogAdminAccess';
 import { useDocuments } from '@/hooks/useData';
 import { Document } from '@/lib/supabase';
 
-type View = 'library' | 'bookmarks' | 'reading-list' | 'upload' | 'profile' | 'my-uploads' | 'all-documents';
+type View = 'library' | 'bookmarks' | 'reading-list' | 'upload' | 'profile' | 'my-uploads' | 'all-documents' | 'admin-catalog';
+
+function getViewFromLocation(): View {
+  return window.location.pathname === '/admin/catalog' ? 'admin-catalog' : 'library';
+}
 
 function AppContent() {
   const { user, loading, signOut } = useAuth();
   const { documents, loading: docsLoading, refetch } = useDocuments();
-  const [view, setView] = useState<View>('library');
+  const [view, setView] = useState<View>(getViewFromLocation);
   const [activeDoc, setActiveDoc] = useState<Document | null>(null);
   const [showOnlineLibrary, setShowOnlineLibrary] = useState(false);
+  const catalogAdmin = isCatalogAdmin(user);
 
-  const handleUploaded = useCallback((_doc: Document) => {
+  const navigateToView = useCallback((nextView: View) => {
+    const nextPath = nextView === 'admin-catalog' ? '/admin/catalog' : '/';
+    if (window.location.pathname !== nextPath) {
+      window.history.pushState(null, '', nextPath);
+    }
+    setActiveDoc(null);
+    setView(nextView);
+  }, []);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      setActiveDoc(null);
+      setView(getViewFromLocation());
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  const handleUploaded = useCallback(() => {
     refetch();
-    setView('library');
-  }, [refetch]);
+    navigateToView('library');
+  }, [navigateToView, refetch]);
 
   if (loading) {
     return (
@@ -56,7 +81,7 @@ function AppContent() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-8">
             <button
-              onClick={() => { setActiveDoc(null); setView('library'); }}
+              onClick={() => navigateToView('library')}
               className="flex items-center gap-2.5"
             >
               <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-600 to-amber-700 flex items-center justify-center shadow-md shadow-amber-600/20">
@@ -69,7 +94,7 @@ function AppContent() {
               {navItems.map(({ key, label, icon: Icon }) => (
                 <button
                   key={key}
-                  onClick={() => { setActiveDoc(null); setView(key); }}
+                  onClick={() => navigateToView(key)}
                   className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-medium transition-all ${
                     view === key && !activeDoc
                       ? 'bg-stone-900 text-white'
@@ -85,12 +110,13 @@ function AppContent() {
 
           <div className="flex items-center gap-3">
             <ImportMenu
-              onUpload={() => { setActiveDoc(null); setView('upload'); }}
+              onUpload={() => navigateToView('upload')}
               onOnlineLibrary={() => { setShowOnlineLibrary(true); }}
             />
             <UserMenu
-              onProfile={() => { setActiveDoc(null); setView('profile'); }}
-              onMyUploads={() => { setActiveDoc(null); setView('my-uploads'); }}
+              onProfile={() => navigateToView('profile')}
+              onMyUploads={() => navigateToView('my-uploads')}
+              onAdminCatalog={() => navigateToView('admin-catalog')}
               onSignOut={signOut}
             />
           </div>
@@ -101,7 +127,7 @@ function AppContent() {
           {navItems.map(({ key, label, icon: Icon }) => (
             <button
               key={key}
-              onClick={() => { setActiveDoc(null); setView(key); }}
+              onClick={() => navigateToView(key)}
               className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
                 view === key && !activeDoc ? 'bg-stone-900 text-white' : 'text-stone-500 hover:bg-stone-100'
               }`}
@@ -115,7 +141,22 @@ function AppContent() {
 
       {/* Main content */}
       <main>
-        {activeDoc ? (
+        {view === 'admin-catalog' ? (
+          catalogAdmin ? (
+            <CatalogAdmin onBack={() => navigateToView('library')} />
+          ) : (
+            <div className="max-w-3xl mx-auto px-4 py-24 text-center">
+              <h1 className="text-2xl font-serif font-bold text-stone-800">Administrator access required</h1>
+              <p className="mt-2 text-sm text-stone-500">This catalog maintenance page is restricted to authorized administrators.</p>
+              <button
+                onClick={() => navigateToView('library')}
+                className="mt-6 rounded-lg bg-stone-900 px-4 py-2 text-sm font-medium text-white hover:bg-stone-700"
+              >
+                Return to library
+              </button>
+            </div>
+          )
+        ) : activeDoc ? (
           <Reader document={activeDoc} onBack={() => setActiveDoc(null)} />
         ) : (
           <>
@@ -124,7 +165,7 @@ function AppContent() {
                 documents={documents}
                 loading={docsLoading}
                 onOpenDoc={setActiveDoc}
-                onViewAll={() => setView('all-documents')}
+                onViewAll={() => navigateToView('all-documents')}
               />
             )}
             {view === 'bookmarks' && <BookmarksView onOpenDoc={setActiveDoc} />}
@@ -137,7 +178,8 @@ function AppContent() {
                 documents={documents}
                 loading={docsLoading}
                 onOpenDoc={setActiveDoc}
-                onBack={() => setView('library')}
+                onBack={() => navigateToView('library')}
+                onCollectionChanged={async () => { await refetch(); }}
               />
             )}
           </>

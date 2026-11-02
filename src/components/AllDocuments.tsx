@@ -1,23 +1,60 @@
 import { useState, useMemo } from 'react';
-import { ArrowLeft, ChevronLeft, ChevronRight, Clock, User, Hash, Search } from 'lucide-react';
+import { ArrowLeft, ChevronLeft, ChevronRight, Clock, User, Hash, Search, BookMinus } from 'lucide-react';
 import { Document } from '@/lib/supabase';
 import { ReadLaterButton } from '@/components/ReadLaterButton';
 import { useReadingProgress } from '@/hooks/useData';
 import { DocumentCover } from '@/components/DocumentCover';
+import { useAuth } from '@/context/AuthContext';
+import { useToast } from '@/context/ToastContext';
+import { removeCatalogDocumentFromCollection } from '@/services/catalogCollection';
+import { supabaseCatalogCollectionStore } from '@/services/supabaseCatalogCollection';
+import { DocumentAccessNotice } from '@/components/DocumentAccessNotice';
+import { isDocumentLockedForUser } from '@/lib/documentAccess';
 
 interface AllDocumentsProps {
   documents: Document[];
   loading: boolean;
   onOpenDoc: (doc: Document) => void;
   onBack: () => void;
+  onCollectionChanged: () => Promise<void>;
 }
 
 const PAGE_SIZE = 10;
 
-export function AllDocuments({ documents, loading, onOpenDoc, onBack }: AllDocumentsProps) {
+export function AllDocuments({
+  documents,
+  loading,
+  onOpenDoc,
+  onBack,
+  onCollectionChanged,
+}: AllDocumentsProps) {
+  const { user } = useAuth();
+  const { showToast } = useToast();
   const [page, setPage] = useState(0);
   const [search, setSearch] = useState('');
+  const [removingDocumentId, setRemovingDocumentId] = useState<string | null>(null);
   const { getProgress } = useReadingProgress();
+
+  const handleRemoveFromCollection = async (document: Document) => {
+    if (!user || removingDocumentId) return;
+    setRemovingDocumentId(document.id);
+    try {
+      await removeCatalogDocumentFromCollection(
+        supabaseCatalogCollectionStore,
+        user.id,
+        document,
+      );
+      await onCollectionChanged();
+      showToast('Removed from your collection. The shared catalog book remains available to others.');
+    } catch (error) {
+      showToast(
+        error instanceof Error ? error.message : 'Could not remove the book from your collection.',
+        'error',
+      );
+    } finally {
+      setRemovingDocumentId(null);
+    }
+  };
 
   const sorted = useMemo(() => {
     return [...documents]
@@ -98,17 +135,20 @@ export function AllDocuments({ documents, loading, onOpenDoc, onBack }: AllDocum
               {pageDocs.map((doc) => {
                 const uploadDate = new Date(doc.created_at);
                 const timeLabel = uploadDate.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
+                const locked = isDocumentLockedForUser(doc, user?.id);
                 return (
                   <tr
                     key={doc.id}
-                    onClick={() => onOpenDoc(doc)}
-                    className="border-b border-stone-100 last:border-0 hover:bg-amber-50/40 transition-colors cursor-pointer group"
+                    onClick={() => !locked && onOpenDoc(doc)}
+                    aria-disabled={locked}
+                    className={`border-b border-stone-100 last:border-0 transition-colors group ${locked ? 'cursor-not-allowed opacity-60' : 'cursor-pointer hover:bg-amber-50/40'}`}
                   >
                     <td className="px-4 py-3 max-w-xs">
                       <div className="flex items-center gap-3">
                         <DocumentCover document={doc} className="w-8 h-11 object-cover rounded flex-shrink-0" />
                         <div className="min-w-0 overflow-hidden">
                           <p className="text-sm font-medium text-stone-800 truncate group-hover:text-amber-700 transition-colors">{doc.title}</p>
+                          {locked && <div className="mt-1 max-w-xs"><DocumentAccessNotice /></div>}
                           <p className="text-xs text-stone-400 sm:hidden truncate">{doc.author}</p>
                           <div className="flex items-center gap-1.5 mt-0.5">
                             <span className="text-[10px] px-1.5 py-0.5 bg-stone-100 text-stone-500 rounded font-medium">{doc.category}</span>
@@ -142,10 +182,31 @@ export function AllDocuments({ documents, loading, onOpenDoc, onBack }: AllDocum
                     </td>
                     <td className="px-4 py-3 text-right">
                       <div className="flex items-center justify-end gap-1">
-                        <ReadLaterButton doc={doc} variant="compact" hasProgress={!!getProgress(doc.id)} />
-                        <span className="text-xs text-amber-600 font-medium opacity-0 group-hover:opacity-100 transition-opacity">
-                          Read
-                        </span>
+                        {!locked && <ReadLaterButton doc={doc} variant="compact" hasProgress={!!getProgress(doc.id)} />}
+                        {doc.origin === 'catalog_import' && (
+                          <button
+                            type="button"
+                            aria-label={`Remove ${doc.title} from my collection`}
+                            title="Remove from my collection"
+                            disabled={removingDocumentId !== null}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              void handleRemoveFromCollection(doc);
+                            }}
+                            className="p-1.5 rounded-md text-stone-400 hover:text-red-600 hover:bg-red-50 disabled:opacity-40 transition-colors"
+                          >
+                            {removingDocumentId === doc.id ? (
+                              <span className="block w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                            ) : (
+                              <BookMinus className="w-4 h-4" />
+                            )}
+                          </button>
+                        )}
+                        {!locked && (
+                          <span className="text-xs text-amber-600 font-medium opacity-0 group-hover:opacity-100 transition-opacity">
+                            Read
+                          </span>
+                        )}
                       </div>
                     </td>
                   </tr>

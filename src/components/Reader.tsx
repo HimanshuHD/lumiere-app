@@ -29,6 +29,9 @@ import {
 } from '@/lib/settings';
 import { PdfViewer } from '@/components/PdfViewer';
 import { useDocumentStorageUrl } from '@/hooks/useDocumentStorageUrl';
+import { useAuth } from '@/context/AuthContext';
+import { DocumentAccessNotice } from '@/components/DocumentAccessNotice';
+import { isDocumentLockedForUser } from '@/lib/documentAccess';
 import type EpubBook from 'epubjs/types/book';
 import type EpubRendition from 'epubjs/types/rendition';
 
@@ -89,13 +92,16 @@ export function Reader({ document: doc, onBack }: ReaderProps) {
   const { toggleBookmark, isBookmarked } = useBookmarks();
   const { saveProgress, getProgress, loading: progressLoading } = useReadingProgress();
   const { removeFromReadingList } = useReadingList();
-  const { url: fileUrl, error: fileAccessError } = useDocumentStorageUrl(doc.file_storage_path, doc.file_url);
+  const { user } = useAuth();
+  const locked = isDocumentLockedForUser(doc, user?.id);
+  const { url: fileUrl, error: fileAccessError } = useDocumentStorageUrl(doc.file_storage_path, doc.file_url, !locked);
 
   const theme = themeMap[settings.theme];
   const textMode = isTextDoc(doc);
 
   // Load saved progress on mount
   useEffect(() => {
+    if (locked) return;
     if (progressLoading) return;
 
     const prog = getProgress(doc.id);
@@ -109,7 +115,7 @@ export function Reader({ document: doc, onBack }: ReaderProps) {
       void removeFromReadingList(doc.id);
     }
     setLocalBookmarked(isBookmarked(doc.id));
-  }, [doc.id, getProgress, progressLoading, saveProgress, removeFromReadingList]);
+  }, [doc.id, getProgress, isBookmarked, locked, progressLoading, saveProgress, removeFromReadingList]);
 
   useEffect(() => {
     setLocalBookmarked(isBookmarked(doc.id));
@@ -122,7 +128,7 @@ export function Reader({ document: doc, onBack }: ReaderProps) {
 
   // EPUB rendering
   useEffect(() => {
-    if (progressLoading || textMode || doc.file_format !== 'epub' || !fileUrl || !epubViewerRef.current) return;
+    if (locked || progressLoading || textMode || doc.file_format !== 'epub' || !fileUrl || !epubViewerRef.current) return;
 
     const container = epubViewerRef.current;
     let cancelled = false;
@@ -200,7 +206,7 @@ export function Reader({ document: doc, onBack }: ReaderProps) {
       rendition?.destroy();
       book?.destroy();
     };
-  }, [doc.id, fileUrl, doc.file_format, textMode, epubLoadAttempt, progressLoading, saveProgress]);
+  }, [doc.id, fileUrl, doc.file_format, locked, textMode, epubLoadAttempt, progressLoading, saveProgress]);
 
   const turnEpubPage = useCallback(async (direction: 'previous' | 'next') => {
     const rendition = epubRenditionRef.current;
@@ -215,7 +221,7 @@ export function Reader({ document: doc, onBack }: ReaderProps) {
 
   // Scroll tracking + progress saving (text mode only)
   useEffect(() => {
-    if (!textMode) return;
+    if (locked || !textMode) return;
     const handleScroll = () => {
       const el = contentRef.current;
       if (!el) return;
@@ -235,9 +241,10 @@ export function Reader({ document: doc, onBack }: ReaderProps) {
       window.removeEventListener('scroll', handleScroll);
       if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current);
     };
-  }, [doc.id, chapterIndex, saveProgress, textMode]);
+  }, [doc.id, chapterIndex, locked, saveProgress, textMode]);
 
   const handleBookmark = async () => {
+    if (locked) return;
     const result = await toggleBookmark(doc.id);
     setLocalBookmarked(result);
   };
@@ -259,6 +266,20 @@ export function Reader({ document: doc, onBack }: ReaderProps) {
 
   const chapter = doc.chapters[chapterIndex];
   const totalProgress = ((chapterIndex + scrollPercent) / doc.chapters.length) * 100;
+
+  if (locked) {
+    return (
+      <div className="mx-auto flex min-h-[60vh] max-w-3xl flex-col justify-center px-4 py-12">
+        <button
+          onClick={onBack}
+          className="mb-8 inline-flex w-fit items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-stone-600 hover:bg-stone-100"
+        >
+          <ArrowLeft className="h-4 w-4" /> Back to your library
+        </button>
+        <DocumentAccessNotice />
+      </div>
+    );
+  }
 
   return (
     <div className={`${theme.bg} transition-colors duration-300 min-h-screen`}>

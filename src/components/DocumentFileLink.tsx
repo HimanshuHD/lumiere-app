@@ -1,6 +1,8 @@
 import type { AnchorHTMLAttributes, ReactNode } from 'react';
 import type { Document } from '@/lib/supabase';
 import { useDocumentStorageUrl } from '@/hooks/useDocumentStorageUrl';
+import { useAuth } from '@/context/AuthContext';
+import { isDocumentLockedForUser } from '@/lib/documentAccess';
 
 interface DocumentFileLinkProps extends AnchorHTMLAttributes<HTMLAnchorElement> {
   document: Document;
@@ -8,7 +10,9 @@ interface DocumentFileLinkProps extends AnchorHTMLAttributes<HTMLAnchorElement> 
 }
 
 export function DocumentFileLink({ document, children, ...anchorProps }: DocumentFileLinkProps) {
-  const { url, error } = useDocumentStorageUrl(document.file_storage_path, document.file_url);
+  const { user } = useAuth();
+  const locked = isDocumentLockedForUser(document, user?.id);
+  const { url, error } = useDocumentStorageUrl(document.file_storage_path, document.file_url, !locked);
   if (!document.file_storage_path && !document.file_url) return null;
 
   return (

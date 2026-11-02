@@ -48,13 +48,25 @@ async function getSignedDocumentUrl(storagePath: string): Promise<SignedUrlResul
   return { url: await entry.promise, refreshAt: entry.refreshAt };
 }
 
-export function useDocumentStorageUrl(storagePath: string | null | undefined, fallbackUrl?: string | null) {
+export function useDocumentStorageUrl(
+  storagePath: string | null | undefined,
+  fallbackUrl?: string | null,
+  enabled = true,
+) {
   const [url, setUrl] = useState<string | null>(fallbackUrl || null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
     let refreshTimer: ReturnType<typeof setTimeout> | undefined;
+
+    if (!enabled) {
+      setUrl(null);
+      setError(null);
+      return () => {
+        active = false;
+      };
+    }
 
     if (!storagePath) {
       setUrl(fallbackUrl || null);
@@ -90,7 +102,7 @@ export function useDocumentStorageUrl(storagePath: string | null | undefined, fa
       active = false;
       if (refreshTimer) clearTimeout(refreshTimer);
     };
-  }, [storagePath, fallbackUrl]);
+  }, [storagePath, fallbackUrl, enabled]);
 
   return { url, error };
 }

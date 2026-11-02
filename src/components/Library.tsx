@@ -5,6 +5,9 @@ import { useBookmarks, useReadingProgress } from '@/hooks/useData';
 import { ReadLaterButton } from '@/components/ReadLaterButton';
 import { DocumentCover } from '@/components/DocumentCover';
 import { DocumentFileLink } from '@/components/DocumentFileLink';
+import { useAuth } from '@/context/AuthContext';
+import { DocumentAccessNotice } from '@/components/DocumentAccessNotice';
+import { isDocumentLockedForUser } from '@/lib/documentAccess';
 
 interface LibraryProps {
   documents: Document[];
@@ -27,6 +30,7 @@ export function Library({ documents, loading, onOpenDoc, onViewAll }: LibraryPro
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState('All');
   const [selectedDoc, setSelectedDoc] = useState<Document | null>(null);
+  const { user } = useAuth();
   const { isBookmarked } = useBookmarks();
   const { progress, loading: progressLoading, getProgress } = useReadingProgress();
 
@@ -40,7 +44,10 @@ export function Library({ documents, loading, onOpenDoc, onViewAll }: LibraryPro
     });
   }, [documents, search, activeCategory]);
 
-  const featured = useMemo(() => documents.find((d) => d.is_featured), [documents]);
+  const featured = useMemo(
+    () => documents.find((document) => document.is_featured && !isDocumentLockedForUser(document, user?.id)),
+    [documents, user?.id],
+  );
 
   const recentAdditions = useMemo(() => {
     return [...documents]
@@ -124,11 +131,13 @@ export function Library({ documents, loading, onOpenDoc, onViewAll }: LibraryPro
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {continueReading.map(({ doc, progress }) => {
               const totalPercent = getProgressPercent(doc, progress);
+              const locked = isDocumentLockedForUser(doc, user?.id);
               return (
                 <div
                   key={doc.id}
-                  onClick={() => onOpenDoc(doc)}
-                  className="flex gap-4 p-4 bg-white rounded-xl border border-stone-200 hover:border-amber-400 hover:shadow-lg transition-all cursor-pointer group"
+                  onClick={() => !locked && onOpenDoc(doc)}
+                  aria-disabled={locked}
+                  className={`flex gap-4 p-4 bg-white rounded-xl border border-stone-200 transition-all group ${locked ? 'cursor-not-allowed opacity-60' : 'cursor-pointer hover:border-amber-400 hover:shadow-lg'}`}
                 >
                   <DocumentCover document={doc} className="w-16 h-24 object-cover rounded-md flex-shrink-0" />
                   <div className="flex-1 min-w-0">
@@ -136,6 +145,7 @@ export function Library({ documents, loading, onOpenDoc, onViewAll }: LibraryPro
                       {doc.title}
                     </h3>
                     <p className="text-xs text-stone-500 mb-2">{doc.author}</p>
+                    {locked && <div className="mb-2"><DocumentAccessNotice /></div>}
                     <div className="w-full h-1.5 bg-stone-200 rounded-full overflow-hidden">
                       <div className="h-full bg-amber-600 rounded-full transition-all" style={{ width: `${totalPercent}%` }} />
                     </div>
@@ -188,14 +198,16 @@ export function Library({ documents, loading, onOpenDoc, onViewAll }: LibraryPro
                   return (
                     <tr
                       key={doc.id}
-                      onClick={() => setSelectedDoc(doc)}
-                      className="border-b border-stone-100 last:border-0 hover:bg-amber-50/40 transition-colors cursor-pointer group"
+                      onClick={() => !isDocumentLockedForUser(doc, user?.id) && setSelectedDoc(doc)}
+                      aria-disabled={isDocumentLockedForUser(doc, user?.id)}
+                      className={`border-b border-stone-100 last:border-0 transition-colors group ${isDocumentLockedForUser(doc, user?.id) ? 'cursor-not-allowed opacity-60' : 'cursor-pointer hover:bg-amber-50/40'}`}
                     >
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
                           <DocumentCover document={doc} className="w-8 h-11 object-cover rounded flex-shrink-0" />
                           <div className="min-w-0">
                             <p className="text-sm font-medium text-stone-800 truncate group-hover:text-amber-700 transition-colors">{doc.title}</p>
+                            {isDocumentLockedForUser(doc, user?.id) && <div className="mt-1 max-w-xs"><DocumentAccessNotice /></div>}
                             <p className="text-xs text-stone-400 sm:hidden">{doc.author}</p>
                             <div className="flex items-center gap-1.5 mt-0.5">
                               <span className="text-[10px] px-1.5 py-0.5 bg-stone-100 text-stone-500 rounded font-medium">{doc.category}</span>
@@ -228,7 +240,10 @@ export function Library({ documents, loading, onOpenDoc, onViewAll }: LibraryPro
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <button className="text-xs text-amber-600 font-medium opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button
+                          disabled={isDocumentLockedForUser(doc, user?.id)}
+                          className="text-xs text-amber-600 font-medium opacity-0 group-hover:opacity-100 transition-opacity disabled:hidden"
+                        >
                           Details
                         </button>
                       </td>
@@ -260,6 +275,9 @@ export function Library({ documents, loading, onOpenDoc, onViewAll }: LibraryPro
               <div className="flex-1 min-w-0">
                 <h3 className="text-xl font-serif font-bold text-stone-800 mb-1">{selectedDoc.title}</h3>
                 <p className="text-sm text-stone-500 mb-3">by {selectedDoc.author}</p>
+                {isDocumentLockedForUser(selectedDoc, user?.id) && (
+                  <div className="mb-4"><DocumentAccessNotice /></div>
+                )}
                 <p className="text-sm text-stone-600 leading-relaxed mb-4">{selectedDoc.summary}</p>
                 <div className="grid grid-cols-2 gap-3 mb-4">
                   <div className="p-2.5 bg-stone-50 rounded-lg">
@@ -294,7 +312,7 @@ export function Library({ documents, loading, onOpenDoc, onViewAll }: LibraryPro
                   </p>
                 </div>
                 <div className="flex items-center gap-3 flex-wrap">
-                  {(selectedDoc.file_storage_path || selectedDoc.file_url) && (
+                  {!isDocumentLockedForUser(selectedDoc, user?.id) && (selectedDoc.file_storage_path || selectedDoc.file_url) && (
                     <DocumentFileLink
                       document={selectedDoc}
                       download={selectedDoc.file_name || undefined}
@@ -304,18 +322,22 @@ export function Library({ documents, loading, onOpenDoc, onViewAll }: LibraryPro
                       Download original {(selectedDoc.file_format || 'file').toUpperCase()}
                     </DocumentFileLink>
                   )}
-                  {!selectedProgress && <ReadLaterButton doc={selectedDoc} />}
-                  <button
-                    onClick={() => { onOpenDoc(selectedDoc); setSelectedDoc(null); }}
-                    className="inline-flex items-center gap-2 px-5 py-2.5 bg-amber-600 hover:bg-amber-500 text-white text-sm font-medium rounded-lg transition-all shadow-lg shadow-amber-600/20"
-                  >
-                    <Play className="w-4 h-4" />
-                    {!selectedProgress
-                      ? 'Start Reading'
-                      : selectedDoc.page_count == null
-                        ? 'Continue Reading'
-                        : `Continue Reading (${Math.ceil(selectedDoc.page_count * (1 - selectedProgressPercent / 100))} pages remaining)`}
-                  </button>
+                  {!isDocumentLockedForUser(selectedDoc, user?.id) && (
+                    <>
+                      {!selectedProgress && <ReadLaterButton doc={selectedDoc} />}
+                      <button
+                        onClick={() => { onOpenDoc(selectedDoc); setSelectedDoc(null); }}
+                        className="inline-flex items-center gap-2 px-5 py-2.5 bg-amber-600 hover:bg-amber-500 text-white text-sm font-medium rounded-lg transition-all shadow-lg shadow-amber-600/20"
+                      >
+                        <Play className="w-4 h-4" />
+                        {!selectedProgress
+                          ? 'Start Reading'
+                          : selectedDoc.page_count == null
+                            ? 'Continue Reading'
+                            : `Continue Reading (${Math.ceil(selectedDoc.page_count * (1 - selectedProgressPercent / 100))} pages remaining)`}
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
@@ -359,11 +381,13 @@ export function Library({ documents, loading, onOpenDoc, onViewAll }: LibraryPro
           const bookmarked = isBookmarked(doc.id);
           const prog = getProgress(doc.id);
           const totalPercent = getProgressPercent(doc, prog);
+          const locked = isDocumentLockedForUser(doc, user?.id);
           return (
             <div
               key={doc.id}
-              onClick={() => onOpenDoc(doc)}
-              className="group cursor-pointer"
+              onClick={() => !locked && onOpenDoc(doc)}
+              aria-disabled={locked}
+              className={`group ${locked ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
             >
               <div className="relative aspect-[3/4] rounded-xl overflow-hidden mb-3 shadow-md group-hover:shadow-xl transition-all">
                 <DocumentCover
@@ -371,6 +395,7 @@ export function Library({ documents, loading, onOpenDoc, onViewAll }: LibraryPro
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                {locked && <DocumentAccessNotice overlay />}
                 {bookmarked && (
                   <div className="absolute top-2 right-2 w-7 h-7 rounded-full bg-white/90 flex items-center justify-center shadow-md">
                     <BookMarked className="w-3.5 h-3.5 text-amber-600" />
@@ -381,12 +406,12 @@ export function Library({ documents, loading, onOpenDoc, onViewAll }: LibraryPro
                     <div className="h-full bg-amber-500" style={{ width: `${totalPercent}%` }} />
                   </div>
                 )}
-                <div className="absolute bottom-3 left-3 right-3 opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 transition-all">
+                {!locked && <div className="absolute bottom-3 left-3 right-3 opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 transition-all">
                   <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/95 text-stone-900 text-xs font-medium rounded-lg shadow-lg">
                     <Play className="w-3 h-3" />
                     {totalPercent > 0 ? 'Continue' : 'Read Now'}
                   </span>
-                </div>
+                </div>}
               </div>
               <h3 className="font-serif font-semibold text-stone-800 text-sm leading-snug line-clamp-2 group-hover:text-amber-700 transition-colors">
                 {doc.title}
