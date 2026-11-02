@@ -7,14 +7,14 @@ ALTER TABLE public.reading_progress
 -- Compare-and-swap prevents a delayed writer from replacing a newer action.
 -- SECURITY INVOKER preserves the existing owner/document-access RLS policies.
 CREATE OR REPLACE FUNCTION public.save_reading_position(
-  p_document_id uuid, p_position jsonb, p_chapter_index integer,
+  p_user_id uuid, p_document_id uuid, p_position jsonb, p_chapter_index integer,
   p_scroll_percent numeric, p_expected_revision bigint, p_mutation_id uuid
 ) RETURNS jsonb
 LANGUAGE plpgsql SECURITY INVOKER SET search_path = pg_catalog
 AS $$
 DECLARE saved public.reading_progress; current_row public.reading_progress;
 BEGIN
-  IF auth.uid() IS NULL THEN RAISE EXCEPTION 'Authentication required'; END IF;
+  IF auth.uid() IS NULL OR auth.uid() IS DISTINCT FROM p_user_id THEN RAISE EXCEPTION 'Authentication required'; END IF;
   IF p_position IS NULL OR jsonb_typeof(p_position) <> 'object'
     OR p_position->>'version' IS DISTINCT FROM '1'
     OR p_position->>'format' IS NULL OR p_position->>'format' NOT IN ('txt','pdf','epub')
@@ -47,5 +47,5 @@ BEGIN
   RETURN jsonb_build_object('accepted', current_row.mutation_id = p_mutation_id, 'row', to_jsonb(current_row));
 END;
 $$;
-REVOKE ALL ON FUNCTION public.save_reading_position(uuid,jsonb,integer,numeric,bigint,uuid) FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION public.save_reading_position(uuid,jsonb,integer,numeric,bigint,uuid) TO authenticated;
+REVOKE ALL ON FUNCTION public.save_reading_position(uuid,uuid,jsonb,integer,numeric,bigint,uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.save_reading_position(uuid,uuid,jsonb,integer,numeric,bigint,uuid) TO authenticated;
