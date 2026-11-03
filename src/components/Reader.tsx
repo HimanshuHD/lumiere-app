@@ -14,7 +14,7 @@ import {
   Sun,
   ScrollText,
 } from 'lucide-react';
-import { Document } from '@/lib/supabase';
+import type { Document } from '@/domain/documents';
 import type { Location as EpubLocation } from 'epubjs';
 import { useBookmarks, useReadingProgress, useReadingList } from '@/hooks/useData';
 import {
@@ -34,8 +34,8 @@ import { useToast } from '@/context/ToastContext';
 import { useAuth } from '@/context/AuthContext';
 import { DocumentAccessNotice } from '@/components/DocumentAccessNotice';
 import { isDocumentLockedForUser } from '@/lib/documentAccess';
-import { legacyPosition, textPosition } from '@/features/reader/progress/position';
-import type { ReaderPosition } from '@/features/reader/progress/position';
+import { legacyPosition, textPosition } from '@/domain/reading-position';
+import type { ReaderPosition } from '@/domain/reading-position';
 import { textScrollRange, textScrollProgress } from '@/features/reader/progress/text-scroll';
 import type EpubBook from 'epubjs/types/book';
 import type EpubRendition from 'epubjs/types/rendition';

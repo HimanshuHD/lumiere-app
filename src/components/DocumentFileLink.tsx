@@ -1,5 +1,5 @@
 import type { AnchorHTMLAttributes, ReactNode } from 'react';
-import type { Document } from '@/lib/supabase';
+import type { Document } from '@/domain/documents';
 import { useDocumentStorageUrl } from '@/hooks/useDocumentStorageUrl';
 import { useAuth } from '@/context/AuthContext';
 import { isDocumentLockedForUser } from '@/lib/documentAccess';

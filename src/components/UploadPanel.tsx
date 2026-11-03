@@ -1,3 +1,4 @@
+import { DOCUMENT_CATEGORIES } from '@/domain/documents';
 import { useState, useRef, useCallback, useEffect } from 'react';
 import {
   Upload,
@@ -14,7 +15,7 @@ import {
   CheckCircle2,
   Hash,
 } from 'lucide-react';
-import { Document } from '@/lib/supabase';
+import type { Document } from '@/domain/documents';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import {
@@ -36,7 +37,7 @@ interface UploadPanelProps {
   onUploaded: (doc: Document) => void;
 }
 
-const CATEGORIES = ['Fiction', 'Non-Fiction', 'Science', 'History', 'Technology', 'Philosophy', 'Adventure'];
+const CATEGORIES = DOCUMENT_CATEGORIES;
 
 const ACCEPTED_FORMATS = '.pdf,.txt,.epub';
 
@@ -668,53 +669,10 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
 
           {/* Auto-detected info */}
           {pageCount !== null && pageCount > 0 && (
-            <div className="grid grid-cols-2 gap-4">
-              <div className="p-3 bg-stone-50 rounded-lg border border-stone-200">
-                <div className="flex items-center gap-1.5 text-xs text-stone-500 mb-1">
-                  <Hash className="w-3.5 h-3.5" />
-                  Pages (auto-detected)
-                </div>
-                <p className="text-lg font-serif font-bold text-stone-800">{pageCount}</p>
-              </div>
-              <div className="p-3 bg-stone-50 rounded-lg border border-stone-200">
-                <div className="flex items-center gap-1.5 text-xs text-stone-500 mb-1">
-                  <Clock className="w-3.5 h-3.5" />
-                  Est. Read Time
-                </div>
-                <p className="text-lg font-serif font-bold text-stone-800">{estimateReadingTime(pageCount)} min</p>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Actions */}
-      <div className="mt-8 flex items-center justify-end gap-3 pt-6 border-t border-stone-200">
-        <button
-          onClick={resetForm}
-          disabled={uploading}
-          className="px-4 py-2.5 text-sm font-medium text-stone-600 bg-white border border-stone-200 rounded-lg hover:bg-stone-50 transition-all disabled:opacity-50"
-        >
-          Reset
-        </button>
-        <button
-          onClick={handleSubmit}
-          disabled={!canSubmit}
-          className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-white bg-amber-600 hover:bg-amber-500 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-amber-600/20"
-        >
-          {uploading ? (
-            <>
-              <Loader2 className="w-4 h-4 animate-spin" />
-              Uploading...
-            </>
-          ) : (
-            <>
-              <Upload className="w-4 h-4" />
-              Upload Document
-            </>
-          )}
-        </button>
-      </div>
-    </div>
-  );
-}
+            <…91910 tokens truncated…    p_user_id: userId, p_document_id: documentId, p_position: pending.position,
+      p_chapter_index: pending.chapterIndex, p_scroll_percent: pending.progress,
+      p_expected_revision: pending.expectedRevision, p_mutation_id: pending.mutationId,
+    });
+    if (error) throw error; return data as SaveResult;
+  },
+};

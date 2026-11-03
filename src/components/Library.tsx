@@ -1,9 +1,10 @@
+import { DOCUMENT_CATEGORIES } from '@/domain/documents';
 import { readingProgressPercent as getProgressPercent } from '@/lib/readingProgressPercent';
 import { DemoBadge } from '@/components/DemoBadge';
 import { useState, useMemo } from 'react';
 import { Search, Clock, BookMarked, Play, Star, Sparkles, User, FileText, Hash, X, Download, ChevronRight } from 'lucide-react';
-import type { ReadingProgress } from '@/lib/supabase';
-import type { DocumentSummary as Document } from '@/features/data/document-summary';
+import type { ReadingProgress } from '@/domain/documents';
+import type {  DocumentSummary as Document  } from '@/domain/document-summary';
 import { useBookmarks, useReadingProgress } from '@/hooks/useData';
 import { ReadLaterButton } from '@/components/ReadLaterButton';
 import { DocumentCover } from '@/components/DocumentCover';
@@ -19,7 +20,7 @@ interface LibraryProps {
   onViewAll: () => void;
 }
 
-const categories = ['All', 'Fiction', 'Non-Fiction', 'Science', 'History', 'Technology', 'Philosophy', 'Adventure'];
+const categories = ['All', ...DOCUMENT_CATEGORIES];
 
 export function Library({ documents, loading, onOpenDoc, onViewAll }: LibraryProps) {
   const [search, setSearch] = useState('');

@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, type FormEvent } from 'react';
 import { X, Globe, ExternalLink, BookOpen, Search, ArrowLeft, Loader2, Download, AlertCircle, BookMarked, BookPlus } from 'lucide-react';
-import { supabase, type Document } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase';
+import type { Document } from '@/domain/documents';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import { requestTurnstileToken } from '@/lib/turnstile';

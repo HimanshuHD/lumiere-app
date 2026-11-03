@@ -2,7 +2,7 @@ import { readingProgressPercent } from '@/lib/readingProgressPercent';
 import { QueryNotice } from '@/components/QueryNotice';
 import { DemoBadge } from '@/components/DemoBadge';
 import { BookOpen, BookMarked } from 'lucide-react';
-import type { DocumentSummary as Document } from '@/features/data/document-summary';
+import type {  DocumentSummary as Document  } from '@/domain/document-summary';
 import { useBookmarks, useReadingProgress } from '@/hooks/useData';
 import { DocumentCover } from '@/components/DocumentCover';
 import { useAuth } from '@/context/AuthContext';

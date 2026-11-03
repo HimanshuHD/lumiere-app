@@ -1,7 +1,7 @@
 import { QueryNotice } from '@/components/QueryNotice';
 import { DemoBadge } from '@/components/DemoBadge';
 import { BookOpen, Clock, ListTodo } from 'lucide-react';
-import type { DocumentSummary as Document } from '@/features/data/document-summary';
+import type {  DocumentSummary as Document  } from '@/domain/document-summary';
 import { useReadingList } from '@/hooks/useData';
 import { ReadLaterButton } from '@/components/ReadLaterButton';
 import { DocumentCover } from '@/components/DocumentCover';

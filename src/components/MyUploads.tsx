@@ -1,6 +1,7 @@
+import { DOCUMENT_CATEGORIES } from '@/domain/documents';
 import { useState } from 'react';
 import { AlertTriangle, FileEdit, Trash2, X, Loader2, BookOpen, Download, Pencil, Save } from 'lucide-react';
-import type { DocumentSummary as Document } from '@/features/data/document-summary';
+import type {  DocumentSummary as Document  } from '@/domain/document-summary';
 import { useDocuments } from '@/hooks/useData';
 import { cachedAccountStore } from '@/features/data/account-store';
 import { QueryNotice } from '@/components/QueryNotice';
@@ -14,7 +15,7 @@ import { supabaseUserDocumentDeletionStore } from '@/services/supabaseUserDocume
 import { updateUserDocument } from '@/services/userDocumentVisibility';
 import { supabaseUserDocumentVisibilityStore } from '@/services/supabaseUserDocumentVisibility';
 
-const CATEGORIES = ['Fiction', 'Non-Fiction', 'Science', 'History', 'Technology', 'Philosophy', 'Adventure'];
+const CATEGORIES = DOCUMENT_CATEGORIES;
 
 export function MyUploads() {
   const { user } = useAuth();

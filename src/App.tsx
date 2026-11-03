@@ -7,8 +7,8 @@ import { Library } from '@/components/Library';
 import { BookmarksView } from '@/components/BookmarksView';
 import { ReaderLoader } from '@/components/ReaderLoader';
 import { QueryNotice } from '@/components/QueryNotice';
-import type { DocumentSummary } from '@/features/data/document-summary';
-import { summarizeDocument } from '@/features/data/document-summary';
+import type {  DocumentSummary  } from '@/domain/document-summary';
+import {  summarizeDocument  } from '@/domain/document-summary';
 import { UploadPanel } from '@/components/UploadPanel';
 import { Profile } from '@/components/Profile';
 import { MyUploads } from '@/components/MyUploads';
@@ -20,7 +20,7 @@ import { OnlineLibraryModal } from '@/components/OnlineLibraryModal';
 import { CatalogAdmin } from '@/components/CatalogAdmin';
 import { isCatalogAdmin } from '@/lib/catalogAdminAccess';
 import { useDocuments } from '@/hooks/useData';
-import { Document } from '@/lib/supabase';
+import type { Document } from '@/domain/documents';
 
 type View = 'library' | 'bookmarks' | 'reading-list' | 'upload' | 'profile' | 'my-uploads' | 'all-documents' | 'admin-catalog';
 

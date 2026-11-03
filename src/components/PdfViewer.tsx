@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, Loader2, ZoomIn, ZoomOut } from 'lucide-react';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
-import { parsePosition, fraction } from '@/features/reader/progress/position';
-import type { ReaderPosition } from '@/features/reader/progress/position';
+import { parsePosition, fraction } from '@/domain/reading-position';
+import type { ReaderPosition } from '@/domain/reading-position';
 import { PdfSession } from '@/features/reader/pdf/pdf-session';
 import { PdfRenderQueue } from '@/features/reader/pdf/pdf-render-queue';
 
