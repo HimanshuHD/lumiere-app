@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { mapDocument, mapSummary, mapReference, mapSaveResult } from '../src/infrastructure/supabase/mappers.ts';
+import { mapDocument, mapSummary, mapReference, mapSaveResult, mapProfile } from '../src/infrastructure/supabase/mappers.ts';
 import { ServiceError } from '../src/domain/errors.ts';
 const metadata = {id:'doc',title:'Book',author:'Author',category:'Fiction',summary:'Summary',reading_time:1,cover_url:null,origin:'demo',visibility:'shared',is_featured:false,created_at:null,chapter_count:1};
 test('database mapping validates nested content and excludes chapter bodies from summaries', () => {
@@ -21,4 +21,10 @@ test('embedded references retain redaction and progress acknowledgement must be 
   assert.throws(() => mapSaveResult({accepted:true,row:null}),ServiceError);
   assert.throws(() => mapSaveResult({accepted:'yes',row:null}),ServiceError);
   assert.deepEqual(mapSaveResult({accepted:false,row:null}),{accepted:false,row:null});
+});
+
+test('profile mapping rejects malformed display data and omits unexpected fields', () => {
+  assert.equal(mapProfile(null),null);
+  assert.deepEqual(mapProfile({full_name:'Name',avatar_url:null,extra:'discard'}),{full_name:'Name',avatar_url:null});
+  assert.throws(()=>mapProfile({full_name:42}),ServiceError);
 });

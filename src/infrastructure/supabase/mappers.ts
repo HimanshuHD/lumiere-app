@@ -62,3 +62,8 @@ export function mapSaveResult(input: unknown): SaveResult {
   if (typeof row.accepted !== 'boolean' || !('row' in row) || (row.accepted && row.row == null)) throw new ServiceError('validation', 'The server did not confirm the reading position.');
   return { accepted: row.accepted, row: row.row == null ? null : mapProgress(row.row) };
 }
+export function mapProfile(input: unknown): { full_name: string | null; avatar_url: string | null } | null {
+  if (input == null) return null;
+  const row = record(input);
+  return { full_name: nullableText(row,'full_name'), avatar_url: nullableText(row,'avatar_url') };
+}

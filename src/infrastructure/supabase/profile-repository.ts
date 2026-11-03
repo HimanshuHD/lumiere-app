@@ -1,8 +1,9 @@
+import { mapProfile } from './mappers';
 import { toServiceError } from '@/domain/errors';
 import { supabase } from './client';
 export const profileRepository = {
   async get(userId:string) {
-    const {data,error}=await supabase.from('profiles').select('full_name,avatar_url').eq('id',userId).maybeSingle();if(error)throw toServiceError(error);return data;
+    const {data,error}=await supabase.from('profiles').select('full_name,avatar_url').eq('id',userId).maybeSingle();if(error)throw toServiceError(error);return mapProfile(data);
   },
   async saveName(userId:string,name:string) {
     const {error}=await supabase.from('profiles').upsert({id:userId,full_name:name.trim()},{onConflict:'id'});if(error)throw toServiceError(error);

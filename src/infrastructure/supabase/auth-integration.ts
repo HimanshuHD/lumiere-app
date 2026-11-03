@@ -1,7 +1,10 @@
 import { toServiceError, attempt } from '@/domain/errors';
 import { supabase } from './client';
 import type { AuthSession } from '@/domain/auth';
-const mapSession = (session: {user: AuthSession['user']} | null): AuthSession | null => session ? {user:session.user} : null;
+const mapSession = (session: {user: AuthSession['user']} | null): AuthSession | null => session ? {
+  user: { id: session.user.id, email: session.user.email,
+    user_metadata: session.user.user_metadata, app_metadata: session.user.app_metadata },
+} : null;
 export const authIntegration = {
   async getSession() {
     const {data,error}=await supabase.auth.getSession(); if(error)throw toServiceError(error);return mapSession(data.session);
