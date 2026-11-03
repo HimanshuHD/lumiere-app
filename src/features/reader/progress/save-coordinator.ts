@@ -2,7 +2,6 @@ import { parsePosition, fraction } from '../../../domain/reading-position.ts';
 import type { ReaderPosition } from '../../../domain/reading-position.ts';
 
 import type { ProgressRow, PendingSave, PendingStorage, SaveResult, SaveStatus } from '../../../domain/progress.ts';
-export type { ProgressRow, PendingSave, PendingStorage, SaveResult } from '../../../domain/progress.ts';
 interface Entry {
   row?: ProgressRow; pending?: PendingSave; revision: number; status: SaveStatus;
   storageError: boolean; error?: string; timer?: ReturnType<typeof setTimeout>; running?: Promise<void>;

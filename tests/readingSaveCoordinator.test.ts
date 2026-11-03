@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { SaveCoordinator } from '../src/features/reader/progress/save-coordinator.ts';
-import type { PendingSave, ProgressRow, SaveResult } from '../src/features/reader/progress/save-coordinator.ts';
+import type { PendingSave, ProgressRow, SaveResult } from '../src/domain/progress.ts';
 const position = (page: number) => ({version:1 as const,format:'pdf' as const,page,view:{mode:'width' as const}});
 const row = (p: PendingSave): ProgressRow => ({id:'row',user_id:'user',document_id:'doc',chapter_index:0,scroll_percent:p.progress,position:p.position,revision:p.expectedRevision+1,mutation_id:p.mutationId,updated_at:''});
 function storage() {

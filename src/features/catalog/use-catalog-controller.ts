@@ -41,6 +41,7 @@ export function canImportBook(catalogUrl: string | undefined, book: OpdsBook): b
 
 export function useCatalogController(open: boolean, onClose: () => void, onBookAdded: (document: Document) => void) {
   const { catalogFeed: fetchCatalogFeed } = useIntegrations();
+  const importGeneration = useRef(0);
   const active = useRef(true);
   useEffect(() => { active.current = true; return () => { active.current = false; }; }, []);
   const { user } = useAuth();
@@ -58,8 +59,9 @@ export function useCatalogController(open: boolean, onClose: () => void, onBookA
   const turnstileContainerRef = useRef<HTMLDivElement>(null);
 
   const request = useRef<AbortController | null>(null);
-  useEffect(() => { if (!open) request.current?.abort(); return () => { request.current?.abort(); }; }, [open]);
+  useEffect(() => { if (!open) { request.current?.abort(); importGeneration.current++; } return () => { request.current?.abort(); }; }, [open]);
   const loadCatalog = useCallback(async (catalog: OpdsCatalog) => {
+    importGeneration.current++;
     request.current?.abort();
     const controller = new AbortController();
     request.current = controller;
@@ -75,7 +77,7 @@ export function useCatalogController(open: boolean, onClose: () => void, onBookA
         const container = turnstileContainerRef.current;
         if (!container) throw new Error('The security check is unavailable. Please try again.');
         setCheckingSecurity(true);
-        try { return await requestTurnstileToken(container, publicConfig.turnstileSiteKey); }
+        try { return await requestTurnstileToken(container, publicConfig.turnstileSiteKey, controller.signal); }
         finally { if (!controller.signal.aborted) setCheckingSecurity(false); }
       }, controller.signal)));
       if (controller.signal.aborted) return;
@@ -116,6 +118,7 @@ export function useCatalogController(open: boolean, onClose: () => void, onBookA
       return;
     }
 
+    const generation = importGeneration.current;
     const bookId = book.id;
     setAddingBookId(bookId);
     try {
@@ -130,13 +133,13 @@ export function useCatalogController(open: boolean, onClose: () => void, onBookA
           format,
         },
       )));
-      if (!active.current) return;
+      if (!active.current || generation !== importGeneration.current) return;
       showToast('Book added to your collection. Opening it now.');
       onBookAdded(collectionDocument);
     } catch (err) {
-      if (active.current) showToast(err instanceof Error ? err.message : 'Could not add this book to your library.', 'error');
+      if (active.current && generation === importGeneration.current) showToast(err instanceof Error ? err.message : 'Could not add this book to your library.', 'error');
     } finally {
-      if (active.current) setAddingBookId(null);
+      if (active.current && generation === importGeneration.current) setAddingBookId(null);
     }
   }, [onBookAdded, selectedCatalog, showToast, user]);
 
@@ -170,6 +173,8 @@ export function useCatalogController(open: boolean, onClose: () => void, onBookA
   }, [catalogHistory, loadCatalog]);
 
   const handleClose = useCallback(() => {
+    importGeneration.current++;
+    setAddingBookId(null);
     request.current?.abort();
     onClose();
     request.current?.abort();

@@ -41,16 +41,15 @@ export function useUploadController(onUploaded: (doc: Document) => void) {
   const [success, setSuccess] = useState(false);
   const docInputRef = useRef<HTMLInputElement>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
+  const coverSelection = useRef(0);
   const documentSelectionRef = useRef(0);
   const operationIdRef = useRef<string | null>(null);
   const submitLockRef = useRef(false);
 
   useEffect(() => {
-    return () => {
-      if (coverPreview) URL.revokeObjectURL(coverPreview);
-      if (pdfCoverPreview) URL.revokeObjectURL(pdfCoverPreview);
-    };
-  }, [coverPreview, pdfCoverPreview]);
+    return () => { if (coverPreview) URL.revokeObjectURL(coverPreview); };
+  }, [coverPreview]);
+  useEffect(() => () => { if (pdfCoverPreview) URL.revokeObjectURL(pdfCoverPreview); }, [pdfCoverPreview]);
 
   const userId = user?.id;
 
@@ -124,9 +123,12 @@ export function useUploadController(onUploaded: (doc: Document) => void) {
   }, []);
 
   const handleCoverSelect = useCallback(async (file: File) => {
+    const selection = ++coverSelection.current;
     try {
       await validateCoverFile(file);
+      if (!active.current || selection !== coverSelection.current) return;
     } catch (selectionError) {
+      if (!active.current || selection !== coverSelection.current) return;
       setError(selectionError instanceof Error
         ? selectionError.message
         : 'Could not validate this cover image.');
@@ -238,6 +240,7 @@ export function useUploadController(onUploaded: (doc: Document) => void) {
   };
 
   const resetForm = () => {
+    coverSelection.current++;
     documentSelectionRef.current += 1;
     operationIdRef.current = null;
     setTitle('');
