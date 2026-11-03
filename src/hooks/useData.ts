@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useSyncExternalStore } from 'react';
 import type { ReadingProgress } from '@/domain/documents';
 import { useAuth } from '@/context/AuthContext';
-import { getProgressStore } from '@/features/reader/progress';
+import { getProgressStore } from '@/app/progress-runtime';
 import type { ReaderPosition } from '@/domain/reading-position';
 import { getAccountStore } from '@/app/account-runtime';
 import type { QueryCache } from '@/features/data';

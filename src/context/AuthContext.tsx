@@ -1,7 +1,6 @@
 import { createContext, useContext, useEffect, useState, useCallback, useRef, ReactNode } from 'react';
 import type { AuthSession as Session, AuthUser as User } from '@/domain/auth';
-import { authIntegration } from '@/infrastructure/supabase/auth-integration';
-import { profileRepository } from '@/infrastructure/supabase/profile-repository';
+import { useIntegrations } from '@/shared/integrations';
 
 export interface ProfileData {
   fullName: string;
@@ -22,7 +21,8 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
-export function AuthProvider({ children }: { children: ReactNode }) {
+export function AuthProvider({ children, onAccountChange }: { children: ReactNode; onAccountChange: (id: string | undefined) => void }) {
+  const { auth: authIntegration, profile: profileRepository } = useIntegrations();
   const accountRef = useRef<string | undefined>(undefined);
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -40,7 +40,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       fullName: data?.full_name?.trim() || googleName,
       avatarUrl: data?.avatar_url || null,
     });
-  }, [user]);
+  }, [user, profileRepository]);
 
   useEffect(() => {
     let active = true;
@@ -49,15 +49,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!active) return;
       const id = next?.user.id;
       if (accountRef.current !== id) setProfile({ fullName: '', avatarUrl: null });
+      onAccountChange(id);
       accountRef.current = id;
       setSession(next); setUser(next?.user ?? null); setLoading(false);
     };
     const unsubscribe = authIntegration.subscribe(next => {
       eventObserved = true; apply(next);
     });
-    void authIntegration.getSession().then(next => { if (!eventObserved) apply(next); }).catch(() => apply(null));
+    void authIntegration.getSession().then(next => { if (!eventObserved) apply(next); }).catch(() => { if (!eventObserved) apply(null); });
     return () => { active = false; unsubscribe(); };
-  }, []);
+  }, [authIntegration, onAccountChange]);
 
   useEffect(() => {
     if (user) {

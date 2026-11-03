@@ -1,8 +1,6 @@
-import { progressRepository } from '@/infrastructure/supabase/progress-repository';
-import { browserStorage } from '@/infrastructure/browser/pending-progress';
-import { authIntegration } from '@/infrastructure/supabase/auth-integration';
-import { SaveCoordinator } from './save-coordinator';
-import type { ProgressRow } from './save-coordinator';
+import { SaveCoordinator } from './save-coordinator.ts';
+import type { ProgressRow, PendingStorage, PendingSave, SaveResult } from '../../../domain/progress.ts';
+export interface ProgressRepository { list(userId: string): Promise<ProgressRow[]>; save(userId: string, id: string, pending: PendingSave): Promise<SaveResult> }
 
 export class ProgressStore {
   readonly coordinator: SaveCoordinator;
@@ -11,11 +9,13 @@ export class ProgressStore {
   private request?: Promise<void>;
   private loaded = false;
   private disposed = false;
+  private readonly repository: ProgressRepository;
   private readonly userId: string;
   private listeners = new Set<() => void>();
-  constructor(userId: string) {
+  constructor(userId: string, repository: ProgressRepository, storage: PendingStorage) {
     this.userId = userId;
-    this.coordinator = new SaveCoordinator(browserStorage(userId), (id, pending) => progressRepository.save(userId, id, pending));
+    this.repository = repository;
+    this.coordinator = new SaveCoordinator(storage, (id, pending) => repository.save(userId, id, pending));
     this.coordinator.subscribe(() => this.notify());
   }
   subscribe = (listener: () => void) => { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; };
@@ -28,34 +28,16 @@ export class ProgressStore {
     this.loading = true; this.error = null; this.notify();
     this.request = (async () => {
       try {
-        const data = await progressRepository.list(this.userId);
+        const data = await this.repository.list(this.userId);
         if (this.disposed) return;
-        this.coordinator.reconcile((data || []) as ProgressRow[]);
+        this.coordinator.reconcile(data);
         this.loaded = true;
         this.coordinator.retryFailed();
       } catch (error) {
+        if (this.disposed) return;
         this.error = error instanceof Error ? error.message : 'Could not load your reading position. Please retry.';
       } finally { this.loading = false; this.request = undefined; this.notify(); }
     })();
     return this.request;
   };
-}
-const stores = new Map<string, ProgressStore>();
-export function discardProgressStore(userId: string) {
-  const store = stores.get(userId); store?.dispose(); stores.delete(userId);
-}
-export function getProgressStore(userId: string) {
-  let store = stores.get(userId);
-  if (!store) { store = new ProgressStore(userId); stores.set(userId, store); }
-  return store;
-}
-// Flush only the active account. The RPC also verifies the expected user ID.
-let activeUserId: string | undefined;
-authIntegration.subscribe(session => {
-  if (activeUserId && activeUserId !== session?.user.id) discardProgressStore(activeUserId);
-  activeUserId = session?.user.id;
-});
-if (typeof window !== 'undefined') {
-  window.addEventListener('online', () => { if (activeUserId) stores.get(activeUserId)?.coordinator.retryFailed(); });
-  window.addEventListener('pagehide', () => { if (activeUserId) void stores.get(activeUserId)?.coordinator.flushAll(); });
 }

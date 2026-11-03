@@ -1,3 +1,4 @@
+import { useIntegrations } from '@/shared/integrations';
 import { DemoBadge } from '@/components/DemoBadge';
 import { useState, useRef, useEffect, useCallback, useLayoutEffect } from 'react';
 import {
@@ -81,7 +82,8 @@ export function Reader(props: ReaderProps) {
 }
 
 function ReaderSession({ document: doc, onBack }: ReaderProps) {
-  const [settings, setSettings] = useState<ReaderSettings>(() => loadSettings());
+  const { preferences } = useIntegrations();
+  const [settings, setSettings] = useState<ReaderSettings>(() => loadSettings(preferences));
   const [chapterIndex, setChapterIndex] = useState(0);
   const [scrollPercent, setScrollPercent] = useState(0);
   const [showSettings, setShowSettings] = useState(false);
@@ -142,9 +144,9 @@ function ReaderSession({ document: doc, onBack }: ReaderProps) {
 
   // Persist settings
   useEffect(() => {
-    const result = saveSettings(settings);
+    const result = saveSettings(settings, preferences);
     if (!result.ok) showToast("Reader preferences could not be saved on this device.", "error");
-  }, [settings, showToast]);
+  }, [settings, showToast, preferences]);
 
   // EPUB rendering
   useEffect(() => {

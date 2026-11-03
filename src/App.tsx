@@ -1,3 +1,6 @@
+import { IntegrationContext } from '@/shared/integrations';
+import { setActiveAccount } from '@/app/account-runtime';
+import { integrations } from '@/app/integrations';
 import { useState, useCallback, useEffect } from 'react';
 import { BookOpen, BookMarked, Library as LibraryIcon, Loader2, ListTodo } from 'lucide-react';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
@@ -225,8 +228,8 @@ function AccountContent() {
 
 export default function App() {
   return (
-    <AuthProvider>
+    <IntegrationContext.Provider value={integrations}><AuthProvider onAccountChange={setActiveAccount}>
       <AccountContent />
-    </AuthProvider>
+    </AuthProvider></IntegrationContext.Provider>
   );
 }

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { getSignedDocumentUrl } from '@/infrastructure/supabase/document-storage';
+import { useIntegrations } from '@/shared/integrations';
 import { getSignedUrlRefreshDelay } from './documentStorageUrlRefresh';
 
 export function useDocumentStorageUrl(
@@ -7,6 +7,7 @@ export function useDocumentStorageUrl(
   fallbackUrl?: string | null,
   enabled = true,
 ) {
+  const { documentUrl: getSignedDocumentUrl } = useIntegrations();
   const [url, setUrl] = useState<string | null>(fallbackUrl || null);
   const [error, setError] = useState<string | null>(null);
 
@@ -56,7 +57,7 @@ export function useDocumentStorageUrl(
       active = false;
       if (refreshTimer) clearTimeout(refreshTimer);
     };
-  }, [storagePath, fallbackUrl, enabled]);
+  }, [storagePath, fallbackUrl, enabled, getSignedDocumentUrl]);
 
   return { url, error };
 }
