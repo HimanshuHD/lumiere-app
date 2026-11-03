@@ -27,16 +27,16 @@ import {
   fontSizeMap,
   lineHeightMap,
   themeMap,
-} from '@/lib/settings';
+} from '@/features/reader/preferences';
 import { PdfViewer } from '@/components/PdfViewer';
 import { useDocumentStorageUrl } from '@/hooks/useDocumentStorageUrl';
-import { useToast } from '@/context/ToastContext';
+import { useToast } from '@/shared/ui';
 import { useAuth } from '@/context/AuthContext';
 import { DocumentAccessNotice } from '@/components/DocumentAccessNotice';
 import { isDocumentLockedForUser } from '@/lib/documentAccess';
 import { legacyPosition, textPosition } from '@/domain/reading-position';
 import type { ReaderPosition } from '@/domain/reading-position';
-import { textScrollRange, textScrollProgress } from '@/features/reader/progress/text-scroll';
+import { textScrollRange, textScrollProgress } from '@/features/reader/text';
 import type EpubBook from 'epubjs/types/book';
 import type EpubRendition from 'epubjs/types/rendition';
 
@@ -142,8 +142,9 @@ function ReaderSession({ document: doc, onBack }: ReaderProps) {
 
   // Persist settings
   useEffect(() => {
-    saveSettings(settings);
-  }, [settings]);
+    const result = saveSettings(settings);
+    if (!result.ok) showToast("Reader preferences could not be saved on this device.", "error");
+  }, [settings, showToast]);
 
   // EPUB rendering
   useEffect(() => {
