@@ -5,9 +5,9 @@ import type { Document } from '@/domain/documents';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import { requestTurnstileToken } from '@/lib/turnstile';
-import { supabaseCatalogCollectionStore } from '@/services/supabaseCatalogCollection';
+import { supabaseCatalogCollectionStore } from '@/app/document-operations';
 import { importCatalogDocumentToCollection } from '@/services/catalogImport';
-import { supabaseCatalogImportStore } from '@/services/supabaseCatalogImport';
+import { supabaseCatalogImportStore } from '@/app/document-operations';
 
 interface OnlineLibraryModalProps {
   open: boolean;

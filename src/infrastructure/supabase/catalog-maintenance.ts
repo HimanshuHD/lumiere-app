@@ -1,4 +1,3 @@
-import { activeAccountStore } from '@/app/account-runtime';
 import { supabase } from '@/infrastructure/supabase/client';
 import type {
   CatalogCleanupResult,
@@ -77,10 +76,8 @@ export const supabaseCatalogMaintenanceStore: CatalogMaintenanceStore = {
   },
 
   async deleteCanonicalDocument(documentId) {
-    const account = activeAccountStore();
     const data = await invokeMaintenance({ action: 'delete', documentId });
     if (data.deleted !== true) throw new Error('The server did not confirm catalog deletion.');
-    account?.changedDocument(documentId, true);
     return {
       impact: parseImpact(data.impact),
       cleanup: parseCleanup(data.cleanup, data.error),

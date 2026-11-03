@@ -1,9 +1,9 @@
 import { useEffect, useState, useCallback, useSyncExternalStore } from 'react';
-import type { ReadingProgress } from '@/lib/supabase';
+import type { ReadingProgress } from '@/domain/documents';
 import { useAuth } from '@/context/AuthContext';
 import { getProgressStore } from '@/features/reader/progress/progress-store';
-import type { ReaderPosition } from '@/features/reader/progress/position';
-import { getAccountStore } from '@/features/data/account-store';
+import type { ReaderPosition } from '@/domain/reading-position';
+import { getAccountStore } from '@/app/account-runtime';
 import type { QueryCache } from '@/features/data/query-cache';
 
 function useAccountStore() {

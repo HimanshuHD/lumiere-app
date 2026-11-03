@@ -8,7 +8,7 @@ import { DocumentCover } from '@/components/DocumentCover';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import { removeCatalogDocumentFromCollection } from '@/services/catalogCollection';
-import { supabaseCatalogCollectionStore } from '@/services/supabaseCatalogCollection';
+import { supabaseCatalogCollectionStore } from '@/app/document-operations';
 import { DocumentAccessNotice } from '@/components/DocumentAccessNotice';
 import { isDocumentLockedForUser } from '@/lib/documentAccess';
 

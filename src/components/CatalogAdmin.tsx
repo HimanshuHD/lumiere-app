@@ -12,7 +12,7 @@ import {
   type CatalogCleanupResult,
   type CatalogDocumentDeletionImpact,
 } from '@/services/catalogMaintenance';
-import { supabaseCatalogMaintenanceStore } from '@/services/supabaseCatalogMaintenance';
+import { supabaseCatalogMaintenanceStore } from '@/app/document-operations';
 
 interface CatalogAdminProps {
   onBack: () => void;
