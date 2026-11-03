@@ -3,8 +3,8 @@ import { ChevronLeft, ChevronRight, Loader2, ZoomIn, ZoomOut } from 'lucide-reac
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 import { parsePosition, fraction } from '@/domain/reading-position';
 import type { ReaderPosition } from '@/domain/reading-position';
-import { PdfSession } from '@/features/reader/pdf/pdf-session';
-import { PdfRenderQueue } from '@/features/reader/pdf/pdf-render-queue';
+import { PdfSession } from '@/features/reader/pdf';
+import { PdfRenderQueue } from '@/features/reader/pdf';
 
 interface PdfViewerProps {
   url: string;

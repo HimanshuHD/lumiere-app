@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import type { Document } from '@/domain/documents';
 import { useAuth } from '@/context/AuthContext';
-import { useToast } from '@/context/ToastContext';
+import { useToast } from '@/shared/ui';
 import {
   DocumentLifecycleError,
   recoverPendingUserUploadFiles,

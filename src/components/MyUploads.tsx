@@ -4,9 +4,9 @@ import { AlertTriangle, FileEdit, Trash2, X, Loader2, BookOpen, Download, Pencil
 import type {  DocumentSummary as Document  } from '@/domain/document-summary';
 import { useDocuments } from '@/hooks/useData';
 import { cachedAccountStore } from '@/app/account-runtime';
-import { QueryNotice } from '@/components/QueryNotice';
+import { QueryNotice } from '@/shared/ui';
 import { useAuth } from '@/context/AuthContext';
-import { useToast } from '@/context/ToastContext';
+import { useToast } from '@/shared/ui';
 import { DocumentCover } from '@/components/DocumentCover';
 import { DocumentFileLink } from '@/components/DocumentFileLink';
 import { supabaseDocumentLifecycleDependencies } from '@/app/document-operations';

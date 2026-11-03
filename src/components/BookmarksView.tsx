@@ -1,5 +1,5 @@
 import { readingProgressPercent } from '@/lib/readingProgressPercent';
-import { QueryNotice } from '@/components/QueryNotice';
+import { QueryNotice } from '@/shared/ui';
 import { DemoBadge } from '@/components/DemoBadge';
 import { BookOpen, BookMarked } from 'lucide-react';
 import type {  DocumentSummary as Document  } from '@/domain/document-summary';

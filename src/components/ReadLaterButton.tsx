@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import { useReadingList } from '@/hooks/useData';
-import { useToast } from '@/context/ToastContext';
+import { useToast } from '@/shared/ui';
 import type {  DocumentSummary as Document  } from '@/domain/document-summary';
 
 interface ReadLaterButtonProps {

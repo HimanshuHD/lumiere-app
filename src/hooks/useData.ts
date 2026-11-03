@@ -1,10 +1,10 @@
 import { useEffect, useState, useCallback, useSyncExternalStore } from 'react';
 import type { ReadingProgress } from '@/domain/documents';
 import { useAuth } from '@/context/AuthContext';
-import { getProgressStore } from '@/features/reader/progress/progress-store';
+import { getProgressStore } from '@/features/reader/progress';
 import type { ReaderPosition } from '@/domain/reading-position';
 import { getAccountStore } from '@/app/account-runtime';
-import type { QueryCache } from '@/features/data/query-cache';
+import type { QueryCache } from '@/features/data';
 
 function useAccountStore() {
   const { user } = useAuth();

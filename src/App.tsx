@@ -1,12 +1,12 @@
 import { useState, useCallback, useEffect } from 'react';
 import { BookOpen, BookMarked, Library as LibraryIcon, Loader2, ListTodo } from 'lucide-react';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
-import { ToastProvider } from '@/context/ToastContext';
+import { ToastProvider, useToast } from '@/shared/ui';
 import { AuthScreen } from '@/components/AuthScreen';
 import { Library } from '@/components/Library';
 import { BookmarksView } from '@/components/BookmarksView';
 import { ReaderLoader } from '@/components/ReaderLoader';
-import { QueryNotice } from '@/components/QueryNotice';
+import { QueryNotice } from '@/shared/ui';
 import type {  DocumentSummary  } from '@/domain/document-summary';
 import {  summarizeDocument  } from '@/domain/document-summary';
 import { UploadPanel } from '@/components/UploadPanel';
@@ -30,6 +30,8 @@ function getViewFromLocation(): View {
 
 function AppContent() {
   const { user, loading, signOut } = useAuth();
+  const { showToast } = useToast();
+  const handleSignOut = async () => { try { await signOut(); } catch (error) { showToast(error instanceof Error ? error.message : 'Could not sign out.', 'error'); } };
   const { documents, loading: docsLoading, error: docsError, refetch } = useDocuments();
   const [view, setView] = useState<View>(getViewFromLocation);
   const [activeDoc, setActiveDoc] = useState<DocumentSummary | null>(null);
@@ -121,7 +123,7 @@ function AppContent() {
               onProfile={() => navigateToView('profile')}
               onMyUploads={() => navigateToView('my-uploads')}
               onAdminCatalog={() => navigateToView('admin-catalog')}
-              onSignOut={signOut}
+              onSignOut={handleSignOut}
             />
           </div>
         </div>
