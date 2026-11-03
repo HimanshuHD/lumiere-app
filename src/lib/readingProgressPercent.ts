@@ -1,6 +1,6 @@
-import type { ReadingProgress } from './supabase';
-import type { DocumentSummary } from '../features/data/document-summary';
-import { fraction, parsePosition } from '../features/reader/progress/position.ts';
+import type { ReadingProgress } from '../domain/documents.ts';
+import type {  DocumentSummary  } from '../domain/document-summary.ts';
+import { fraction, parsePosition } from '../domain/reading-position.ts';
 export function readingProgressPercent(document: DocumentSummary, progress?: ReadingProgress): number {
   if (!progress) return 0;
   const position = parsePosition(progress.position);

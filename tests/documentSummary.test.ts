@@ -1,8 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { DOCUMENT_SUMMARY_FIELDS, summarizeDocument } from '../src/features/data/document-summary.ts';
+import { DOCUMENT_SUMMARY_FIELDS } from '../src/infrastructure/supabase/document-fields.ts';
+import { summarizeDocument } from '../src/domain/document-summary.ts';
 import { readingProgressPercent } from '../src/lib/readingProgressPercent.ts';
-import type { Document, ReadingProgress } from '../src/lib/supabase.ts';
+import type { Document, ReadingProgress } from '../src/domain/documents.ts';
 test('summary projection and conversion exclude chapter bodies',()=>{
  assert.equal(DOCUMENT_SUMMARY_FIELDS.split(',').includes('chapters'),false);
  const summary=summarizeDocument({id:'doc',chapters:[{title:'Chapter',content:'Private text'}]} as Document);

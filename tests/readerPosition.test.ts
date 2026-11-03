@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parsePosition, textPosition, legacyPosition } from '../src/features/reader/progress/position.ts';
+import { parsePosition, textPosition, legacyPosition } from '../src/domain/reading-position.ts';
 test('validates positions and bounds corrupt text positions', () => {
   assert.deepEqual(textPosition({version:1,format:'txt',chapterIndex:99,chapterProgress:Infinity}, 2), {version:1,format:'txt',chapterIndex:1,chapterProgress:0});
   assert.equal(textPosition(null, 0).chapterIndex, 0);

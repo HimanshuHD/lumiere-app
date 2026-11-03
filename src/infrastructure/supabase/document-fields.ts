@@ -1,0 +1,1 @@
+export const DOCUMENT_SUMMARY_FIELDS = 'id,title,author,category,cover_url,reading_time,summary,is_featured,created_at,origin,visibility,uploaded_by,page_count,file_url,file_storage_path,cover_storage_path,file_format,file_name,source_url,source_identity,chapter_count';

@@ -1,4 +1,4 @@
-import type { Document } from './supabase';
+import type { Document } from '../domain/documents.ts';
 type LibraryMetadata = Pick<Document, 'id' | 'origin' | 'visibility'>;
 
 /** Input is already constrained by database RLS, including redacted locked references. */

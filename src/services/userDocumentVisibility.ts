@@ -1,5 +1,5 @@
-import type { Document } from '@/lib/supabase';
-import type { DocumentSummary } from '@/features/data/document-summary';
+import type { Document } from '@/domain/documents';
+import type {  DocumentSummary  } from '@/domain/document-summary';
 
 export type UserDocumentUpdate = Pick<Document, 'title' | 'author' | 'category' | 'summary' | 'visibility'>;
 

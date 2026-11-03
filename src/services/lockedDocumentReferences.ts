@@ -1,4 +1,4 @@
-import type { Document } from '@/lib/supabase';
+import type { Document } from '@/domain/documents';
 
 // A denied embedded documents join is null. Hydrate it only with the server's
 // redacted reference, and never replace a document the caller can already read.
