@@ -7,4 +7,5 @@ stores CFI plus approximate completion. A coordinator owns restoration, debounce
 local pending entries and revision conflicts. Engines emit typed positions and do not persist them.
 Network writes never determine whether local pending state survives termination. Account-bound replay
 and explicit conflict retry remain intact. Higher page/percentage is not a newer action: intentional
-backwards reading is valid. Reader controller extraction and runtime injection remain tracked in #15.
+backwards reading is valid. PDF, EPUB and TXT controllers emit typed position events to the session controller.
+The app runtime injects repository and pending-storage ports and disposes account stores on session changes.
