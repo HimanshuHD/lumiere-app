@@ -1,0 +1,62 @@
+[
+  {
+    "from": "src/components/Profile.tsx",
+    "to": "src/infrastructure/supabase/profile-repository.ts",
+    "issue": 15,
+    "removeWhen": "Move profile form orchestration behind a profile controller."
+  },
+  {
+    "from": "src/components/Profile.tsx",
+    "to": "src/infrastructure/supabase/auth-integration.ts",
+    "issue": 15,
+    "removeWhen": "Route password changes through the auth feature controller."
+  },
+  {
+    "from": "src/context/AuthContext.tsx",
+    "to": "src/infrastructure/supabase/auth-integration.ts",
+    "issue": 15,
+    "removeWhen": "Inject auth integration at composition while retaining session readiness guards."
+  },
+  {
+    "from": "src/context/AuthContext.tsx",
+    "to": "src/infrastructure/supabase/profile-repository.ts",
+    "issue": 15,
+    "removeWhen": "Separate profile state from session context."
+  },
+  {
+    "from": "src/components/OnlineLibraryModal.tsx",
+    "to": "src/infrastructure/supabase/catalog-feed.ts",
+    "issue": 15,
+    "removeWhen": "Extract catalog browsing controller and inject transport."
+  },
+  {
+    "from": "src/hooks/useDocumentStorageUrl.ts",
+    "to": "src/infrastructure/supabase/document-storage.ts",
+    "issue": 15,
+    "removeWhen": "Inject storage service through the document feature entry point."
+  },
+  {
+    "from": "src/features/reader/progress/progress-store.ts",
+    "to": "src/infrastructure/supabase/progress-repository.ts",
+    "issue": 15,
+    "removeWhen": "Move progress runtime construction to the app composition root."
+  },
+  {
+    "from": "src/features/reader/progress/progress-store.ts",
+    "to": "src/infrastructure/browser/pending-progress.ts",
+    "issue": 15,
+    "removeWhen": "Inject the durable pending storage port at runtime construction."
+  },
+  {
+    "from": "src/features/reader/progress/progress-store.ts",
+    "to": "src/infrastructure/supabase/auth-integration.ts",
+    "issue": 15,
+    "removeWhen": "Consolidate session subscriptions at runtime composition."
+  },
+  {
+    "from": "src/features/reader/preferences/index.ts",
+    "to": "src/infrastructure/browser/reader-preferences.ts",
+    "issue": 15,
+    "removeWhen": "Inject preference storage through the reader controller composition."
+  }
+]
