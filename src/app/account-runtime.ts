@@ -1,7 +1,7 @@
-import { AccountDataStore } from '@/features/data/account-store';
+import { AccountDataStore } from '@/features/data';
 import { createUserDataRepository } from '@/infrastructure/supabase/user-data-repository';
-import { supabase } from '@/infrastructure/supabase/client';
-import { getProgressStore, discardProgressStore } from '@/features/reader/progress/progress-store';
+import { authIntegration } from '@/infrastructure/supabase/auth-integration';
+import { getProgressStore, discardProgressStore } from '@/features/reader/progress';
 
 const stores = new Map<string, AccountDataStore>();
 export function getAccountStore(userId: string) {
@@ -10,7 +10,7 @@ export function getAccountStore(userId: string) {
 export function cachedAccountStore(userId: string) { return stores.get(userId); }
 export function activeAccountStore() { return activeUser ? stores.get(activeUser) : undefined; }
 let activeUser: string | undefined;
-supabase.auth.onAuthStateChange((_event, session) => {
+authIntegration.subscribe(session => {
   const next = session?.user.id;
   if (activeUser && activeUser !== next) {
     stores.get(activeUser)?.dispose(); stores.delete(activeUser); discardProgressStore(activeUser);

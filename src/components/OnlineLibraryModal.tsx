@@ -1,9 +1,11 @@
 import { useState, useCallback, useRef, type FormEvent } from 'react';
 import { X, Globe, ExternalLink, BookOpen, Search, ArrowLeft, Loader2, Download, AlertCircle, BookMarked, BookPlus } from 'lucide-react';
-import { supabase } from '@/infrastructure/supabase/client';
+import { fetchCatalogFeed } from '@/infrastructure/supabase/catalog-feed';
+import { publicConfig } from '@/shared/config';
+import type { OpdsBook } from '@/domain/catalog';
 import type { Document } from '@/domain/documents';
 import { useAuth } from '@/context/AuthContext';
-import { useToast } from '@/context/ToastContext';
+import { useToast } from '@/shared/ui';
 import { requestTurnstileToken } from '@/lib/turnstile';
 import { supabaseCatalogCollectionStore } from '@/app/document-operations';
 import { importCatalogDocumentToCollection } from '@/services/catalogImport';
@@ -22,27 +24,6 @@ interface OpdsCatalog {
   description: string;
   count: string;
   accent: string;
-}
-
-interface OpdsBook {
-  title: string;
-  author: string;
-  summary: string;
-  id: string;
-  updated: string;
-  coverUrl: string;
-  downloadUrl: string;
-  downloadType: string;
-  catalogUrl: string;
-  categories: string[];
-  rights: string;
-}
-
-interface OpdsFeedResult {
-  title: string;
-  subtitle: string;
-  count: number;
-  books: OpdsBook[];
 }
 
 function getReadableFormat(book: OpdsBook): 'epub' | 'pdf' | null {
@@ -129,36 +110,13 @@ export function OnlineLibraryModal({ open, onClose, onBookAdded }: OnlineLibrary
     setLoading(true);
     setCheckingSecurity(false);
     try {
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      const endpoint = new URL('/functions/v1/opds-fetch', supabaseUrl);
-      endpoint.searchParams.set('url', catalog.url);
-      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-      if (sessionError) throw new Error('Could not verify the sign-in session.');
-      const headers: Record<string, string> = {
-        apikey: anonKey,
-        'Content-Type': 'application/json',
-      };
-      if (sessionData.session) {
-        headers.Authorization = `Bearer ${sessionData.session.access_token}`;
-      } else {
+      const data = await fetchCatalogFeed(catalog.url, async () => {
         const container = turnstileContainerRef.current;
         if (!container) throw new Error('The security check is unavailable. Please try again.');
         setCheckingSecurity(true);
-        headers['X-Turnstile-Token'] = await requestTurnstileToken(
-          container,
-          import.meta.env.VITE_TURNSTILE_SITE_KEY,
-        );
-        setCheckingSecurity(false);
-      }
-      const res = await fetch(endpoint, {
-        headers,
+        try { return await requestTurnstileToken(container, publicConfig.turnstileSiteKey); }
+        finally { setCheckingSecurity(false); }
       });
-      if (!res.ok) {
-        const errBody = await res.json().catch(() => ({}));
-        throw new Error(errBody.error || errBody.message || `Failed to load catalog (${res.status})`);
-      }
-      const data: OpdsFeedResult = await res.json();
       setFeedTitle(data.title || catalog.name);
       setBooks(data.books);
     } catch (err) {

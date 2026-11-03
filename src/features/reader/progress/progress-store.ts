@@ -1,19 +1,8 @@
-import { supabase } from '@/infrastructure/supabase/client';
+import { progressRepository } from '@/infrastructure/supabase/progress-repository';
+import { browserStorage } from '@/infrastructure/browser/pending-progress';
+import { authIntegration } from '@/infrastructure/supabase/auth-integration';
 import { SaveCoordinator } from './save-coordinator';
-import type { PendingSave, PendingStorage, ProgressRow, SaveResult } from './save-coordinator';
-
-function browserStorage(userId: string): PendingStorage {
-  const prefix = `lumiere:reading-position:v1:${userId}:`;
-  return {
-    read: id => JSON.parse(localStorage.getItem(prefix + id) || 'null'),
-    write: (id, pending) => localStorage.setItem(prefix + id, JSON.stringify(pending)),
-    remove: (id, mutationId) => {
-      const saved = JSON.parse(localStorage.getItem(prefix + id) || 'null');
-      if (saved?.mutationId === mutationId) localStorage.removeItem(prefix + id);
-    },
-    documentIds: () => Object.keys(localStorage).filter(key => key.startsWith(prefix)).map(key => key.slice(prefix.length)),
-  };
-}
+import type { ProgressRow } from './save-coordinator';
 
 export class ProgressStore {
   readonly coordinator: SaveCoordinator;
@@ -26,16 +15,7 @@ export class ProgressStore {
   private listeners = new Set<() => void>();
   constructor(userId: string) {
     this.userId = userId;
-    this.coordinator = new SaveCoordinator(browserStorage(userId), async (documentId: string, pending: PendingSave) => {
-      const { data, error } = await supabase.rpc('save_reading_position', {
-        p_user_id: userId,
-        p_document_id: documentId, p_position: pending.position,
-        p_chapter_index: pending.chapterIndex, p_scroll_percent: pending.progress,
-        p_expected_revision: pending.expectedRevision, p_mutation_id: pending.mutationId,
-      });
-      if (error) throw error;
-      return data as SaveResult;
-    });
+    this.coordinator = new SaveCoordinator(browserStorage(userId), (id, pending) => progressRepository.save(userId, id, pending));
     this.coordinator.subscribe(() => this.notify());
   }
   subscribe = (listener: () => void) => { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; };
@@ -48,8 +28,7 @@ export class ProgressStore {
     this.loading = true; this.error = null; this.notify();
     this.request = (async () => {
       try {
-        const { data, error } = await supabase.from('reading_progress').select('*').eq('user_id', this.userId);
-        if (error) throw error;
+        const data = await progressRepository.list(this.userId);
         if (this.disposed) return;
         this.coordinator.reconcile((data || []) as ProgressRow[]);
         this.loaded = true;
@@ -72,7 +51,7 @@ export function getProgressStore(userId: string) {
 }
 // Flush only the active account. The RPC also verifies the expected user ID.
 let activeUserId: string | undefined;
-supabase.auth.onAuthStateChange((_event, session) => {
+authIntegration.subscribe(session => {
   if (activeUserId && activeUserId !== session?.user.id) discardProgressStore(activeUserId);
   activeUserId = session?.user.id;
 });

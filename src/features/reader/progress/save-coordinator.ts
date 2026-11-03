@@ -1,28 +1,12 @@
-import { parsePosition, fraction } from './position.ts';
-import type { ReaderPosition } from './position.ts';
+import { parsePosition, fraction } from '../../../domain/reading-position.ts';
+import type { ReaderPosition } from '../../../domain/reading-position.ts';
 
-export interface ProgressRow {
-  id: string; user_id: string; document_id: string; chapter_index: number;
-  scroll_percent: number; epub_cfi?: string | null; position?: unknown;
-  revision?: number; mutation_id?: string | null; updated_at: string;
-}
-export interface PendingSave {
-  position: ReaderPosition; chapterIndex: number; progress: number;
-  expectedRevision: number; mutationId: string;
-}
-export type SaveStatus = 'saved' | 'pending' | 'saving' | 'error' | 'conflict';
+import type { ProgressRow, PendingSave, PendingStorage, SaveResult, SaveStatus } from '../../../domain/progress.ts';
+export type { ProgressRow, PendingSave, PendingStorage, SaveResult } from '../../../domain/progress.ts';
 interface Entry {
   row?: ProgressRow; pending?: PendingSave; revision: number; status: SaveStatus;
   storageError: boolean; error?: string; timer?: ReturnType<typeof setTimeout>; running?: Promise<void>;
 }
-export interface PendingStorage {
-  read(documentId: string): unknown;
-  write(documentId: string, pending: PendingSave): void;
-  remove(documentId: string, mutationId: string): void;
-  documentIds(): string[];
-}
-export interface SaveResult { accepted: boolean; row: ProgressRow | null }
-
 export function parsePending(value: unknown): PendingSave | undefined {
   if (!value || typeof value !== 'object') return;
   const p = value as PendingSave;

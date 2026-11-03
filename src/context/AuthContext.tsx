@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, useCallback, useRef, ReactNode } from 'react';
-import { Session, User } from '@supabase/supabase-js';
-import { supabase } from '@/infrastructure/supabase/client';
+import type { AuthSession as Session, AuthUser as User } from '@/domain/auth';
+import { authIntegration } from '@/infrastructure/supabase/auth-integration';
+import { profileRepository } from '@/infrastructure/supabase/profile-repository';
 
 export interface ProfileData {
   fullName: string;
@@ -30,11 +31,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refreshProfile = useCallback(async () => {
     if (!user) return;
-    const { data } = await supabase
-      .from('profiles')
-      .select('full_name, avatar_url')
-      .eq('id', user.id)
-      .maybeSingle();
+    const data = await profileRepository.get(user.id).catch(() => null);
     if (accountRef.current !== user.id) return;
     const googleName = [user.user_metadata.full_name, user.user_metadata.name]
       .find((value): value is string => typeof value === 'string' && value.trim().length > 0)
@@ -55,47 +52,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       accountRef.current = id;
       setSession(next); setUser(next?.user ?? null); setLoading(false);
     };
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, next) => {
+    const unsubscribe = authIntegration.subscribe(next => {
       eventObserved = true; apply(next);
     });
-    void supabase.auth.getSession().then(({ data }) => { if (!eventObserved) apply(data.session); });
-    return () => { active = false; listener.subscription.unsubscribe(); };
+    void authIntegration.getSession().then(next => { if (!eventObserved) apply(next); }).catch(() => apply(null));
+    return () => { active = false; unsubscribe(); };
   }, []);
 
   useEffect(() => {
     if (user) {
-      refreshProfile();
+      void refreshProfile().catch(() => {});
     } else {
       setProfile({ fullName: '', avatarUrl: null });
     }
   }, [user, refreshProfile]);
 
-  const signUp = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signUp({ email, password });
-    if (error) return { error: error.message };
-    return { error: null };
-  };
-
-  const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) return { error: error.message };
-    return { error: null };
-  };
-
-  const signInWithGoogle = async () => {
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: window.location.origin,
-      },
-    });
-    if (error) return { error: error.message };
-    return { error: null };
-  };
-
-  const signOut = async () => {
-    await supabase.auth.signOut();
-  };
+  const signUp = authIntegration.signUp;
+  const signIn = authIntegration.signIn;
+  const signInWithGoogle = authIntegration.signInWithGoogle;
+  const signOut = authIntegration.signOut;
 
   return (
     <AuthContext.Provider value={{ user, session, loading, profile, refreshProfile, signUp, signIn, signInWithGoogle, signOut }}>

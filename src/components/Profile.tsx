@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { User, Camera, Loader2, Save, Lock, Mail, CheckCircle2, Eye, EyeOff } from 'lucide-react';
-import { supabase } from '@/infrastructure/supabase/client';
+import { profileRepository } from '@/infrastructure/supabase/profile-repository';
+import { authIntegration } from '@/infrastructure/supabase/auth-integration';
 import { useAuth } from '@/context/AuthContext';
-import { useToast } from '@/context/ToastContext';
+import { useToast } from '@/shared/ui';
 
 export function Profile() {
   const { user, profile, refreshProfile } = useAuth();
@@ -38,10 +39,7 @@ export function Profile() {
     if (!user) return;
     setSavingName(true);
     try {
-      const { error } = await supabase
-        .from('profiles')
-        .upsert({ id: user.id, full_name: fullName.trim() }, { onConflict: 'id' });
-      if (error) throw new Error(error.message);
+      await profileRepository.saveName(user.id, fullName);
       await refreshProfile();
       showToast('Profile name updated successfully.');
     } catch (err) {
@@ -55,22 +53,8 @@ export function Profile() {
     if (!user || !avatarFile) return;
     setUploadingAvatar(true);
     try {
-      const ext = avatarFile.name.split('.').pop()?.toLowerCase() || 'jpg';
-      const path = `${user.id}/avatar.${ext}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('avatars')
-        .upload(path, avatarFile, { upsert: true });
-      if (uploadError) throw new Error(uploadError.message);
-
-      const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(path);
-
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .upsert({ id: user.id, avatar_url: urlData.publicUrl }, { onConflict: 'id' });
-      if (updateError) throw new Error(updateError.message);
-
-      setAvatarUrl(urlData.publicUrl);
+      const publicUrl = await profileRepository.saveAvatar(user.id, avatarFile);
+      setAvatarUrl(publicUrl);
       setAvatarFile(null);
       setAvatarPreview(null);
       await refreshProfile();
@@ -94,10 +78,7 @@ export function Profile() {
     }
     setChangingPassword(true);
     try {
-      const { error: updateError } = await supabase.auth.updateUser({
-        password: newPassword,
-      });
-      if (updateError) throw new Error(updateError.message);
+      await authIntegration.changePassword(newPassword);
       setNewPassword('');
       setConfirmPassword('');
       showToast('Password changed successfully.');
