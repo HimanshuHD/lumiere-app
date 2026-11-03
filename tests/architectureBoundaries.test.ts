@@ -12,3 +12,7 @@ test('rejects infrastructure-to-feature dependencies, shared UI dependencies and
 test('accepts pure domain contracts and public feature imports',()=>{
  const f=fixture({'src/domain/doc.ts':'export interface Doc {id:string}', 'src/features/data/index.ts':"export type {Doc} from '@/domain/doc';",'src/components/View.ts':"import type {Doc} from '@/features/data';"});try{assert.deepEqual(checkBoundaries(f.root),[]);}finally{f.close();}
 });
+test('reader engines cannot coordinate progress repositories through the application layer',()=>{
+ const f=fixture({'src/features/reader/epub/engine.ts':"import '@/app/progress-runtime';",'src/app/progress-runtime.ts':'export const store=1;'});
+ try{assert.ok(checkBoundaries(f.root).some(error=>error.includes('reader engines report events')));}finally{f.close();}
+});

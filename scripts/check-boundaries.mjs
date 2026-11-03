@@ -31,6 +31,7 @@ export function checkBoundaries(root) {
         const match=exceptions.find(e=>e.from===from&&e.to===target&&e.issue&&e.removeWhen);
         if(match)usedExceptions.add(match);else report('feature/UI persistence integration requires a controller port or tracked migration exception');
       }
+      if(/^src\/features\/reader\/(pdf|epub|text)\//.test(from)&&target&&(/^src\/(app|infrastructure)\//.test(target)||target==='src/hooks/useData.ts'||target.startsWith('src/features/reader/progress/')))report('reader engines report events and cannot own persistence');
       if(target?.startsWith('supabase/'))report('backend-only modules cannot enter the browser graph');
       const feature=target&&featureRoot(target),own=featureRoot(from);
       if(feature&&feature!==own&&!target.endsWith('/index.ts'))report('use the feature public entry point');
