@@ -5,7 +5,7 @@ import type {  DocumentSummary as Document  } from '@/domain/document-summary';
 import { ReadLaterButton } from '@/components/ReadLaterButton';
 import { useReadingProgress } from '@/hooks/useData';
 import { DocumentCover } from '@/components/DocumentCover';
-import { useAuth } from '@/context/AuthContext';
+import { useAuth } from '@/features/auth';
 import { useToast } from '@/shared/ui';
 import { removeCatalogDocumentFromCollection } from '@/services/catalogCollection';
 import { supabaseCatalogCollectionStore } from '@/app/document-operations';

@@ -1,9 +1,10 @@
+import { attempt, requireValue } from '@/domain/errors';
 import { useState, useCallback, useRef, useEffect, type FormEvent } from 'react';
 import { useIntegrations } from '@/shared/integrations';
 import { publicConfig } from '@/shared/config';
 import type { OpdsBook } from '@/domain/catalog';
 import type { Document } from '@/domain/documents';
-import { useAuth } from '@/context/AuthContext';
+import { useAuth } from '@/features/auth';
 import { useToast } from '@/shared/ui';
 import { requestTurnstileToken } from '@/lib/turnstile';
 import { supabaseCatalogCollectionStore } from '@/app/document-operations';
@@ -69,14 +70,14 @@ export function useCatalogController(open: boolean, onClose: () => void, onBookA
     setLoading(true);
     setCheckingSecurity(false);
     try {
-      const data = await fetchCatalogFeed(catalog.url, async () => {
+      const data = requireValue(await attempt(() => fetchCatalogFeed(catalog.url, async () => {
         if (controller.signal.aborted) throw new DOMException("Cancelled", "AbortError");
         const container = turnstileContainerRef.current;
         if (!container) throw new Error('The security check is unavailable. Please try again.');
         setCheckingSecurity(true);
         try { return await requestTurnstileToken(container, publicConfig.turnstileSiteKey); }
         finally { if (!controller.signal.aborted) setCheckingSecurity(false); }
-      }, controller.signal);
+      }, controller.signal)));
       if (controller.signal.aborted) return;
       setFeedTitle(data.title || catalog.name);
       setBooks(data.books);
@@ -118,7 +119,7 @@ export function useCatalogController(open: boolean, onClose: () => void, onBookA
     const bookId = book.id;
     setAddingBookId(bookId);
     try {
-      const collectionDocument = await importCatalogDocumentToCollection(
+      const collectionDocument = requireValue(await attempt(() => importCatalogDocumentToCollection(
         supabaseCatalogImportStore,
         supabaseCatalogCollectionStore,
         user.id,
@@ -128,7 +129,7 @@ export function useCatalogController(open: boolean, onClose: () => void, onBookA
           downloadUrl: book.downloadUrl,
           format,
         },
-      );
+      )));
       if (!active.current) return;
       showToast('Book added to your collection. Opening it now.');
       onBookAdded(collectionDocument);

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { Document } from '@/domain/documents';
 import { useDocumentStorageUrl } from '@/hooks/useDocumentStorageUrl';
-import { useAuth } from '@/context/AuthContext';
+import { useAuth } from '@/features/auth';
 import { isDocumentLockedForUser } from '@/lib/documentAccess';
 
 const FALLBACK_COVER_URL = '/lumiere-book-cover.svg?v=2';

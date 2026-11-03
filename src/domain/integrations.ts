@@ -1,14 +1,15 @@
+import type { ServiceResult } from './errors.ts';
 import type { AuthSession } from './auth.ts';
 import type { OpdsFeedResult } from './catalog.ts';
 import type { ReaderSettings } from './reader-preferences.ts';
 export interface AuthPort {
   getSession(): Promise<AuthSession | null>;
   subscribe(listener: (session: AuthSession | null) => void): () => void;
-  signUp(email: string, password: string): Promise<{ error: string | null }>;
-  signIn(email: string, password: string): Promise<{ error: string | null }>;
-  signInWithGoogle(): Promise<{ error: string | null }>;
-  signOut(): Promise<void>;
-  changePassword(password: string): Promise<void>;
+  signUp(email: string, password: string): Promise<ServiceResult<void>>;
+  signIn(email: string, password: string): Promise<ServiceResult<void>>;
+  signInWithGoogle(): Promise<ServiceResult<void>>;
+  signOut(): Promise<ServiceResult<void>>;
+  changePassword(password: string): Promise<ServiceResult<void>>;
 }
 export interface ProfilePort {
   get(id: string): Promise<{ full_name: string | null; avatar_url: string | null } | null>;

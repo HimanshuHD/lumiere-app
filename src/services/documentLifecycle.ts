@@ -1,3 +1,4 @@
+import { ServiceError, toServiceError } from '../domain/errors.ts';
 import type { Document } from '@/domain/documents';
 import {
   getCoverContentType,
@@ -89,7 +90,7 @@ export interface UserUploadRecoveryResult {
   pending: number;
 }
 
-export class DocumentLifecycleError extends Error {
+export class DocumentLifecycleError extends ServiceError {
   readonly operationId: string;
   readonly stage: UserUploadStage;
   readonly recoveryPaths: string[];
@@ -104,7 +105,7 @@ export class DocumentLifecycleError extends Error {
     cleanupPendingPaths: string[] = [],
     originalError?: unknown,
   ) {
-    super(message);
+    super(originalError ? toServiceError(originalError).category : 'unexpected', message, originalError);
     this.name = 'DocumentLifecycleError';
     this.operationId = operationId;
     this.stage = stage;

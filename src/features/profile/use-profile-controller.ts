@@ -1,3 +1,5 @@
+import { requireValue } from '@/domain/errors';
+import { createProfileCommands } from './commands';
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/features/auth';
 import { useToast } from '@/shared/ui';
@@ -5,6 +7,7 @@ import { useIntegrations } from '@/shared/integrations';
 
 export function useProfileController() {
   const { profile: profileRepository, auth: authIntegration } = useIntegrations();
+  const commands = createProfileCommands(profileRepository, authIntegration);
   const { user, profile, refreshProfile } = useAuth();
   const active = useRef(true);
   useEffect(() => { active.current = true; return () => { active.current = false; }; }, []);
@@ -40,7 +43,7 @@ export function useProfileController() {
     if (!user) return;
     setSavingName(true);
     try {
-      await profileRepository.saveName(user.id, fullName);
+      requireValue(await commands.saveName(user.id, fullName));
       await refreshProfile();
       if (!active.current) return;
       showToast('Profile name updated successfully.');
@@ -55,7 +58,7 @@ export function useProfileController() {
     if (!user || !avatarFile) return;
     setUploadingAvatar(true);
     try {
-      const publicUrl = await profileRepository.saveAvatar(user.id, avatarFile);
+      const publicUrl = requireValue(await commands.saveAvatar(user.id, avatarFile));
       if (!active.current) return;
       setAvatarUrl(publicUrl);
       setAvatarFile(null);
@@ -82,7 +85,7 @@ export function useProfileController() {
     }
     setChangingPassword(true);
     try {
-      await authIntegration.changePassword(newPassword);
+      requireValue(await commands.changePassword(newPassword));
       if (!active.current) return;
       setNewPassword('');
       setConfirmPassword('');

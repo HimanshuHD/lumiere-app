@@ -1,4 +1,4 @@
-import { toServiceError } from '@/domain/errors';
+import { toServiceError, attempt } from '@/domain/errors';
 import { supabase } from './client';
 import type { AuthSession } from '@/domain/auth';
 const mapSession = (session: {user: AuthSession['user']} | null): AuthSession | null => session ? {user:session.user} : null;
@@ -10,9 +10,9 @@ export const authIntegration = {
     const {data}=supabase.auth.onAuthStateChange((_event,session)=>listener(mapSession(session)));
     return ()=>data.subscription.unsubscribe();
   },
-  async signUp(email:string,password:string) {const {error}=await supabase.auth.signUp({email,password});return {error:error?.message??null};},
-  async signIn(email:string,password:string) {const {error}=await supabase.auth.signInWithPassword({email,password});return {error:error?.message??null};},
-  async signInWithGoogle() {const {error}=await supabase.auth.signInWithOAuth({provider:'google',options:{redirectTo:window.location.origin}});return {error:error?.message??null};},
-  async signOut() {const {error}=await supabase.auth.signOut();if(error)throw toServiceError(error);},
-  async changePassword(password:string) {const {error}=await supabase.auth.updateUser({password});if(error)throw toServiceError(error);},
+  signUp(email: string, password: string) { return attempt(async () => { const {error} = await supabase.auth.signUp({email,password}); if (error) throw error; }); },
+  signIn(email: string, password: string) { return attempt(async () => { const {error} = await supabase.auth.signInWithPassword({email,password}); if (error) throw error; }); },
+  signInWithGoogle() { return attempt(async () => { const {error} = await supabase.auth.signInWithOAuth({provider:'google',options:{redirectTo:window.location.origin}}); if (error) throw error; }); },
+  signOut() { return attempt(async () => { const {error} = await supabase.auth.signOut(); if (error) throw error; }); },
+  changePassword(password: string) { return attempt(async () => { const {error} = await supabase.auth.updateUser({password}); if (error) throw error; }); },
 };

@@ -52,8 +52,8 @@ function ReadLaterAction({ doc, variant = 'full', className = '' }: ReadLaterBut
       setBusy(true);
       try {
         const result = await toggleReadingList(doc.id);
-        if (!result.ok) { showToast(result.message, 'error'); return; }
-        showToast(result.selected ? `"${doc.title}" added to your Reading List` : `"${doc.title}" removed from your Reading List`, 'success');
+        if (!result.ok) { showToast(result.error.message, 'error'); return; }
+        showToast(result.value.selected ? `"${doc.title}" added to your Reading List` : `"${doc.title}" removed from your Reading List`, 'success');
       } finally { setBusy(false); }
     },
     [pending, toggleReadingList, doc.id, doc.title, showToast]

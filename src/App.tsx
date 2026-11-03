@@ -3,7 +3,8 @@ import { setActiveAccount } from '@/app/account-runtime';
 import { integrations } from '@/app/integrations';
 import { useState, useCallback, useEffect } from 'react';
 import { BookOpen, BookMarked, Library as LibraryIcon, Loader2, ListTodo } from 'lucide-react';
-import { AuthProvider, useAuth } from '@/context/AuthContext';
+import { AuthProvider } from '@/context/AuthContext';
+import { useAuth } from '@/features/auth';
 import { ToastProvider, useToast } from '@/shared/ui';
 import { AuthScreen } from '@/components/AuthScreen';
 import { Library } from '@/components/Library';
@@ -34,7 +35,7 @@ function getViewFromLocation(): View {
 function AppContent() {
   const { user, loading, signOut } = useAuth();
   const { showToast } = useToast();
-  const handleSignOut = async () => { try { await signOut(); } catch (error) { showToast(error instanceof Error ? error.message : 'Could not sign out.', 'error'); } };
+  const handleSignOut = async () => { const result = await signOut(); if (!result.ok) showToast(result.error.message, 'error'); };
   const { documents, loading: docsLoading, error: docsError, refetch } = useDocuments();
   const [view, setView] = useState<View>(getViewFromLocation);
   const [activeDoc, setActiveDoc] = useState<DocumentSummary | null>(null);

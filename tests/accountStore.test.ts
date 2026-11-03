@@ -16,7 +16,7 @@ function fixture() {
 }
 test('account store coordinates a fake repository without SDK or environment initialization',async()=>{
  const f=fixture(),store=new AccountDataStore('user',f.repository);await Promise.all([store.documents.load(),store.documents.load()]);assert.equal(f.stats().listed,1);
- assert.deepEqual(await store.toggle('bookmarks','doc'),{ok:true,selected:true});assert.equal(store.bookmarks.getSnapshot().data.length,1);
+ assert.deepEqual(await store.toggle('bookmarks','doc'),{ok:true,value:{selected:true}});assert.equal(store.bookmarks.getSnapshot().data.length,1);
  f.setFail(true);assert.equal((await store.toggle('bookmarks','doc')).ok,false);assert.equal(store.bookmarks.getSnapshot().data.length,1);
  f.setFail(false);await store.toggle('bookmarks','doc');assert.equal(store.bookmarks.getSnapshot().data.length,0);store.dispose();
 });

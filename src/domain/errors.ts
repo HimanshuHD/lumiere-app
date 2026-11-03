@@ -16,3 +16,14 @@ export function toServiceError(error: unknown): ServiceError {
   if ((record.name === 'TypeError' && /failed to fetch|fetch failed|network/i.test(message)) || (typeof record.status === 'number' && record.status >= 500)) return new ServiceError('network', message, error);
   return new ServiceError('unexpected', message, error);
 }
+
+/** UI-facing commands settle as data, including SDK/network exceptions. */
+export async function attempt<T>(operation: () => Promise<T>): Promise<ServiceResult<T>> {
+  try { return { ok: true, value: await operation() }; }
+  catch (error) { return { ok: false, error: toServiceError(error) }; }
+}
+/** Controllers may lift a result into their existing single error/presentation path. */
+export function requireValue<T>(result: ServiceResult<T>): T {
+  if (!result.ok) throw result.error;
+  return result.value;
+}

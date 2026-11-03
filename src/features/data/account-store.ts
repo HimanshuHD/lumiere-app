@@ -1,11 +1,12 @@
+import { toServiceError, type ServiceResult } from '../../domain/errors.ts';
 import type { UserDataRepository, CollectionName } from '@/domain/collections';
 import type { Document } from '@/domain/documents';
-import { QueryCache, errorMessage } from './query-cache.ts';
+import { QueryCache } from './query-cache.ts';
 import { MutationGate } from './mutation-gate.ts';
 import type { DocumentSummary, BookmarkSummary } from '@/domain/document-summary';
 import { selectLibraryDocuments } from '../../lib/libraryDocuments.ts';
 
-export type ToggleResult = { ok: true; selected: boolean } | { ok: false; message: string };
+export type ToggleResult = ServiceResult<{ selected: boolean }>;
 type Collection = CollectionName;
 export class AccountDataStore {
   readonly documents: QueryCache<DocumentSummary[]>;
@@ -53,7 +54,7 @@ export class AccountDataStore {
           const count = await this.repository.deleteReferences(table, id);
           if (!count) throw new Error('The removal was not confirmed. Refresh and retry.');
           this.assertActive(); query.set(query.getSnapshot().data.filter(r => r.document_id !== id));
-          return { ok: true as const, selected: false };
+          return { ok: true as const, value: { selected: false } };
         }
         // Metadata is available before committing the reference. No ambiguous post-insert fetch.
         let document = this.documents.getSnapshot().data.find(d => d.id === id);
@@ -61,9 +62,9 @@ export class AccountDataStore {
         this.assertActive();
         const data = await this.repository.saveReference(table, id);
         this.assertActive(); query.set([{ ...data, document }, ...query.getSnapshot().data.filter(r => r.document_id !== id)]);
-        return { ok: true as const, selected: true };
+        return { ok: true as const, value: { selected: true } };
       });
-    } catch (error) { return { ok: false, message: errorMessage(error) }; }
+    } catch (error) { return { ok: false, error: toServiceError(error) }; }
   }
   async removeReadingList(id: string) {
     return this.mutations.run(`reading_list:${id}`, async () => {

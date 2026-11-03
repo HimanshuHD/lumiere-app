@@ -9,7 +9,7 @@ import { useBookmarks, useReadingProgress } from '@/hooks/useData';
 import { ReadLaterButton } from '@/components/ReadLaterButton';
 import { DocumentCover } from '@/components/DocumentCover';
 import { DocumentFileLink } from '@/components/DocumentFileLink';
-import { useAuth } from '@/context/AuthContext';
+import { useAuth } from '@/features/auth';
 import { DocumentAccessNotice } from '@/components/DocumentAccessNotice';
 import { isDocumentLockedForUser } from '@/lib/documentAccess';
 

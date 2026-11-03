@@ -86,7 +86,7 @@ export function useReaderController(doc: Document) {
   const handleBookmark = async () => {
     if (locked) return;
     const result = await toggleBookmark(doc.id);
-    if (!result.ok) showToast(result.message, 'error');
+    if (!result.ok) showToast(result.error.message, 'error');
   };
 
   const onPdfPosition = (position: Extract<ReaderPosition, {format: 'pdf'}>, percent: number) => savePosition(doc.id, position, 0, percent);

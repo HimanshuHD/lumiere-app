@@ -1,6 +1,6 @@
 import { useState, FormEvent } from 'react';
 import { BookOpen, Eye, EyeOff, Loader2, Mail, Lock, User as UserIcon } from 'lucide-react';
-import { useAuth } from '@/context/AuthContext';
+import { useAuth } from '@/features/auth';
 
 function GoogleIcon({ className }: { className?: string }) {
   return (
@@ -31,20 +31,20 @@ export function AuthScreen() {
     setLoading(true);
     const fn = mode === 'signin' ? signIn : signUp;
     const { email, password } = formValues[mode];
-    const { error } = await fn(email, password);
+    const result = await fn(email, password);
     setLoading(false);
-    if (error) {
-      setError(error);
+    if (!result.ok) {
+      setError(result.error.message);
     }
   };
 
   const handleGoogleSignIn = async () => {
     setError(null);
     setGoogleLoading(true);
-    const { error } = await signInWithGoogle();
-    if (error) {
+    const result = await signInWithGoogle();
+    if (!result.ok) {
       setGoogleLoading(false);
-      setError(error);
+      setError(result.error.message);
     }
   };
 

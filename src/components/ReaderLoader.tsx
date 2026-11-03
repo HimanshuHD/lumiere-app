@@ -2,7 +2,7 @@ import type {  DocumentSummary  } from '@/domain/document-summary';
 import { useDocumentContent } from '@/hooks/useData';
 import { Reader } from './Reader';
 import { QueryNotice } from '@/shared/ui';
-import { useAuth } from '@/context/AuthContext';
+import { useAuth } from '@/features/auth';
 import { isDocumentLockedForUser } from '@/lib/documentAccess';
 import { DocumentAccessNotice } from './DocumentAccessNotice';
 

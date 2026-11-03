@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { User, FileEdit, LogOut, ChevronDown, Shield } from 'lucide-react';
-import { useAuth } from '@/context/AuthContext';
+import { useAuth } from '@/features/auth';
 import { isCatalogAdmin } from '@/lib/catalogAdminAccess';
 
 interface UserMenuProps {

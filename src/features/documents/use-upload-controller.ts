@@ -1,7 +1,8 @@
+import { attempt, requireValue } from '@/domain/errors';
 import { useState, useRef, useCallback, useEffect } from 'react';
 
 import type { Document } from '@/domain/documents';
-import { useAuth } from '@/context/AuthContext';
+import { useAuth } from '@/features/auth';
 import { useToast } from '@/shared/ui';
 import {
   DocumentLifecycleError,
@@ -177,7 +178,7 @@ export function useUploadController(onUploaded: (doc: Document) => void) {
       }
 
       const readingTime = pageCount === null ? 1 : estimateReadingTime(pageCount);
-      const uploadedDocument = await uploadUserDocument(supabaseDocumentLifecycleDependencies, {
+      const uploadedDocument = requireValue(await attempt(() => uploadUserDocument(supabaseDocumentLifecycleDependencies, {
         operationId,
         userId: user.id,
         documentFile: docFile,
@@ -196,7 +197,7 @@ export function useUploadController(onUploaded: (doc: Document) => void) {
           file_format: docExt || null,
           file_name: docFile.name,
         },
-      });
+      })));
 
       if (!active.current) return;
       setSuccess(true);

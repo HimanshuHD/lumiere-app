@@ -5,7 +5,7 @@ import type {  DocumentSummary as Document  } from '@/domain/document-summary';
 import { useDocuments } from '@/hooks/useData';
 import { cachedAccountStore } from '@/app/account-runtime';
 import { QueryNotice } from '@/shared/ui';
-import { useAuth } from '@/context/AuthContext';
+import { useAuth } from '@/features/auth';
 import { useToast } from '@/shared/ui';
 import { DocumentCover } from '@/components/DocumentCover';
 import { DocumentFileLink } from '@/components/DocumentFileLink';

@@ -1,3 +1,4 @@
+import { ServiceError } from '../domain/errors.ts';
 export const MAX_DOCUMENT_SIZE_BYTES = 50 * 1024 * 1024;
 export const MAX_COVER_SIZE_BYTES = 5 * 1024 * 1024;
 
@@ -17,9 +18,9 @@ const COVER_CONTENT_TYPES: Record<SupportedCoverFormat, string> = {
   gif: 'image/gif',
 };
 
-export class DocumentValidationError extends Error {
+export class DocumentValidationError extends ServiceError {
   constructor(message: string) {
-    super(message);
+    super('validation', message);
     this.name = 'DocumentValidationError';
   }
 }

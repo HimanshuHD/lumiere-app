@@ -5,7 +5,6 @@ import { useIntegrations } from '@/shared/integrations';
 import { useProfileData } from '@/features/profile';
 
 import { AuthContext } from '@/features/auth';
-export { useAuth } from '@/features/auth';
 
 export function AuthProvider({ children, onAccountChange }: { children: ReactNode; onAccountChange: (id: string | undefined) => void }) {
   const { auth: authIntegration, profile: profileRepository } = useIntegrations();
