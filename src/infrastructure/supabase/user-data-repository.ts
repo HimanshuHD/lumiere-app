@@ -1,8 +1,7 @@
+import { mapSummary, mapDocument, mapReference } from './mappers';
 import { supabase } from './client';
 import { DOCUMENT_SUMMARY_FIELDS } from './document-fields';
 import type { UserDataRepository, CollectionName } from '@/domain/collections';
-import type { Document } from '@/domain/documents';
-import type { BookmarkSummary, DocumentSummary } from '@/domain/document-summary';
 import { ServiceError } from '@/domain/errors';
 
 export function createUserDataRepository(userId: string): UserDataRepository {
@@ -13,15 +12,15 @@ export function createUserDataRepository(userId: string): UserDataRepository {
   return {
     async listDocuments(signal) {
       const { data, error } = await supabase.from('documents').select(DOCUMENT_SUMMARY_FIELDS).order('created_at', { ascending: true }).abortSignal(signal);
-      if (error) throw error; return (data ?? []) as unknown as DocumentSummary[];
+      if (error) throw error; return (data ?? []).map(mapSummary);
     },
     async listCatalog(signal) {
       const { data, error } = await supabase.from('documents').select(DOCUMENT_SUMMARY_FIELDS).eq('origin', 'catalog_import').order('title', { ascending: true }).limit(1000).abortSignal(signal);
-      if (error) throw error; return (data ?? []) as unknown as DocumentSummary[];
+      if (error) throw error; return (data ?? []).map(mapSummary);
     },
     async listLocked(signal) {
       const { data, error } = await supabase.rpc('get_locked_document_summaries').abortSignal(signal);
-      if (error) throw error; return (data ?? []) as DocumentSummary[];
+      if (error) throw error; return (data ?? []).map(mapSummary);
     },
     async listMembershipIds(signal) {
       const { data, error } = await supabase.from('document_library_memberships').select('document_id').eq('user_id', userId).abortSignal(signal);
@@ -30,24 +29,21 @@ export function createUserDataRepository(userId: string): UserDataRepository {
     async listReferences(collection, signal) {
       const { data, error } = await supabase.from(collection).select(`id,user_id,document_id,created_at,document:documents(${DOCUMENT_SUMMARY_FIELDS})`)
         .eq('user_id', userId).order('created_at', { ascending: false }).abortSignal(signal);
-      if (error) throw error; return (data ?? []) as unknown as BookmarkSummary[];
+      if (error) throw error; return (data ?? []).map(mapReference);
     },
     async getDocument(id, signal) {
       const { data, error } = await supabase.from('documents').select('*').eq('id', id).abortSignal(signal).single();
       if (error) throw error;
-      if (!data || !Array.isArray(data.chapters) || !data.chapters.every((chapter: unknown) => chapter && typeof chapter === 'object' && 'title' in chapter && typeof chapter.title === 'string' && 'content' in chapter && typeof chapter.content === 'string')) {
-        throw new ServiceError('validation', 'The document content is unavailable or invalid.');
-      }
-      return data as Document;
+      return mapDocument(data);
     },
     async getSummary(id) {
       const { data, error } = await supabase.from('documents').select(DOCUMENT_SUMMARY_FIELDS).eq('id', id).single();
       if (error) throw error; if (!data) throw new ServiceError('unexpected', 'The document metadata was not returned.');
-      return data as unknown as DocumentSummary;
+      return mapSummary(data);
     },
     async saveReference(collection, id) {
       const { data, error } = await supabase.from(collection).upsert({ user_id: userId, document_id: id }, { onConflict: 'user_id,document_id' }).select('id,user_id,document_id,created_at').single();
-      if (error) throw error; if (!data) throw new ServiceError('unexpected', 'The save was not confirmed.'); return data;
+      if (error) throw error; if (!data) throw new ServiceError('unexpected', 'The save was not confirmed.'); return mapReference(data);
     },
     deleteReferences: remove,
   };
