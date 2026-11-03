@@ -1,5 +1,5 @@
-import { activeAccountStore } from '@/features/data/account-store';
-import { supabase } from '@/lib/supabase';
+import { activeAccountStore } from '@/app/account-runtime';
+import { supabase } from '@/infrastructure/supabase/client';
 import type { UserDocumentDeletionImpact, UserDocumentDeletionStore } from '@/services/userDocumentDeletion';
 
 function parseImpact(row: Record<string, unknown>): UserDocumentDeletionImpact {

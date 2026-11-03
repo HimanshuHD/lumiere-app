@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/infrastructure/supabase/client';
 import { getSignedUrlRefreshDelay } from './documentStorageUrlRefresh';
 
 const SIGNED_URL_TTL_SECONDS = 900;

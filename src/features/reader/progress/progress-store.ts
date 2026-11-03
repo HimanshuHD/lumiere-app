@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/infrastructure/supabase/client';
 import { SaveCoordinator } from './save-coordinator';
 import type { PendingSave, PendingStorage, ProgressRow, SaveResult } from './save-coordinator';
 

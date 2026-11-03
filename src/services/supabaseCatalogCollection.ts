@@ -1,5 +1,5 @@
-import { cachedAccountStore } from '@/features/data/account-store';
-import { supabase } from '@/lib/supabase';
+import { cachedAccountStore } from '@/app/account-runtime';
+import { supabase } from '@/infrastructure/supabase/client';
 import type { CatalogCollectionStore } from '@/services/catalogCollection';
 
 export const supabaseCatalogCollectionStore: CatalogCollectionStore = {

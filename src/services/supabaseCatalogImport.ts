@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/infrastructure/supabase/client';
 import type { CatalogImportRequest, CatalogImportStore } from '@/services/catalogImport';
 
 export const supabaseCatalogImportStore: CatalogImportStore = {

@@ -1,4 +1,5 @@
-import { supabase, type Document } from '@/lib/supabase';
+import { supabase } from '@/infrastructure/supabase/client';
+import type { Document } from '@/domain/documents';
 import { USER_UPLOAD_RECOVERY_STAGES } from '@/services/documentLifecycle';
 import type {
   DocumentLifecycleDependencies,
