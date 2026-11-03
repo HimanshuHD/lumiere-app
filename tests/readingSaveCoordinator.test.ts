@@ -44,3 +44,14 @@ test('stale fetches do not replace acknowledged session state; pre-load events c
  const disk=storage();const queue=new SaveCoordinator(disk,async(_id,p)=>({accepted:true,row:row(p)}));
  queue.record('doc',position(1),0,0);assert.equal(disk.data.size,0);queue.hydrate([]);queue.record('doc',position(5),0,.5);await queue.flushAll();queue.hydrate([]);assert.equal(queue.snapshot('doc').row?.revision,1);
 });
+test('refresh cannot overwrite pending positions and deleted documents cannot replay after acknowledgement',async()=>{
+ const disk=storage();let release!: (value:SaveResult)=>void;
+ const queue=new SaveCoordinator(disk,async()=>new Promise(resolve=>{release=resolve;}));queue.hydrate([]);
+ queue.record('doc',position(8),0,.8);const pending=queue.snapshot('doc').pending!;
+ queue.reconcile([{...row(pending),position:position(1),revision:99}]);assert.equal((queue.snapshot('doc').pending?.position as {page:number}).page,8);
+ const running=queue.flush('doc');queue.forget('doc');release({accepted:true,row:row(pending)});await running;
+ assert.equal(disk.data.size,0);assert.equal(queue.rows().length,0);queue.record('doc',position(2),0,.2);assert.equal(disk.data.size,0);
+});
+test('ending an account stops queued writes while retaining durable replay for that account',async()=>{
+ const disk=storage();let calls=0;const queue=new SaveCoordinator(disk,async(_id,p)=>{calls++;return {accepted:true,row:row(p)};});queue.hydrate([]);queue.record('doc',position(3),0,.3);queue.dispose();await queue.flushAll();assert.equal(calls,0);assert.equal(disk.data.size,1);assert.equal(queue.rows().length,0);
+});

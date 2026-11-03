@@ -5,11 +5,11 @@ export interface CatalogCollectionStore {
   removeMembership(userId: string, documentId: string): Promise<void>;
 }
 
-export async function addCatalogDocumentToCollection(
+export async function addCatalogDocumentToCollection<T extends Pick<Document, 'id' | 'origin' | 'visibility'>>(
   store: CatalogCollectionStore,
   userId: string,
-  document: Document,
-): Promise<Document> {
+  document: T,
+): Promise<T> {
   if (document.origin !== 'catalog_import' || document.visibility !== 'shared') {
     throw new Error('Only shared catalog documents can be added to your collection.');
   }
@@ -20,7 +20,7 @@ export async function addCatalogDocumentToCollection(
 export async function removeCatalogDocumentFromCollection(
   store: CatalogCollectionStore,
   userId: string,
-  document: Document,
+  document: Pick<Document, 'id' | 'origin' | 'visibility'>,
 ): Promise<void> {
   if (document.origin !== 'catalog_import' || document.visibility !== 'shared') {
     throw new Error('Only shared catalog documents can be removed from your collection.');

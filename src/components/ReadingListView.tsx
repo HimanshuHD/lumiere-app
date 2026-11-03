@@ -1,6 +1,7 @@
+import { QueryNotice } from '@/components/QueryNotice';
 import { DemoBadge } from '@/components/DemoBadge';
 import { BookOpen, Clock, ListTodo } from 'lucide-react';
-import { Document } from '@/lib/supabase';
+import type { DocumentSummary as Document } from '@/features/data/document-summary';
 import { useReadingList } from '@/hooks/useData';
 import { ReadLaterButton } from '@/components/ReadLaterButton';
 import { DocumentCover } from '@/components/DocumentCover';
@@ -13,10 +14,12 @@ interface ReadingListViewProps {
 }
 
 export function ReadingListView({ onOpenDoc }: ReadingListViewProps) {
-  const { readingList, loading } = useReadingList();
+  const { readingList, loading, error, refetch } = useReadingList();
   const { user } = useAuth();
 
-  if (loading) {
+  if (error && readingList.length === 0) return <QueryNotice error={error} retry={refetch} label="reading list" />;
+
+  if (loading && readingList.length === 0) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center">
         <div className="w-8 h-8 border-2 border-amber-600 border-t-transparent rounded-full animate-spin" />
@@ -26,6 +29,7 @@ export function ReadingListView({ onOpenDoc }: ReadingListViewProps) {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <QueryNotice error={error} retry={refetch} label="reading list" />
       <div className="flex items-center gap-3 mb-8">
         <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center">
           <ListTodo className="w-5 h-5 text-amber-700" />

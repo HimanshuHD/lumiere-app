@@ -5,7 +5,7 @@ import { useAuth } from '@/context/AuthContext';
 import { isDocumentLockedForUser } from '@/lib/documentAccess';
 
 interface DocumentFileLinkProps extends AnchorHTMLAttributes<HTMLAnchorElement> {
-  document: Document;
+  document: Omit<Document, 'chapters'>;
   children: ReactNode;
 }
 

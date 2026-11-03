@@ -1,6 +1,7 @@
+import { useCatalogDocuments } from '@/hooks/useData';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, ArrowLeft, Loader2, Search, Shield, Trash2 } from 'lucide-react';
-import { Document } from '@/lib/supabase';
+import type { DocumentSummary as Document } from '@/features/data/document-summary';
 import { DocumentCover } from '@/components/DocumentCover';
 import { useToast } from '@/context/ToastContext';
 import {
@@ -12,7 +13,6 @@ import {
   type CatalogDocumentDeletionImpact,
 } from '@/services/catalogMaintenance';
 import { supabaseCatalogMaintenanceStore } from '@/services/supabaseCatalogMaintenance';
-import { supabase } from '@/lib/supabase';
 
 interface CatalogAdminProps {
   onBack: () => void;
@@ -25,7 +25,7 @@ function cleanupMessage(cleanup: CatalogCleanupResult): string {
 
 export function CatalogAdmin({ onBack }: CatalogAdminProps) {
   const { showToast } = useToast();
-  const [documents, setDocuments] = useState<Document[]>([]);
+  const { data: documents, loading: catalogLoading, error: catalogError, refetch: refreshCatalog } = useCatalogDocuments();
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
@@ -41,24 +41,16 @@ export function CatalogAdmin({ onBack }: CatalogAdminProps) {
     setLoading(true);
     setLoadError(null);
     try {
-      const [documentsResult, pendingCount] = await Promise.all([
-        supabase
-          .from('documents')
-          .select('*')
-          .eq('origin', 'catalog_import')
-          .order('title', { ascending: true })
-          .limit(1000),
-        getCatalogCleanupCount(supabaseCatalogMaintenanceStore),
+      const [, pendingCount] = await Promise.all([
+        refreshCatalog(), getCatalogCleanupCount(supabaseCatalogMaintenanceStore),
       ]);
-      if (documentsResult.error) throw new Error(documentsResult.error.message);
-      setDocuments((documentsResult.data ?? []) as Document[]);
       setPendingCleanup(pendingCount);
     } catch (error) {
       setLoadError(error instanceof Error ? error.message : 'Could not load catalog maintenance data.');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [refreshCatalog]);
 
   useEffect(() => {
     void loadCatalog();
@@ -97,7 +89,7 @@ export function CatalogAdmin({ onBack }: CatalogAdminProps) {
         supabaseCatalogMaintenanceStore,
         selectedDocument.id,
       );
-      setDocuments((current) => current.filter((document) => document.id !== selectedDocument.id));
+
       setSelectedDocument(null);
       setImpact(null);
       setPendingCleanup(result.cleanup.pending);
@@ -181,13 +173,13 @@ export function CatalogAdmin({ onBack }: CatalogAdminProps) {
         />
       </div>
 
-      {loading ? (
+      {(loading || catalogLoading) ? (
         <div className="flex min-h-48 items-center justify-center">
           <Loader2 className="h-8 w-8 animate-spin text-amber-600" />
         </div>
-      ) : loadError ? (
+      ) : (loadError || catalogError) ? (
         <div className="rounded-xl border border-red-200 bg-red-50 p-5 text-sm text-red-800">
-          <p>Could not load catalog maintenance data: {loadError}</p>
+          <p>Could not load catalog maintenance data: {loadError || catalogError}</p>
           <button onClick={() => void loadCatalog()} className="mt-3 font-semibold underline">Try again</button>
         </div>
       ) : filteredDocuments.length === 0 ? (

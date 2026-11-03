@@ -1,7 +1,9 @@
+import { readingProgressPercent as getProgressPercent } from '@/lib/readingProgressPercent';
 import { DemoBadge } from '@/components/DemoBadge';
 import { useState, useMemo } from 'react';
 import { Search, Clock, BookMarked, Play, Star, Sparkles, User, FileText, Hash, X, Download, ChevronRight } from 'lucide-react';
-import { Document, ReadingProgress } from '@/lib/supabase';
+import type { ReadingProgress } from '@/lib/supabase';
+import type { DocumentSummary as Document } from '@/features/data/document-summary';
 import { useBookmarks, useReadingProgress } from '@/hooks/useData';
 import { ReadLaterButton } from '@/components/ReadLaterButton';
 import { DocumentCover } from '@/components/DocumentCover';
@@ -18,14 +20,6 @@ interface LibraryProps {
 }
 
 const categories = ['All', 'Fiction', 'Non-Fiction', 'Science', 'History', 'Technology', 'Philosophy', 'Adventure'];
-
-function getProgressPercent(doc: Document, progress?: ReadingProgress): number {
-  if (!progress) return 0;
-  const chapterCount = Math.max(1, doc.chapters.length);
-  return Math.min(100, Math.max(0, Math.round(
-    ((progress.chapter_index + progress.scroll_percent) / chapterCount) * 100
-  )));
-}
 
 export function Library({ documents, loading, onOpenDoc, onViewAll }: LibraryProps) {
   const [search, setSearch] = useState('');
@@ -306,7 +300,7 @@ export function Library({ documents, loading, onOpenDoc, onViewAll }: LibraryPro
                   <div className="p-2.5 bg-stone-50 rounded-lg">
                     <p className="text-xs text-stone-400 mb-0.5">Chapters</p>
                     <p className="text-sm font-medium text-stone-700 flex items-center gap-1">
-                      <FileText className="w-3 h-3" /> {selectedDoc.chapters.length}
+                      <FileText className="w-3 h-3" /> {selectedDoc.chapter_count}
                     </p>
                   </div>
                 </div>

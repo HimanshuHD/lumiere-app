@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import { useReadingList } from '@/hooks/useData';
 import { useToast } from '@/context/ToastContext';
-import { Document } from '@/lib/supabase';
+import type { DocumentSummary as Document } from '@/features/data/document-summary';
 
 interface ReadLaterButtonProps {
   doc: Document;
@@ -32,35 +32,38 @@ function ReadLaterIcon({ filled, className }: { filled: boolean; className?: str
   );
 }
 
-export function ReadLaterButton({ doc, variant = 'full', className = '', hasProgress = false }: ReadLaterButtonProps) {
-  if (hasProgress) return null;
-  const { toggleReadingList, isInReadingList } = useReadingList();
+export function ReadLaterButton(props: ReadLaterButtonProps) {
+  return props.hasProgress ? null : <ReadLaterAction {...props} />;
+}
+
+function ReadLaterAction({ doc, variant = 'full', className = '' }: ReadLaterButtonProps) {
+  const { toggleReadingList, isInReadingList, isReadingListPending } = useReadingList();
   const { showToast } = useToast();
   const [busy, setBusy] = useState(false);
 
+  const pending = busy || isReadingListPending(doc.id);
   const saved = isInReadingList(doc.id);
 
   const handleClick = useCallback(
     async (e: React.MouseEvent) => {
       e.stopPropagation();
       e.preventDefault();
-      if (busy) return;
+      if (pending) return;
       setBusy(true);
-      const added = await toggleReadingList(doc.id);
-      showToast(
-        added ? `"${doc.title}" added to your Reading List` : `"${doc.title}" removed from your Reading List`,
-        'success'
-      );
-      setBusy(false);
+      try {
+        const result = await toggleReadingList(doc.id);
+        if (!result.ok) { showToast(result.message, 'error'); return; }
+        showToast(result.selected ? `"${doc.title}" added to your Reading List` : `"${doc.title}" removed from your Reading List`, 'success');
+      } finally { setBusy(false); }
     },
-    [busy, toggleReadingList, doc.id, doc.title, showToast]
+    [pending, toggleReadingList, doc.id, doc.title, showToast]
   );
 
   if (variant === 'compact') {
     return (
       <button
         onClick={handleClick}
-        disabled={busy}
+        disabled={pending}
         title={saved ? 'Remove from Reading List' : 'Read Later'}
         className={`p-1.5 rounded-lg transition-colors disabled:opacity-50 ${
           saved
@@ -76,7 +79,7 @@ export function ReadLaterButton({ doc, variant = 'full', className = '', hasProg
   return (
     <button
       onClick={handleClick}
-      disabled={busy}
+      disabled={pending}
       className={`inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg border transition-all disabled:opacity-50 ${
         saved
           ? 'text-amber-700 bg-amber-50 border-amber-200 hover:bg-amber-100'

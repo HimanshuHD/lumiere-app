@@ -1,6 +1,8 @@
+import { readingProgressPercent } from '@/lib/readingProgressPercent';
+import { QueryNotice } from '@/components/QueryNotice';
 import { DemoBadge } from '@/components/DemoBadge';
 import { BookOpen, BookMarked } from 'lucide-react';
-import { Document } from '@/lib/supabase';
+import type { DocumentSummary as Document } from '@/features/data/document-summary';
 import { useBookmarks, useReadingProgress } from '@/hooks/useData';
 import { DocumentCover } from '@/components/DocumentCover';
 import { useAuth } from '@/context/AuthContext';
@@ -12,11 +14,13 @@ interface BookmarksViewProps {
 }
 
 export function BookmarksView({ onOpenDoc }: BookmarksViewProps) {
-  const { bookmarks, loading } = useBookmarks();
+  const { bookmarks, loading, error, refetch } = useBookmarks();
   const { getProgress } = useReadingProgress();
   const { user } = useAuth();
 
-  if (loading) {
+  if (error && bookmarks.length === 0) return <QueryNotice error={error} retry={refetch} label="bookmarks" />;
+
+  if (loading && bookmarks.length === 0) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center">
         <div className="w-8 h-8 border-2 border-amber-600 border-t-transparent rounded-full animate-spin" />
@@ -26,6 +30,7 @@ export function BookmarksView({ onOpenDoc }: BookmarksViewProps) {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <QueryNotice error={error} retry={refetch} label="bookmarks" />
       <div className="flex items-center gap-3 mb-8">
         <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center">
           <BookMarked className="w-5 h-5 text-amber-700" />
@@ -51,9 +56,7 @@ export function BookmarksView({ onOpenDoc }: BookmarksViewProps) {
             if (!doc) return null;
             const locked = isDocumentLockedForUser(doc, user?.id);
             const prog = getProgress(doc.id);
-            const totalPercent = prog
-              ? Math.round(((prog.chapter_index + prog.scroll_percent) / doc.chapters.length) * 100)
-              : 0;
+            const totalPercent = readingProgressPercent(doc, prog);
             return (
               <div
                 key={bm.id}
