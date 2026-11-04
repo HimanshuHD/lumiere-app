@@ -10,7 +10,7 @@ This project uses Supabase Auth, Storage, and the database. The Supabase CLI run
 2. From the project root, install the project dependencies:
 
    ```powershell
-   npm install
+   npm ci --include=dev
    ```
 
 3. Start the local Supabase services. On the first run, Docker downloads the required images, then Supabase creates the local services and applies the migrations:
@@ -94,3 +94,35 @@ Supabase Studio is available at `http://127.0.0.1:54323`; the local PostgreSQL s
 Document ownership, visibility, private storage, deployment order, URL expiry, and recovery guidance are documented in [supabase/SECURITY_DEPLOYMENT.md](./supabase/SECURITY_DEPLOYMENT.md).
 
 The later Node.js backend can be a separate project and connect to this local PostgreSQL instance. Before building it, decide whether it should replace Supabase Auth/Storage too or only provide a custom API over the same database.
+
+
+### Browser test setup and installation troubleshooting
+
+Use Node.js 24 (matching CI) and run commands from the repository root. Browser tests
+start their own Vite server and mock Supabase; no local Supabase stack is required.
+
+```powershell
+npm ci --include=dev
+npm run setup:browser
+npm run test:browser
+```
+
+The Playwright Node package is a development dependency; Chromium is a separate download.
+Re-run `setup:browser` after Playwright upgrades. CI uses `playwright install --with-deps chromium`
+to install Linux system dependencies too. `PLAYWRIGHT_CHROMIUM_EXECUTABLE` optionally selects
+an existing compatible Chromium executable.
+
+If installation fails, browser tests cannot repair that failure automatically. Check the
+first npm error (not just the final summary):
+
+- `EUSAGE` / manifest-lockfile mismatch: confirm both `package.json` and `package-lock.json`
+  are from the same checkout. Do not delete or regenerate the lockfile as a routine fix.
+- `EPERM` / `EBUSY` on Windows: stop Vite/test processes and close programs locking files,
+  then retry. `npm ci` replaces `node_modules`.
+- `ENOTFOUND`, `EAI_AGAIN`, proxy, or certificate errors: check registry connectivity and
+  your configured proxy/CA trust. Keep TLS verification enabled.
+- Missing `playwright`: use `--include=dev`, even when your environment omits development
+  dependencies, then run `npm ls playwright` to confirm installation.
+
+If it still fails, retain the exact command and first error block for diagnosis. An
+installation failure is separate from Supabase Edge Function/Docker DNS failures.
