@@ -11,13 +11,13 @@ function useAccountStore() {
   const { user } = useAuth();
   return user ? getAccountStore(user.id) : undefined;
 }
-const empty = { data: [], status: 'idle' as const, error: null };
+const empty = { data: [], status: 'idle' as const, error: null, errorCategory: null };
 const subscribeEmpty = () => () => {};
 const getEmpty = () => empty;
 const emptyPending: ReadonlySet<string> = new Set();
 const getEmptyPending = () => emptyPending;
 function useQuery<T>(query: QueryCache<T> | undefined, auto = true) {
-  const snapshot = useSyncExternalStore(query?.subscribe ?? subscribeEmpty, query?.getSnapshot ?? getEmpty as () => {data:T;status:'idle';error:null});
+  const snapshot = useSyncExternalStore(query?.subscribe ?? subscribeEmpty, query?.getSnapshot ?? getEmpty as () => {data:T;status:'idle';error:null;errorCategory:null});
   useEffect(() => {
     if (auto && query && snapshot.status === 'idle') void query.load().catch(() => {});
   }, [query, snapshot.status, auto]);

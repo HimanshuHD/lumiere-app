@@ -1,6 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { QueryCache } from '../src/features/data/query-cache.ts';
+test('permission categories survive query snapshots and clear on retry',async()=>{
+ let fail=true; const cache=new QueryCache<null>(null,async()=>{if(fail)throw {code:'42501',message:'Denied'};return null;});
+ await assert.rejects(cache.load()); assert.equal(cache.getSnapshot().error,'Denied');assert.equal(cache.getSnapshot().errorCategory,'permission');
+ fail=false;await cache.load();assert.equal(cache.getSnapshot().errorCategory,null);
+});
 function deferred<T>() { let resolve!: (value:T)=>void;let reject!: (error:unknown)=>void; const promise=new Promise<T>((a,b)=>{resolve=a;reject=b;});return {promise,resolve,reject}; }
 test('multiple consumers share one request and immutable published snapshots',async()=>{
  const d=deferred<number[]>();let calls=0,first=0,second=0;const cache=new QueryCache<number[]>([],async()=>{calls++;return d.promise;});

@@ -1,6 +1,5 @@
 import { useDocumentContent } from '@/hooks/useData';
 import { Reader } from './Reader';
-import { toServiceError } from '@/domain/errors';
 
 export function ReaderLoader({ documentId, onBack }: { documentId: string; onBack: () => void }) {
   return <ContentLoader key={documentId} id={documentId} onBack={onBack} />;
@@ -8,7 +7,7 @@ export function ReaderLoader({ documentId, onBack }: { documentId: string; onBac
 function ContentLoader({ id, onBack }: { id: string; onBack: () => void }) {
   const state = useDocumentContent(id);
   if (state.data) return <Reader key={id} document={state.data} onBack={onBack} />;
-  const error = state.error ? toServiceError(state.error) : null;
+  const error = state.error ? {category: state.errorCategory} : null;
   const title = error?.category === 'permission' ? 'Document access denied'
     : error ? 'Could not open document' : state.loading ? 'Opening document…' : 'Document unavailable';
   return <section className="max-w-3xl mx-auto px-4 py-24 text-center" aria-busy={state.loading}>
