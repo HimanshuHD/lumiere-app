@@ -18,8 +18,8 @@ export function OAuthCallback() {
     if (user && !failed && !handled.current) { handled.current = true; resume(); }
   }, [user, failed]);
   if (user && !failed) return <p className="p-12 text-center" role="status">Completing sign-in…</p>;
-  return <section className="max-w-3xl mx-auto px-4 py-24 text-center">
-    <h1 className="text-2xl font-serif font-bold" role="alert">Sign-in could not be completed</h1>
+  return <section className="max-w-3xl mx-auto px-4 py-24 text-center" role="alert">
+    <h1 className="text-2xl font-serif font-bold">Sign-in could not be completed</h1>
     <p className="mt-3">Please try signing in again.</p>
     <button className="mt-6 underline" onClick={resume}>Return to sign in</button>
   </section>;

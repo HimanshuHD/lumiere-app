@@ -2,7 +2,7 @@ import { toServiceError, attempt } from '@/domain/errors';
 import { supabase } from './client';
 import type { AuthSession } from '@/domain/auth';
 import { rememberOAuthReturn, clearOAuthReturn } from '../browser/oauth-return';
-import { routePath } from '@/domain/navigation';
+import { routePath, safeReturnPath } from '@/domain/navigation';
 const mapSession = (session: {user: AuthSession['user']} | null): AuthSession | null => session ? {
   user: { id: session.user.id, email: session.user.email,
     user_metadata: session.user.user_metadata, app_metadata: session.user.app_metadata },
@@ -19,7 +19,8 @@ export const authIntegration = {
   signIn(email: string, password: string) { return attempt(async () => { const {error} = await supabase.auth.signInWithPassword({email,password}); if (error) throw error; }); },
   signInWithGoogle() { return attempt(async () => {
     const base = import.meta.env.BASE_URL;
-    try { rememberOAuthReturn(window.sessionStorage, window.location.pathname, base); }
+    const destination = safeReturnPath(window.location.pathname, base) ?? routePath({kind:'view',view:'library'},base);
+    try { rememberOAuthReturn(window.sessionStorage, destination, base); }
     catch { throw new Error('Sign-in return storage is unavailable. Allow session storage or use email sign-in.'); }
     const {error} = await supabase.auth.signInWithOAuth({provider:'google',options:{redirectTo:new URL(routePath({kind:'callback'},base),window.location.origin).href}});
     if (error) { clearOAuthReturn(window.sessionStorage, base); throw error; }
