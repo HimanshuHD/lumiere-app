@@ -9,6 +9,21 @@ function deferred<T>() {
   return { promise, resolve, reject };
 }
 const flush = async () => { for (let i = 0; i < 12; i++) await Promise.resolve(); };
+it('cancels obsolete page layers immediately and waits for them before publishing the next page',async()=>{
+ const h=harness(),queue=new PdfRenderQueue(),pending=deferred<void>();let cancelled=0,obsolete=false,layerStarts=0;
+ const layers={cancel(){cancelled++;},async render(_page:unknown,_viewport:unknown,current:()=>boolean){layerStarts++;if(layerStarts===1){await pending.promise;obsolete=!current();}}};
+ const first=queue.request({...h.request,layers},h.callbacks);await flush();h.renders[0].result.resolve();await flush();
+ const second=queue.request({...h.request,layers,page:2},h.callbacks);assert(cancelled>1);await flush();assert.equal(h.renders.length,1);
+ pending.resolve();await flush();h.renders[1].result.resolve();await Promise.all([first,second]);
+ assert.equal(obsolete,true);assert.equal(h.finished,1);assert.deepEqual(h.errors,[]);
+ await queue.dispose();assert(cancelled>2);
+});
+it('reports current text/link layer failure and supports retry without a fresh document',async()=>{
+ const h=harness(),queue=new PdfRenderQueue();let fail=true;
+ const layers={cancel(){},async render(){if(fail)throw Error('Text layer failed');}};
+ const first=queue.request({...h.request,layers},h.callbacks);await flush();h.renders[0].result.resolve();await first;assert.match(String(h.errors[0]),/Text layer/);
+ fail=false;const second=queue.request({...h.request,layers},h.callbacks);await flush();h.renders[1].result.resolve();await second;assert.equal(h.finished,2);
+});
 function harness() {
   const renders: Array<{ result: ReturnType<typeof deferred<void>>; cancelled: boolean; scale: number }> = [];
   const errors: unknown[] = []; let finished = 0;
