@@ -166,7 +166,7 @@ export function CatalogAdmin({ onBack }: CatalogAdminProps) {
       <div className="relative mb-5 max-w-lg">
         <Search aria-hidden="true" className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-400" />
         <input
-          value={search}
+          aria-label="Search catalog documents" value={search}
           onChange={(event) => setSearch(event.target.value)}
           placeholder="Search title, author, or source..."
           className="w-full rounded-xl border border-stone-200 bg-white py-3 pl-10 pr-4 text-sm text-stone-800 focus:border-amber-600 focus:outline-none focus:ring-2 focus:ring-amber-600/20"

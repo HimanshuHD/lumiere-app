@@ -51,7 +51,7 @@ export function Profile() {
               Choose Image
             </button>
             <input
-              ref={avatarInputRef}
+              aria-label="Choose avatar image" ref={avatarInputRef}
               type="file"
               accept="image/*"
               onChange={(e) => e.target.files?.[0] && handleAvatarSelect(e.target.files[0])}
@@ -83,10 +83,10 @@ export function Profile() {
         </h2>
         <div className="space-y-4">
           <div>
-            <label className="block text-xs font-medium text-stone-500 mb-1.5">Full Name</label>
+            <label htmlFor="profile-name" className="block text-xs font-medium text-stone-500 mb-1.5">Full Name</label>
             <input
               type="text"
-              value={fullName}
+              id="profile-name" autoComplete="name" value={fullName}
               onChange={(e) => setFullName(e.target.value)}
               placeholder="Enter your full name"
               className="w-full px-4 py-2.5 bg-white border border-stone-200 rounded-lg text-sm text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-600/30 focus:border-amber-600/40 transition-all"
@@ -123,11 +123,11 @@ export function Profile() {
         </h2>
         <div className="space-y-4">
           <div>
-            <label className="block text-xs font-medium text-stone-500 mb-1.5">New Password</label>
+            <label htmlFor="profile-password" className="block text-xs font-medium text-stone-500 mb-1.5">New Password</label>
             <div className="relative">
               <input
                 type={showNewPassword ? 'text' : 'password'}
-                value={newPassword}
+                id="profile-password" autoComplete="new-password" value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 placeholder="Enter new password"
                 className="w-full px-4 pr-11 py-2.5 bg-white border border-stone-200 rounded-lg text-sm text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-600/30 focus:border-amber-600/40 transition-all"
@@ -146,11 +146,11 @@ export function Profile() {
             </div>
           </div>
           <div>
-            <label className="block text-xs font-medium text-stone-500 mb-1.5">Confirm New Password</label>
+            <label htmlFor="profile-confirm-password" className="block text-xs font-medium text-stone-500 mb-1.5">Confirm New Password</label>
             <div className="relative">
               <input
                 type={showConfirmPassword ? 'text' : 'password'}
-                value={confirmPassword}
+                id="profile-confirm-password" autoComplete="new-password" aria-invalid={!!confirmPassword && newPassword !== confirmPassword} aria-describedby={confirmPassword && newPassword !== confirmPassword ? "password-mismatch" : undefined} value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 placeholder="Confirm new password"
                 className="w-full px-4 pr-11 py-2.5 bg-white border border-stone-200 rounded-lg text-sm text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-600/30 focus:border-amber-600/40 transition-all"
@@ -168,6 +168,7 @@ export function Profile() {
               </button>
             </div>
           </div>
+          {confirmPassword && newPassword !== confirmPassword && <p id="password-mismatch" role="status" className="text-sm text-red-700">Passwords do not match.</p>}
           <button
             onClick={handleChangePassword}
             disabled={changingPassword || !newPassword || !confirmPassword}

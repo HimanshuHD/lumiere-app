@@ -350,7 +350,7 @@ export function Library({ documents, loading, onOpenDoc, onViewAll }: LibraryPro
           <Search aria-hidden="true" className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
           <input
             type="text"
-            value={search}
+            aria-label="Search library" value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by title or author..."
             className="w-full pl-11 pr-4 py-3 bg-white border border-stone-200 rounded-xl text-stone-800 placeholder-stone-400 text-sm focus:outline-none focus:ring-2 focus:ring-amber-600/30 focus:border-amber-600/40 transition-all"

@@ -126,15 +126,16 @@ function ReaderSession({ document: doc, onBack }: ReaderProps) {
             <div className="space-y-5">
               {/* Font Size */}
               <div>
-                <label className={`flex items-center gap-2 text-xs font-medium ${theme.subText} uppercase tracking-wide mb-2`}>
+                <span className={`flex items-center gap-2 text-xs font-medium ${theme.subText} uppercase tracking-wide mb-2`}>
                   <Type aria-hidden="true" className="w-3.5 h-3.5" />
                   Font Size
-                </label>
+                </span>
                 <div className="flex gap-1.5">
                   {(['small', 'medium', 'large'] as FontSize[]).map((size) => (
                     <button
                       key={size}
                       onClick={() => setSettings({ ...settings, fontSize: size })}
+                      aria-pressed={settings.fontSize === size}
                       className={`flex-1 py-2 rounded-lg text-xs font-medium capitalize transition-all ${
                         settings.fontSize === size
                           ? 'bg-amber-600 text-white'
@@ -149,9 +150,9 @@ function ReaderSession({ document: doc, onBack }: ReaderProps) {
 
               {/* Theme */}
               <div>
-                <label className={`flex items-center gap-2 text-xs font-medium ${theme.subText} uppercase tracking-wide mb-2`}>
+                <span className={`flex items-center gap-2 text-xs font-medium ${theme.subText} uppercase tracking-wide mb-2`}>
                   Theme
-                </label>
+                </span>
                 <div className="flex gap-1.5">
                   {([
                     { key: 'light' as ReadingTheme, icon: Sun, label: 'Light' },
@@ -176,14 +177,15 @@ function ReaderSession({ document: doc, onBack }: ReaderProps) {
 
               {/* Line Spacing */}
               <div>
-                <label className={`text-xs font-medium ${theme.subText} uppercase tracking-wide mb-2`}>
+                <span className={`text-xs font-medium ${theme.subText} uppercase tracking-wide mb-2`}>
                   Line Spacing
-                </label>
+                </span>
                 <div className="flex gap-1.5">
                   {(['comfortable', 'compact'] as LineSpacing[]).map((spacing) => (
                     <button
                       key={spacing}
                       onClick={() => setSettings({ ...settings, lineSpacing: spacing })}
+                      aria-pressed={settings.lineSpacing === spacing}
                       className={`flex-1 py-2 rounded-lg text-xs font-medium capitalize transition-all ${
                         settings.lineSpacing === spacing
                           ? 'bg-amber-600 text-white'

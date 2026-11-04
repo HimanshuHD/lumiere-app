@@ -359,18 +359,18 @@ function EditDocumentModal({ doc, onClose, onSaved }: { doc: Document; onClose: 
             )}
           </div>
           <div>
-            <label className="block text-xs font-medium text-stone-500 mb-1.5">Title</label>
+            <label htmlFor="edit-title" className="block text-xs font-medium text-stone-500 mb-1.5">Title</label>
             <input
               type="text"
-              value={title}
+              id="edit-title" value={title}
               onChange={(e) => setTitle(e.target.value)}
               className="w-full px-4 py-2.5 bg-white border border-stone-200 rounded-lg text-sm text-stone-800 focus:outline-none focus:ring-2 focus:ring-amber-600/30 focus:border-amber-600/40 transition-all"
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-stone-500 mb-1.5">Visibility</label>
+            <label htmlFor="edit-visibility" className="block text-xs font-medium text-stone-500 mb-1.5">Visibility</label>
             <select
-              value={visibility}
+              id="edit-visibility" value={visibility}
               onChange={(event) => setVisibility(event.target.value as 'private' | 'shared')}
               className="w-full px-4 py-2.5 bg-white border border-stone-200 rounded-lg text-sm text-stone-800 focus:outline-none focus:ring-2 focus:ring-amber-600/30 focus:border-amber-600/40"
             >
@@ -382,21 +382,22 @@ function EditDocumentModal({ doc, onClose, onSaved }: { doc: Document; onClose: 
             </p>
           </div>
           <div>
-            <label className="block text-xs font-medium text-stone-500 mb-1.5">Author</label>
+            <label htmlFor="edit-author" className="block text-xs font-medium text-stone-500 mb-1.5">Author</label>
             <input
               type="text"
-              value={author}
+              id="edit-author" value={author}
               onChange={(e) => setAuthor(e.target.value)}
               className="w-full px-4 py-2.5 bg-white border border-stone-200 rounded-lg text-sm text-stone-800 focus:outline-none focus:ring-2 focus:ring-amber-600/30 focus:border-amber-600/40 transition-all"
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-stone-500 mb-1.5">Category</label>
-            <div className="flex flex-wrap gap-2">
+            <span id="edit-category-label" className="block text-xs font-medium text-stone-500 mb-1.5">Category</span>
+            <div role="group" aria-labelledby="edit-category-label" className="flex flex-wrap gap-2">
               {CATEGORIES.map((cat) => (
                 <button
                   key={cat}
                   onClick={() => setCategory(cat)}
+                  aria-pressed={category === cat}
                   className={`px-3 py-1.5 text-xs font-medium rounded-full transition-all ${
                     category === cat
                       ? 'bg-stone-900 text-white'
@@ -409,9 +410,9 @@ function EditDocumentModal({ doc, onClose, onSaved }: { doc: Document; onClose: 
             </div>
           </div>
           <div>
-            <label className="block text-xs font-medium text-stone-500 mb-1.5">Summary</label>
+            <label htmlFor="edit-summary" className="block text-xs font-medium text-stone-500 mb-1.5">Summary</label>
             <textarea
-              value={summary}
+              id="edit-summary" value={summary}
               onChange={(e) => setSummary(e.target.value)}
               rows={3}
               className="w-full px-4 py-2.5 bg-white border border-stone-200 rounded-lg text-sm text-stone-800 focus:outline-none focus:ring-2 focus:ring-amber-600/30 focus:border-amber-600/40 transition-all resize-none"

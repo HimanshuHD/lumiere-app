@@ -113,13 +113,14 @@ export function AuthScreen() {
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-stone-400 mb-1.5 uppercase tracking-wide">
+              <label htmlFor="auth-email" className="block text-xs font-medium text-stone-400 mb-1.5 uppercase tracking-wide">
                 Email
               </label>
               <div className="relative">
                 <Mail aria-hidden="true" className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-500" />
                 <input
-                  type="email"
+                  id="auth-email" type="email" autoComplete="email"
+                  aria-invalid={!!error} aria-describedby={error ? "auth-error" : undefined}
                   required
                   value={formValues[mode].email}
                   onChange={(e) => setFormValues((values) => ({
@@ -133,12 +134,14 @@ export function AuthScreen() {
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-stone-400 mb-1.5 uppercase tracking-wide">
+              <label htmlFor="auth-password" className="block text-xs font-medium text-stone-400 mb-1.5 uppercase tracking-wide">
                 Password
               </label>
               <div className="relative">
                 <Lock aria-hidden="true" className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-500" />
                 <input
+                  id="auth-password" autoComplete={mode === "signin" ? "current-password" : "new-password"}
+                  aria-invalid={!!error} aria-describedby={error ? "auth-error" : undefined}
                   type={showPassword ? 'text' : 'password'}
                   required
                   minLength={6}
@@ -165,7 +168,7 @@ export function AuthScreen() {
             </div>
 
             {error && (
-              <div className="text-sm text-red-400 bg-red-950/40 border border-red-900/50 rounded-lg px-4 py-3">
+              <div id="auth-error" role="alert" className="text-sm text-red-400 bg-red-950/40 border border-red-900/50 rounded-lg px-4 py-3">
                 {error}
               </div>
             )}

@@ -42,14 +42,14 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
       </div>
 
       {success && (
-        <div className="mb-6 flex items-center gap-3 p-4 bg-green-50 border border-green-200 rounded-xl">
+        <div role="status" className="mb-6 flex items-center gap-3 p-4 bg-green-50 border border-green-200 rounded-xl">
           <CheckCircle2 aria-hidden="true" className="w-5 h-5 text-green-600 flex-shrink-0" />
           <p className="text-sm text-green-700 font-medium">Document uploaded successfully! It's now available in the library.</p>
         </div>
       )}
 
       {error && (
-        <div className="mb-6 flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-xl">
+        <div id="upload-error" role="alert" className="mb-6 flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-xl">
           <AlertCircle aria-hidden="true" className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
           <p className="text-sm text-red-700">{error}</p>
         </div>
@@ -59,7 +59,7 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
         {/* Left: Document file upload */}
         <div className="space-y-6">
           <div>
-            <label className="flex items-center gap-2 text-sm font-medium text-stone-700 mb-2">
+            <label htmlFor="upload-document" className="flex items-center gap-2 text-sm font-medium text-stone-700 mb-2">
               <FileText aria-hidden="true" className="w-4 h-4 text-stone-400" />
               Document File <span className="text-red-500">*</span>
             </label>
@@ -70,7 +70,7 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
               className="relative border-2 border-dashed border-stone-300 rounded-xl p-8 text-center hover:border-amber-500 hover:bg-amber-50/30 transition-all cursor-pointer group"
             >
               <input
-                ref={docInputRef}
+                id="upload-document" aria-required="true" aria-describedby={error ? "upload-error" : undefined} ref={docInputRef}
                 type="file"
                 accept={ACCEPTED_FORMATS}
                 onChange={(e) => {
@@ -103,6 +103,7 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
                 </div>
               )}
             </div>
+            <button type="button" className="mt-2 underline text-sm text-amber-800" onClick={() => docInputRef.current?.click()}>Choose document file</button>
             {docFile && (
               <button
                 onClick={() => {
@@ -116,7 +117,7 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
           </div>
 
           <div>
-            <label className="flex items-center gap-2 text-sm font-medium text-stone-700 mb-2">
+            <label htmlFor="upload-cover" className="flex items-center gap-2 text-sm font-medium text-stone-700 mb-2">
               <ImageIcon aria-hidden="true" className="w-4 h-4 text-stone-400" />
               Book Cover <span className="text-xs font-normal text-stone-400">(optional)</span>
             </label>
@@ -127,7 +128,7 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
               className="relative border-2 border-dashed border-stone-300 rounded-xl p-6 text-center hover:border-amber-500 hover:bg-amber-50/30 transition-all cursor-pointer group"
             >
               <input
-                ref={coverInputRef}
+                id="upload-cover" ref={coverInputRef}
                 type="file"
                 accept=".jpg,.jpeg,.png,.webp,.gif,image/jpeg,image/png,image/webp,image/gif"
                 onChange={(e) => {
@@ -141,6 +142,7 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
                 <div className="relative inline-block">
                   <img src={coverPreview} alt="Cover preview" className="max-h-48 rounded-lg shadow-md mx-auto" />
                   <button
+                    aria-label="Remove cover image"
                     onClick={(e) => {
                       e.stopPropagation();
                       invalidateOperation();
@@ -202,18 +204,19 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
               JPEG, PNG, WebP, or GIF · up to {MAX_COVER_SIZE_BYTES / 1024 / 1024} MB
             </p>
           </div>
+          <button type="button" className="underline text-sm text-amber-800" onClick={() => coverInputRef.current?.click()}>Choose cover image</button>
         </div>
 
         {/* Right: Form fields */}
         <div className="space-y-5">
           <div>
-            <label className="flex items-center gap-2 text-sm font-medium text-stone-700 mb-2">
+            <label htmlFor="upload-title" className="flex items-center gap-2 text-sm font-medium text-stone-700 mb-2">
               <BookOpen aria-hidden="true" className="w-4 h-4 text-stone-400" />
               Book Name <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
-              value={title}
+              id="upload-title" aria-describedby={error ? "upload-error" : undefined} aria-required="true" aria-invalid={!!error && !title.trim()} value={title}
               onChange={(e) => {
                 invalidateOperation();
                 setTitle(e.target.value);
@@ -224,13 +227,13 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
           </div>
 
           <div>
-            <label className="flex items-center gap-2 text-sm font-medium text-stone-700 mb-2">
+            <label htmlFor="upload-author" className="flex items-center gap-2 text-sm font-medium text-stone-700 mb-2">
               <User aria-hidden="true" className="w-4 h-4 text-stone-400" />
               Author <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
-              value={author}
+              id="upload-author" aria-describedby={error ? "upload-error" : undefined} aria-required="true" aria-invalid={!!error && !author.trim()} value={author}
               onChange={(e) => {
                 invalidateOperation();
                 setAuthor(e.target.value);
@@ -241,14 +244,15 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
           </div>
 
           <div>
-            <label className="flex items-center gap-2 text-sm font-medium text-stone-700 mb-2">
+            <span id="upload-category-label" className="flex items-center gap-2 text-sm font-medium text-stone-700 mb-2">
               <Tag aria-hidden="true" className="w-4 h-4 text-stone-400" />
               Category
-            </label>
-            <div className="flex flex-wrap gap-2">
+            </span>
+            <div role="group" aria-labelledby="upload-category-label" className="flex flex-wrap gap-2">
               {CATEGORIES.map((cat) => (
                 <button
                   key={cat}
+                  aria-pressed={category === cat}
                   onClick={() => {
                     invalidateOperation();
                     setCategory(cat);
@@ -266,11 +270,11 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
           </div>
 
           <div>
-            <label className="flex items-center gap-2 text-sm font-medium text-stone-700 mb-2">
+            <label htmlFor="upload-summary" className="flex items-center gap-2 text-sm font-medium text-stone-700 mb-2">
               Book Description
             </label>
             <textarea
-              value={summary}
+              id="upload-summary" aria-describedby={error ? "upload-error" : undefined} value={summary}
               onChange={(e) => {
                 invalidateOperation();
                 setSummary(e.target.value);
