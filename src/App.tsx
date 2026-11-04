@@ -1,7 +1,9 @@
 import { IntegrationContext } from '@/shared/integrations';
-import { setActiveAccount } from '@/app/account-runtime';
+import { applySessionAccount } from '@/app/session-navigation';
 import { integrations } from '@/app/integrations';
 import { useState, useCallback, useEffect } from 'react';
+import { SessionNavigationBoundary } from '@/app/SessionNavigationBoundary';
+import { OAuthCallback } from '@/app/OAuthCallback';
 import { BookOpen, BookMarked, Library as LibraryIcon, Loader2, ListTodo } from 'lucide-react';
 import { AuthProvider } from '@/context/AuthContext';
 import { useAuth } from '@/features/auth';
@@ -12,7 +14,6 @@ import { BookmarksView } from '@/components/BookmarksView';
 import { ReaderLoader } from '@/components/ReaderLoader';
 import { QueryNotice } from '@/shared/ui';
 import type {  DocumentSummary  } from '@/domain/document-summary';
-import {  summarizeDocument  } from '@/domain/document-summary';
 import { UploadPanel } from '@/components/UploadPanel';
 import { Profile } from '@/components/Profile';
 import { MyUploads } from '@/components/MyUploads';
@@ -26,39 +27,26 @@ import { isCatalogAdmin } from '@/lib/catalogAdminAccess';
 import { useDocuments } from '@/hooks/useData';
 import type { Document } from '@/domain/documents';
 
-type View = 'library' | 'bookmarks' | 'reading-list' | 'upload' | 'profile' | 'my-uploads' | 'all-documents' | 'admin-catalog';
-
-function getViewFromLocation(): View {
-  return window.location.pathname === '/admin/catalog' ? 'admin-catalog' : 'library';
-}
+import type { View } from '@/domain/navigation';
+import { navigate, useAppRoute } from '@/app/navigation';
 
 function AppContent() {
   const { user, loading, signOut } = useAuth();
   const { showToast } = useToast();
   const handleSignOut = async () => { const result = await signOut(); if (!result.ok) showToast(result.error.message, 'error'); };
   const { documents, loading: docsLoading, error: docsError, refetch } = useDocuments();
-  const [view, setView] = useState<View>(getViewFromLocation);
-  const [activeDoc, setActiveDoc] = useState<DocumentSummary | null>(null);
+  const route = useAppRoute();
+  const view = route.kind === 'view' ? route.view : null;
+  const activeDoc = route.kind === 'reader' ? route.documentId : null;
   const [showOnlineLibrary, setShowOnlineLibrary] = useState(false);
-  const openDocument = useCallback((doc: DocumentSummary | Document) => setActiveDoc('chapters' in doc ? summarizeDocument(doc) : doc), []);
+  const routeIdentity = route.kind === 'view' ? route.view : route.kind === 'reader' ? route.documentId : route.kind;
+  useEffect(() => { setShowOnlineLibrary(false); }, [routeIdentity]);
+  const openDocument = useCallback((doc: DocumentSummary | Document) => navigate({kind: 'reader', documentId: doc.id}), []);
   const catalogAdmin = isCatalogAdmin(user);
 
-  const navigateToView = useCallback((nextView: View) => {
-    const nextPath = nextView === 'admin-catalog' ? '/admin/catalog' : '/';
-    if (window.location.pathname !== nextPath) {
-      window.history.pushState(null, '', nextPath);
-    }
-    setActiveDoc(null);
-    setView(nextView);
-  }, []);
-
-  useEffect(() => {
-    const handlePopState = () => {
-      setActiveDoc(null);
-      setView(getViewFromLocation());
-    };
-    window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
+  const navigateToView = useCallback((view: View) => {
+    setShowOnlineLibrary(false);
+    navigate({kind: 'view', view});
   }, []);
 
   const handleUploaded = useCallback(() => {
@@ -73,6 +61,8 @@ function AppContent() {
       </div>
     );
   }
+
+  if (route.kind === 'callback') return <OAuthCallback />;
 
   if (!user) {
     return <AuthScreen />;
@@ -152,7 +142,12 @@ function AppContent() {
       {/* Main content */}
       {!activeDoc && (view === 'library' || view === 'all-documents') && <QueryNotice error={docsError} retry={refetch} label="library" />}
       <main>
-        {view === 'admin-catalog' ? (
+        {route.kind === 'not-found' ? (
+          <div className="max-w-3xl mx-auto px-4 py-24 text-center">
+            <h1 className="text-2xl font-serif font-bold">Page unavailable</h1>
+            <button className="mt-6 underline" onClick={() => navigate({kind:'view',view:'library'},{replace:true})}>Return to library</button>
+          </div>
+        ) : view === 'admin-catalog' ? (
           catalogAdmin ? (
             <CatalogAdmin onBack={() => navigateToView('library')} />
           ) : (
@@ -168,7 +163,7 @@ function AppContent() {
             </div>
           )
         ) : activeDoc ? (
-          <ReaderLoader document={activeDoc} onBack={() => setActiveDoc(null)} />
+          <ReaderLoader key={activeDoc} documentId={activeDoc} onBack={() => navigateToView('library')} />
         ) : (
           <>
             {view === 'library' && !(docsError && documents.length === 0) && (
@@ -224,12 +219,12 @@ function AppContent() {
 
 function AccountContent() {
   const { user } = useAuth();
-  return <ToastProvider key={user?.id ?? 'signed-out'}><AppContent /></ToastProvider>;
+  return <SessionNavigationBoundary><ToastProvider key={user?.id ?? 'signed-out'}><AppContent /></ToastProvider></SessionNavigationBoundary>;
 }
 
 export default function App() {
   return (
-    <IntegrationContext.Provider value={integrations}><AuthProvider onAccountChange={setActiveAccount}>
+    <IntegrationContext.Provider value={integrations}><AuthProvider onAccountChange={applySessionAccount}>
       <AccountContent />
     </AuthProvider></IntegrationContext.Provider>
   );

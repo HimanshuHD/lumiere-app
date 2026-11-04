@@ -7,14 +7,14 @@ microservices, change the UI, or move authorization into the browser. Controller
 integration injection, generated application-schema types, response mappers, command outcomes and
 static enforcement are implemented in PR #30. There are **zero migration exceptions**.
 
-Implementation and automated validation are complete for this refactor. Live Supabase/OAuth/external
-catalog and signed-in manual acceptance remain owner validation before merging or closing #15.
+Issue #15 is closed after merged implementation/automated-validation reconciliation. Live
+Supabase/OAuth/external catalog acceptance is separate and is not implied by that closure.
 
 ## Responsibilities and entry points
 
 | Module | Owns | Does not own | Implementation |
 | --- | --- | --- | --- |
-| App shell/navigation | Providers, views, selected document identity, account composition | Queries or format resources | `App.tsx`, `app/account-runtime.ts`, `app/integrations.ts`, `app/progress-runtime.ts` |
+| App shell/navigation | Providers, views, selected document identity, account composition | Queries or format resources | `App.tsx`, `domain/navigation.ts`, `app/navigation.ts`, `app/SessionNavigationBoundary.tsx`, account/integration/progress runtimes |
 | Authentication | Session readiness, identity, sign-in/out, OAuth, password commands | Profile drafts or document authorization | `features/auth` public context contract; `context/AuthContext.tsx` session provider; auth integration port |
 | Profile | Profile read state, edit/save workflow, avatar preview cleanup | Session tokens or document storage | `features/profile` public API and injected profile repository |
 | Library | Lists, filters, details and collection presentation | Query construction or full-content caching | Library/AllDocuments/Bookmarks/ReadingList views and shared data hooks |
@@ -55,7 +55,7 @@ would not change responsibility ownership.
 
 | State/resource | Owner and lifetime |
 | --- | --- |
-| View/selected document | Account-keyed app shell; summaries identify documents; content loads on demand |
+| View/selected document | URL pathname via the app history adapter; document IDs resolve authorized content on demand |
 | Session | AuthProvider's single subscription, with late-initial-session guard and unsubscribe on unmount |
 | Profile display state | Profile data controller; account identity and request generation reject stale reads |
 | Server metadata/collections | AccountDataStore and immutable QueryCache snapshots; one store per account |
@@ -137,7 +137,7 @@ paths are outside this static check's scope. The exception list is empty; stale 
 CI runs schema drift checks, boundaries, TypeScript, lint, Node tests, production build and the isolated
 Chromium architecture smoke test. The latter uses mocked transport and generated PDF/EPUB fixtures,
 not a real account. See `docs/development/architecture-refactor-validation.md` for reproduction and
-live/manual acceptance. Keep #15 open until that acceptance is recorded and the owner merges.
+live/manual acceptance. Issue closure does not substitute for live-provider acceptance.
 
 
 ## Signed-URL recovery ownership (#32)
@@ -148,6 +148,21 @@ adapter supplies conservative expiration metadata. Transient failures may retain
 permission failures clear access. See `docs/development/async-lifecycle-regressions.md` for the exact
 retry policy and catalog/avatar ownership regression checks.
 
+
+## URL and session navigation (#16)
+
+Domain route contracts define the existing views and UUID reader IDs. The app history adapter owns
+push/replace/popstate subscriptions; components issue navigation commands instead of duplicating view
+or document identity in React state. Transient overlays remain local and close on route changes.
+ReaderLoader fetches authorized content by route ID, independently of library-list membership. Missing
+and RLS-hidden records share an unavailable response; the cache retains error categories for recovery.
+
+The session-navigation composition resets the URL before cache disposal notifies subscribers.
+SessionNavigationBoundary waits for auth readiness before mounting the new account; inactive identities
+cannot create account/progress stores through the UI hooks. Initial signed-out links survive email login; old history links reauthorize with the current
+account. OAuth returns through a base-aware callback and consumes a validated expiring per-tab target.
+See docs/decisions/0005-url-navigation.md and docs/development/url-navigation.md for ownership, hosting,
+return security and validation. No policy or database migration is introduced.
 
 ## Adding code
 

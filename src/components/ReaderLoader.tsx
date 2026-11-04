@@ -1,21 +1,21 @@
-import type {  DocumentSummary  } from '@/domain/document-summary';
 import { useDocumentContent } from '@/hooks/useData';
 import { Reader } from './Reader';
-import { QueryNotice } from '@/shared/ui';
-import { useAuth } from '@/features/auth';
-import { isDocumentLockedForUser } from '@/lib/documentAccess';
-import { DocumentAccessNotice } from './DocumentAccessNotice';
 
-export function ReaderLoader({ document, onBack }: { document: DocumentSummary; onBack: () => void }) {
-  const { user } = useAuth();
-  if (isDocumentLockedForUser(document, user?.id)) return <><button onClick={onBack}>Back to library</button><DocumentAccessNotice /></>;
-  return <ContentLoader key={document.id} id={document.id} onBack={onBack} />;
+export function ReaderLoader({ documentId, onBack }: { documentId: string; onBack: () => void }) {
+  return <ContentLoader key={documentId} id={documentId} onBack={onBack} />;
 }
 function ContentLoader({ id, onBack }: { id: string; onBack: () => void }) {
   const state = useDocumentContent(id);
-  return <>
-    {!state.data && <div className="p-8 text-center"><button className="underline" onClick={onBack}>Back to library</button></div>}
-    <QueryNotice loading={state.loading && !state.data} error={state.error} retry={state.refetch} label="document content" />
-    {state.data && <Reader document={state.data} onBack={onBack} />}
-  </>;
+  if (state.data) return <Reader key={id} document={state.data} onBack={onBack} />;
+  const error = state.error ? {category: state.errorCategory} : null;
+  const title = error?.category === 'permission' ? 'Document access denied'
+    : error ? 'Could not open document' : state.loading ? 'Opening document…' : 'Document unavailable';
+  return <section className="max-w-3xl mx-auto px-4 py-24 text-center" aria-busy={state.loading} aria-live="polite">
+    <h1 className="text-2xl font-serif font-bold text-stone-800">{title}</h1>
+    {!state.loading && <p className="mt-3 text-sm text-stone-500">{error
+      ? error.category === 'permission' ? 'Your current account cannot open this document.' : 'Please check your connection and try again.'
+      : 'This document may have been removed or may not be available to your account.'}</p>}
+    {error && error.category !== 'permission' && <button className="mt-6 mr-6 underline" onClick={state.refetch}>Retry</button>}
+    <button className="mt-6 underline" onClick={onBack}>Return to library</button>
+  </section>;
 }

@@ -9,7 +9,7 @@ export interface UserDataRepository {
   listLocked(signal: AbortSignal): Promise<DocumentSummary[]>;
   listMembershipIds(signal: AbortSignal): Promise<string[]>;
   listReferences(collection: CollectionName, signal: AbortSignal): Promise<BookmarkSummary[]>;
-  getDocument(id: string, signal: AbortSignal): Promise<Document>;
+  getDocument(id: string, signal: AbortSignal): Promise<Document | null>;
   getSummary(id: string): Promise<DocumentSummary>;
   saveReference(collection: CollectionName, id: string): Promise<CollectionReference>;
   deleteReferences(collection: CollectionName, id: string): Promise<number>;
