@@ -1,3 +1,4 @@
+import { Modal } from '@/shared/ui';
 import { DOCUMENT_CATEGORIES } from '@/domain/documents';
 import { readingProgressPercent as getProgressPercent } from '@/lib/readingProgressPercent';
 import { DemoBadge } from '@/components/DemoBadge';
@@ -256,7 +257,7 @@ export function Library({ documents, loading, onOpenDoc, onViewAll }: LibraryPro
 
       {/* Document Detail Modal */}
       {selectedDoc && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setSelectedDoc(null)}>
+        <Modal label="Document details" className="fixed inset-0 z-50 flex items-center justify-center p-4" onClose={() => setSelectedDoc(null)}>
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
           <div
             className="relative bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[85vh] overflow-y-auto"
@@ -264,6 +265,7 @@ export function Library({ documents, loading, onOpenDoc, onViewAll }: LibraryPro
           >
             <button
               onClick={() => setSelectedDoc(null)}
+              aria-label="Close document details"
               className="absolute top-4 right-4 w-8 h-8 rounded-full bg-stone-100 hover:bg-stone-200 flex items-center justify-center transition-colors z-10"
             >
               <X aria-hidden="true" className="w-4 h-4 text-stone-500" />
@@ -341,7 +343,7 @@ export function Library({ documents, loading, onOpenDoc, onViewAll }: LibraryPro
               </div>
             </div>
           </div>
-        </div>
+        </Modal>
       )}
 
       {/* Search and Filters */}

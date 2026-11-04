@@ -1,3 +1,4 @@
+import { Modal } from '@/shared/ui';
 import { DemoBadge } from '@/components/DemoBadge';
 import { ArrowLeft, ChevronLeft, ChevronRight, Bookmark, BookmarkCheck, Settings, List, X, Type, Moon, Sun, ScrollText } from 'lucide-react';
 import type { Document } from '@/domain/documents';
@@ -118,9 +119,9 @@ function ReaderSession({ document: doc, onBack }: ReaderProps) {
 
       {/* Settings Panel (text mode only) */}
       {textMode && showSettings && (
-        <div
+        <Modal label="Contents"
           className="fixed inset-0 z-50"
-          onClick={() => setShowSettings(false)}
+          onClose={() => setShowSettings(false)}
         >
           <div className={`absolute top-28 right-4 w-72 ${theme.cardBg} border ${theme.border} rounded-xl shadow-2xl p-5 z-50`} onClick={(e) => e.stopPropagation()}>
             <div className="space-y-5">
@@ -199,12 +200,12 @@ function ReaderSession({ document: doc, onBack }: ReaderProps) {
               </div>
             </div>
           </div>
-        </div>
+        </Modal>
       )}
 
       {/* TOC Drawer (text mode only) */}
       {textMode && showToc && (
-        <div className="fixed inset-0 z-50" onClick={() => setShowToc(false)}>
+        <Modal label="Contents" className="fixed inset-0 z-50" onClose={() => setShowToc(false)}>
           <div className="absolute inset-0 bg-black/30" />
           <div
             className={`absolute left-0 top-0 bottom-0 w-80 ${theme.sidebarBg} border-r ${theme.border} shadow-2xl overflow-y-auto`}
@@ -242,7 +243,7 @@ function ReaderSession({ document: doc, onBack }: ReaderProps) {
               ))}
             </div>
           </div>
-        </div>
+        </Modal>
       )}
 
       {/* PDF Reader (pdfjs-dist canvas) */}

@@ -1,3 +1,4 @@
+import { Modal } from '@/shared/ui';
 import { useCatalogController, canImportBook, getReadableFormat, type OpdsCatalog } from '@/features/catalog';
 import { X, Globe, ExternalLink, BookOpen, Search, ArrowLeft, Loader2, Download, AlertCircle, BookMarked, BookPlus } from 'lucide-react';
 import type { Document } from '@/domain/documents';
@@ -64,7 +65,7 @@ export function OnlineLibraryModal({ open, onClose, onBookAdded }: OnlineLibrary
     : OPDS_CATALOGS;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={handleClose}>
+    <Modal label="Online library" className="fixed inset-0 z-50 flex items-center justify-center p-4" onClose={handleClose}>
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
       <div
         className="relative bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[85vh] flex flex-col"
@@ -344,6 +345,6 @@ export function OnlineLibraryModal({ open, onClose, onBookAdded }: OnlineLibrary
           </>
         )}
       </div>
-    </div>
+    </Modal>
   );
 }

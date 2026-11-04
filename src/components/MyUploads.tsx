@@ -1,3 +1,4 @@
+import { Modal } from '@/shared/ui';
 import { DOCUMENT_CATEGORIES } from '@/domain/documents';
 import { useState } from 'react';
 import { AlertTriangle, FileEdit, Trash2, X, Loader2, BookOpen, Download, Pencil, Save } from 'lucide-react';
@@ -182,7 +183,7 @@ export function MyUploads() {
 
       {/* Delete confirmation */}
       {deleteDoc && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => !deleting && setDeleteDoc(null)}>
+        <Modal label="Delete document" className="fixed inset-0 z-50 flex items-center justify-center p-4" onClose={() => !deleting && setDeleteDoc(null)}>
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
           <div className="relative bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6" onClick={(e) => e.stopPropagation()}>
             <button aria-label="Close delete confirmation" disabled={deleting} onClick={() => !deleting && setDeleteDoc(null)} className="absolute top-4 right-4 w-8 h-8 rounded-full bg-stone-100 hover:bg-stone-200 flex items-center justify-center transition-colors">
@@ -245,7 +246,7 @@ export function MyUploads() {
               </button>
             </div>
           </div>
-        </div>
+        </Modal>
       )}
     </div>
   );
@@ -299,7 +300,7 @@ function EditDocumentModal({ doc, onClose, onSaved }: { doc: Document; onClose: 
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
+    <Modal label="Edit document" className="fixed inset-0 z-50 flex items-center justify-center p-4" onClose={() => { if (!saving) onClose(); }}>
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
       <div className="relative bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between p-6 border-b border-stone-200">
@@ -307,7 +308,7 @@ function EditDocumentModal({ doc, onClose, onSaved }: { doc: Document; onClose: 
             <Pencil aria-hidden="true" className="w-4 h-4 text-amber-600" />
             Edit Document
           </h3>
-          <button aria-label="Close edit document" onClick={onClose} className="w-8 h-8 rounded-full bg-stone-100 hover:bg-stone-200 flex items-center justify-center transition-colors">
+          <button aria-label="Close edit document" disabled={saving} onClick={onClose} className="w-8 h-8 rounded-full bg-stone-100 hover:bg-stone-200 flex items-center justify-center transition-colors">
             <X aria-hidden="true" className="w-4 h-4 text-stone-500" />
           </button>
         </div>
@@ -421,6 +422,7 @@ function EditDocumentModal({ doc, onClose, onSaved }: { doc: Document; onClose: 
           <div className="flex items-center gap-3 justify-end pt-4 border-t border-stone-200">
             <button
               onClick={onClose}
+              disabled={saving}
               className="px-4 py-2.5 text-sm font-medium text-stone-600 bg-white border border-stone-200 rounded-lg hover:bg-stone-50 transition-all"
             >
               Cancel
@@ -439,6 +441,6 @@ function EditDocumentModal({ doc, onClose, onSaved }: { doc: Document; onClose: 
           </div>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 }
