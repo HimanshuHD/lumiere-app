@@ -9,7 +9,7 @@ export function Profile() {
   if (loading) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center">
-        <Loader2 className="w-8 h-8 text-amber-600 animate-spin" />
+        <Loader2 aria-hidden="true" className="w-8 h-8 text-amber-600 animate-spin" />
       </div>
     );
   }
@@ -18,7 +18,7 @@ export function Profile() {
     <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="flex items-center gap-3 mb-8">
         <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center">
-          <User className="w-5 h-5 text-amber-700" />
+          <User aria-hidden="true" className="w-5 h-5 text-amber-700" />
         </div>
         <div>
           <h1 className="text-2xl font-serif font-bold text-stone-800">Profile</h1>
@@ -29,7 +29,7 @@ export function Profile() {
       {/* Avatar section */}
       <div className="bg-white rounded-2xl border border-stone-200 p-6 mb-6">
         <h2 className="text-sm font-semibold text-stone-700 mb-4 flex items-center gap-2">
-          <Camera className="w-4 h-4 text-stone-400" />
+          <Camera aria-hidden="true" className="w-4 h-4 text-stone-400" />
           Profile Picture
         </h2>
         <div className="flex items-center gap-6">
@@ -38,7 +38,7 @@ export function Profile() {
               {avatarPreview || avatarUrl ? (
                 <img src={avatarPreview || avatarUrl || ''} alt="Avatar" className="w-full h-full object-cover" />
               ) : (
-                <User className="w-10 h-10 text-stone-300" />
+                <User aria-hidden="true" className="w-10 h-10 text-stone-300" />
               )}
             </div>
           </div>
@@ -47,7 +47,7 @@ export function Profile() {
               onClick={() => avatarInputRef.current?.click()}
               className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-stone-700 bg-stone-100 hover:bg-stone-200 border border-stone-200 rounded-lg transition-all"
             >
-              <Camera className="w-4 h-4 text-stone-500" />
+              <Camera aria-hidden="true" className="w-4 h-4 text-stone-500" />
               Choose Image
             </button>
             <input
@@ -64,9 +64,9 @@ export function Profile() {
                 className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-amber-600 hover:bg-amber-500 rounded-lg transition-all disabled:opacity-50 shadow-lg shadow-amber-600/20"
               >
                 {uploadingAvatar ? (
-                  <><Loader2 className="w-4 h-4 animate-spin" /> Uploading...</>
+                  <><Loader2 aria-hidden="true" className="w-4 h-4 animate-spin" /> Uploading...</>
                 ) : (
-                  <><Save className="w-4 h-4" /> Save Picture</>
+                  <><Save aria-hidden="true" className="w-4 h-4" /> Save Picture</>
                 )}
               </button>
             )}
@@ -78,7 +78,7 @@ export function Profile() {
       {/* Name & email section */}
       <div className="bg-white rounded-2xl border border-stone-200 p-6 mb-6">
         <h2 className="text-sm font-semibold text-stone-700 mb-4 flex items-center gap-2">
-          <User className="w-4 h-4 text-stone-400" />
+          <User aria-hidden="true" className="w-4 h-4 text-stone-400" />
           Personal Information
         </h2>
         <div className="space-y-4">
@@ -95,9 +95,9 @@ export function Profile() {
           <div>
             <label className="block text-xs font-medium text-stone-500 mb-1.5">Email</label>
             <div className="flex items-center gap-2 px-4 py-2.5 bg-stone-50 border border-stone-200 rounded-lg">
-              <Mail className="w-4 h-4 text-stone-400" />
+              <Mail aria-hidden="true" className="w-4 h-4 text-stone-400" />
               <span className="text-sm text-stone-600">{user?.email}</span>
-              <CheckCircle2 className="w-4 h-4 text-green-500 ml-auto" />
+              <CheckCircle2 aria-hidden="true" className="w-4 h-4 text-green-500 ml-auto" />
             </div>
             <p className="text-xs text-stone-400 mt-1">Email cannot be changed</p>
           </div>
@@ -107,9 +107,9 @@ export function Profile() {
             className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-white bg-amber-600 hover:bg-amber-500 rounded-lg transition-all disabled:opacity-50 shadow-lg shadow-amber-600/20"
           >
             {savingName ? (
-              <><Loader2 className="w-4 h-4 animate-spin" /> Saving...</>
+              <><Loader2 aria-hidden="true" className="w-4 h-4 animate-spin" /> Saving...</>
             ) : (
-              <><Save className="w-4 h-4" /> Save Changes</>
+              <><Save aria-hidden="true" className="w-4 h-4" /> Save Changes</>
             )}
           </button>
         </div>
@@ -118,7 +118,7 @@ export function Profile() {
       {/* Password change section */}
       <div className="bg-white rounded-2xl border border-stone-200 p-6">
         <h2 className="text-sm font-semibold text-stone-700 mb-4 flex items-center gap-2">
-          <Lock className="w-4 h-4 text-stone-400" />
+          <Lock aria-hidden="true" className="w-4 h-4 text-stone-400" />
           Change Password
         </h2>
         <div className="space-y-4">
@@ -174,9 +174,9 @@ export function Profile() {
             className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-white bg-stone-800 hover:bg-stone-700 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {changingPassword ? (
-              <><Loader2 className="w-4 h-4 animate-spin" /> Updating...</>
+              <><Loader2 aria-hidden="true" className="w-4 h-4 animate-spin" /> Updating...</>
             ) : (
-              <><Lock className="w-4 h-4" /> Update Password</>
+              <><Lock aria-hidden="true" className="w-4 h-4" /> Update Password</>
             )}
           </button>
         </div>

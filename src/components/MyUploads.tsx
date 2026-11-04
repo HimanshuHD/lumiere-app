@@ -76,7 +76,7 @@ export function MyUploads() {
   if (loading && docs.length === 0) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center">
-        <Loader2 className="w-8 h-8 text-amber-600 animate-spin" />
+        <Loader2 aria-hidden="true" className="w-8 h-8 text-amber-600 animate-spin" />
       </div>
     );
   }
@@ -86,7 +86,7 @@ export function MyUploads() {
       <QueryNotice error={error} retry={refetch} label="uploads" />
       <div className="flex items-center gap-3 mb-8">
         <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center">
-          <FileEdit className="w-5 h-5 text-amber-700" />
+          <FileEdit aria-hidden="true" className="w-5 h-5 text-amber-700" />
         </div>
         <div>
           <h1 className="text-2xl font-serif font-bold text-stone-800">My Uploads</h1>
@@ -97,7 +97,7 @@ export function MyUploads() {
       {docs.length === 0 ? (
         <div className="text-center py-24">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-stone-100 mb-4">
-            <BookOpen className="w-8 h-8 text-stone-400" />
+            <BookOpen aria-hidden="true" className="w-8 h-8 text-stone-400" />
           </div>
           <p className="text-stone-500 text-sm mb-1">No uploads yet</p>
           <p className="text-stone-400 text-xs">Documents you upload will appear here.</p>
@@ -147,16 +147,16 @@ export function MyUploads() {
                       <button
                         onClick={() => setEditDoc(doc)}
                         className="p-2 rounded-lg text-stone-500 hover:text-amber-600 hover:bg-amber-50 transition-colors"
-                        title="Edit"
+                        title="Edit" aria-label={`Edit ${doc.title}`}
                       >
-                        <Pencil className="w-4 h-4" />
+                        <Pencil aria-hidden="true" className="w-4 h-4" />
                       </button>
                       <button
                         onClick={() => void prepareDelete(doc)}
                         className="p-2 rounded-lg text-stone-500 hover:text-red-600 hover:bg-red-50 transition-colors"
-                        title="Delete"
+                        title="Delete" aria-label={`Delete ${doc.title}`}
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <Trash2 aria-hidden="true" className="w-4 h-4" />
                       </button>
                     </div>
                   </td>
@@ -185,12 +185,12 @@ export function MyUploads() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => !deleting && setDeleteDoc(null)}>
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
           <div className="relative bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6" onClick={(e) => e.stopPropagation()}>
-            <button onClick={() => !deleting && setDeleteDoc(null)} className="absolute top-4 right-4 w-8 h-8 rounded-full bg-stone-100 hover:bg-stone-200 flex items-center justify-center transition-colors">
-              <X className="w-4 h-4 text-stone-500" />
+            <button aria-label="Close delete confirmation" disabled={deleting} onClick={() => !deleting && setDeleteDoc(null)} className="absolute top-4 right-4 w-8 h-8 rounded-full bg-stone-100 hover:bg-stone-200 flex items-center justify-center transition-colors">
+              <X aria-hidden="true" className="w-4 h-4 text-stone-500" />
             </button>
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center">
-                <Trash2 className="w-5 h-5 text-red-600" />
+                <Trash2 aria-hidden="true" className="w-5 h-5 text-red-600" />
               </div>
               <h3 className="text-lg font-serif font-bold text-stone-800">Delete Document?</h3>
             </div>
@@ -199,7 +199,7 @@ export function MyUploads() {
             </p>
             {loadingDeletionImpact ? (
               <div className="flex items-center gap-2 text-sm text-stone-500 mb-6">
-                <Loader2 className="h-4 w-4 animate-spin" /> Checking who will be affected...
+                <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" /> Checking who will be affected...
               </div>
             ) : deletionImpactError ? (
               <div className="mb-6 space-y-3">
@@ -214,7 +214,7 @@ export function MyUploads() {
             ) : deletionImpact && (
               <div className="mb-6 rounded-lg border border-red-100 bg-red-50 p-3">
                 <p className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-red-800">
-                  <AlertTriangle className="h-4 w-4" /> Distinct affected users by reference type
+                  <AlertTriangle aria-hidden="true" className="h-4 w-4" /> Distinct affected users by reference type
                 </p>
                 <ul className="space-y-1 text-sm text-red-800">
                   <li>{deletionImpact.bookmarkUsers} bookmarked</li>
@@ -238,9 +238,9 @@ export function MyUploads() {
                 className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-500 rounded-lg transition-all disabled:opacity-50"
               >
                 {deleting ? (
-                  <><Loader2 className="w-4 h-4 animate-spin" /> Deleting...</>
+                  <><Loader2 aria-hidden="true" className="w-4 h-4 animate-spin" /> Deleting...</>
                 ) : (
-                  <><Trash2 className="w-4 h-4" /> Delete</>
+                  <><Trash2 aria-hidden="true" className="w-4 h-4" /> Delete</>
                 )}
               </button>
             </div>
@@ -304,11 +304,11 @@ function EditDocumentModal({ doc, onClose, onSaved }: { doc: Document; onClose: 
       <div className="relative bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between p-6 border-b border-stone-200">
           <h3 className="text-lg font-serif font-bold text-stone-800 flex items-center gap-2">
-            <Pencil className="w-4 h-4 text-amber-600" />
+            <Pencil aria-hidden="true" className="w-4 h-4 text-amber-600" />
             Edit Document
           </h3>
-          <button onClick={onClose} className="w-8 h-8 rounded-full bg-stone-100 hover:bg-stone-200 flex items-center justify-center transition-colors">
-            <X className="w-4 h-4 text-stone-500" />
+          <button aria-label="Close edit document" onClick={onClose} className="w-8 h-8 rounded-full bg-stone-100 hover:bg-stone-200 flex items-center justify-center transition-colors">
+            <X aria-hidden="true" className="w-4 h-4 text-stone-500" />
           </button>
         </div>
         <div className="p-6 space-y-5">
@@ -322,7 +322,7 @@ function EditDocumentModal({ doc, onClose, onSaved }: { doc: Document; onClose: 
                   download={doc.file_name || undefined}
                   className="inline-flex items-center gap-1.5 text-xs text-amber-600 hover:text-amber-700 font-medium mt-1"
                 >
-                  <Download className="w-3 h-3" />
+                  <Download aria-hidden="true" className="w-3 h-3" />
                   Download original
                 </DocumentFileLink>
               )}
@@ -331,7 +331,7 @@ function EditDocumentModal({ doc, onClose, onSaved }: { doc: Document; onClose: 
               <div className="absolute inset-0 z-10 flex items-center justify-center rounded-2xl bg-black/40 p-5">
                 <div className="w-full rounded-xl bg-white p-5 shadow-xl">
                   <div className="mb-3 flex items-center gap-2 text-amber-800">
-                    <AlertTriangle className="h-5 w-5" />
+                    <AlertTriangle aria-hidden="true" className="h-5 w-5" />
                     <h4 className="font-semibold">Make this document private?</h4>
                   </div>
                   <p className="mb-5 text-sm leading-relaxed text-stone-600">
@@ -350,7 +350,7 @@ function EditDocumentModal({ doc, onClose, onSaved }: { doc: Document; onClose: 
                       disabled={saving}
                       className="inline-flex items-center gap-2 rounded-lg bg-amber-700 px-4 py-2 text-sm font-medium text-white hover:bg-amber-800 disabled:opacity-50"
                     >
-                      {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+                      {saving && <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />}
                       Make Private
                     </button>
                   </div>
@@ -430,9 +430,9 @@ function EditDocumentModal({ doc, onClose, onSaved }: { doc: Document; onClose: 
               className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-white bg-amber-600 hover:bg-amber-500 rounded-lg transition-all disabled:opacity-50 shadow-lg shadow-amber-600/20"
             >
               {saving ? (
-                <><Loader2 className="w-4 h-4 animate-spin" /> Saving...</>
+                <><Loader2 aria-hidden="true" className="w-4 h-4 animate-spin" /> Saving...</>
               ) : (
-                <><Save className="w-4 h-4" /> Save Changes</>
+                <><Save aria-hidden="true" className="w-4 h-4" /> Save Changes</>
               )}
             </button>
           </div>

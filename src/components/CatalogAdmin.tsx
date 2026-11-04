@@ -131,10 +131,10 @@ export function CatalogAdmin({ onBack }: CatalogAdminProps) {
           aria-label="Back to library"
           className="p-2 rounded-lg text-stone-500 hover:text-stone-800 hover:bg-stone-100"
         >
-          <ArrowLeft className="w-5 h-5" />
+          <ArrowLeft aria-hidden="true" className="w-5 h-5" />
         </button>
         <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center">
-          <Shield className="w-5 h-5 text-amber-700" />
+          <Shield aria-hidden="true" className="w-5 h-5 text-amber-700" />
         </div>
         <div>
           <h1 className="text-2xl font-serif font-bold text-stone-800">Catalog maintenance</h1>
@@ -157,14 +157,14 @@ export function CatalogAdmin({ onBack }: CatalogAdminProps) {
             disabled={retryingCleanup}
             className="inline-flex items-center gap-2 rounded-lg bg-amber-700 px-3 py-2 text-sm font-medium text-white hover:bg-amber-800 disabled:opacity-50"
           >
-            {retryingCleanup && <Loader2 className="h-4 w-4 animate-spin" />}
+            {retryingCleanup && <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />}
             Retry cleanup
           </button>
         </div>
       )}
 
       <div className="relative mb-5 max-w-lg">
-        <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-400" />
+        <Search aria-hidden="true" className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-400" />
         <input
           value={search}
           onChange={(event) => setSearch(event.target.value)}
@@ -175,7 +175,7 @@ export function CatalogAdmin({ onBack }: CatalogAdminProps) {
 
       {(loading || catalogLoading) ? (
         <div className="flex min-h-48 items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-amber-600" />
+          <Loader2 aria-hidden="true" className="h-8 w-8 animate-spin text-amber-600" />
         </div>
       ) : (loadError || catalogError) ? (
         <div className="rounded-xl border border-red-200 bg-red-50 p-5 text-sm text-red-800">
@@ -216,7 +216,7 @@ export function CatalogAdmin({ onBack }: CatalogAdminProps) {
                       onClick={() => void prepareDelete(document)}
                       className="inline-flex items-center gap-2 rounded-lg border border-red-200 px-3 py-2 text-xs font-medium text-red-700 hover:bg-red-50"
                     >
-                      <Trash2 className="h-3.5 w-3.5" />
+                      <Trash2 aria-hidden="true" className="h-3.5 w-3.5" />
                       Global delete
                     </button>
                   </td>
@@ -237,7 +237,7 @@ export function CatalogAdmin({ onBack }: CatalogAdminProps) {
           >
             <div className="mb-4 flex items-start gap-3">
               <div className="rounded-xl bg-red-100 p-2.5">
-                <AlertTriangle className="h-5 w-5 text-red-700" />
+                <AlertTriangle aria-hidden="true" className="h-5 w-5 text-red-700" />
               </div>
               <div>
                 <h2 id="catalog-delete-title" className="text-lg font-semibold text-stone-900">
@@ -249,7 +249,7 @@ export function CatalogAdmin({ onBack }: CatalogAdminProps) {
 
             {loadingImpact ? (
               <div className="flex items-center gap-2 py-4 text-sm text-stone-500">
-                <Loader2 className="h-4 w-4 animate-spin" />
+                <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />
                 Loading affected-user counts...
               </div>
             ) : impactError ? (
@@ -282,7 +282,7 @@ export function CatalogAdmin({ onBack }: CatalogAdminProps) {
                 disabled={!impact || loadingImpact || Boolean(impactError) || deleting}
                 className="inline-flex items-center gap-2 rounded-lg bg-red-700 px-4 py-2 text-sm font-medium text-white hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {deleting && <Loader2 className="h-4 w-4 animate-spin" />}
+                {deleting && <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />}
                 Permanently delete
               </button>
             </div>

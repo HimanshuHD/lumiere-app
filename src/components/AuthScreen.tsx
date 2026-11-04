@@ -58,7 +58,7 @@ export function AuthScreen() {
       <div className="relative w-full max-w-md">
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-amber-600/20 border border-amber-500/30 mb-4">
-            <BookOpen className="w-8 h-8 text-amber-400" />
+            <BookOpen aria-hidden="true" className="w-8 h-8 text-amber-400" />
           </div>
           <h1 className="text-3xl font-serif font-bold text-stone-100 tracking-tight">Lumiere</h1>
           <p className="text-stone-400 mt-2 text-sm">Your personal reading sanctuary</p>
@@ -96,7 +96,7 @@ export function AuthScreen() {
               className="w-full py-3 bg-white hover:bg-stone-50 text-stone-700 font-medium rounded-lg transition-all border border-stone-300 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-3"
             >
               {googleLoading ? (
-                <Loader2 className="w-5 h-5 animate-spin text-stone-500" />
+                <Loader2 aria-hidden="true" className="w-5 h-5 animate-spin text-stone-500" />
               ) : (
                 <GoogleIcon className="w-5 h-5" />
               )}
@@ -117,7 +117,7 @@ export function AuthScreen() {
                 Email
               </label>
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-500" />
+                <Mail aria-hidden="true" className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-500" />
                 <input
                   type="email"
                   required
@@ -137,7 +137,7 @@ export function AuthScreen() {
                 Password
               </label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-500" />
+                <Lock aria-hidden="true" className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-500" />
                 <input
                   type={showPassword ? 'text' : 'password'}
                   required
@@ -172,7 +172,7 @@ export function AuthScreen() {
 
             {mode === 'signup' && (
               <div className="flex items-center gap-2 text-xs text-stone-500">
-                <UserIcon className="w-3.5 h-3.5" />
+                <UserIcon aria-hidden="true" className="w-3.5 h-3.5" />
                 <span>Your account is created instantly — no email confirmation needed.</span>
               </div>
             )}
@@ -182,7 +182,7 @@ export function AuthScreen() {
               disabled={loading}
               className="w-full py-3 bg-amber-600 hover:bg-amber-500 text-white font-medium rounded-lg transition-all shadow-lg shadow-amber-600/20 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
-              {loading && <Loader2 className="w-4 h-4 animate-spin" />}
+              {loading && <Loader2 aria-hidden="true" className="w-4 h-4 animate-spin" />}
               {mode === 'signin' ? 'Sign In' : 'Create Account'}
             </button>
           </form>

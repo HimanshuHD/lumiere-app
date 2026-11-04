@@ -94,9 +94,10 @@ export function AllDocuments({
       <div className="flex items-center gap-3 mb-6">
         <button
           onClick={onBack}
+          aria-label="Back to library"
           className="p-2 rounded-lg text-stone-500 hover:text-stone-800 hover:bg-stone-100 transition-colors"
         >
-          <ArrowLeft className="w-5 h-5" />
+          <ArrowLeft aria-hidden="true" className="w-5 h-5" />
         </button>
         <div>
           <h1 className="text-2xl font-serif font-bold text-stone-800">All Documents</h1>
@@ -107,7 +108,7 @@ export function AllDocuments({
       {/* Search */}
       <div className="mb-6">
         <div className="relative max-w-md">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
+          <Search aria-hidden="true" className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
           <input
             type="text"
             value={search}
@@ -148,7 +149,7 @@ export function AllDocuments({
                       <div className="flex items-center gap-3">
                         <DocumentCover document={doc} className="w-8 h-11 object-cover rounded flex-shrink-0" />
                         <div className="min-w-0 overflow-hidden">
-                          <p className="text-sm font-medium text-stone-800 truncate group-hover:text-amber-700 transition-colors">{doc.title}</p>
+                          <p className="text-sm font-medium text-stone-800 truncate group-hover:text-amber-700 transition-colors"><button type="button" className="text-left rounded" disabled={isDocumentLockedForUser(doc, user?.id)} aria-label={`Open ${doc.title}`} onClick={(event) => { event.stopPropagation(); onOpenDoc(doc); }}>{doc.title}</button></p>
                           <DemoBadge document={doc} />
                           {locked && <div className="mt-1 max-w-xs"><DocumentAccessNotice /></div>}
                           <p className="text-xs text-stone-400 sm:hidden truncate">{doc.author}</p>
@@ -156,7 +157,7 @@ export function AllDocuments({
                             <span className="text-[10px] px-1.5 py-0.5 bg-stone-100 text-stone-500 rounded font-medium">{doc.category}</span>
                             {doc.page_count && (
                               <span className="text-[10px] text-stone-400 flex items-center gap-0.5">
-                                <Hash className="w-2.5 h-2.5" />
+                                <Hash aria-hidden="true" className="w-2.5 h-2.5" />
                                 {doc.page_count}p
                               </span>
                             )}
@@ -168,7 +169,7 @@ export function AllDocuments({
                     <td className="px-4 py-3 text-sm text-stone-600 hidden md:table-cell">
                       {doc.uploaded_by ? (
                         <span className="inline-flex items-center gap-1 text-stone-600">
-                          <User className="w-3 h-3 text-stone-400" />
+                          <User aria-hidden="true" className="w-3 h-3 text-stone-400" />
                           Member
                         </span>
                       ) : (
@@ -178,7 +179,7 @@ export function AllDocuments({
                     <td className="px-4 py-3 text-sm text-stone-500 hidden lg:table-cell">{timeLabel}</td>
                     <td className="px-4 py-3 text-sm text-stone-500 hidden sm:table-cell">
                       <span className="inline-flex items-center gap-1">
-                        <Clock className="w-3 h-3" />
+                        <Clock aria-hidden="true" className="w-3 h-3" />
                         {doc.reading_time}m
                       </span>
                     </td>
@@ -200,7 +201,7 @@ export function AllDocuments({
                             {removingDocumentId === doc.id ? (
                               <span className="block w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
                             ) : (
-                              <BookMinus className="w-4 h-4" />
+                              <BookMinus aria-hidden="true" className="w-4 h-4" />
                             )}
                           </button>
                         )}
@@ -231,7 +232,7 @@ export function AllDocuments({
             disabled={currentPage === 0}
             className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-stone-600 bg-white border border-stone-200 rounded-lg hover:bg-stone-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
           >
-            <ChevronLeft className="w-4 h-4" />
+            <ChevronLeft aria-hidden="true" className="w-4 h-4" />
             Previous
           </button>
           <div className="flex items-center gap-1">
@@ -255,7 +256,7 @@ export function AllDocuments({
             className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-stone-600 bg-white border border-stone-200 rounded-lg hover:bg-stone-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
           >
             Next
-            <ChevronRight className="w-4 h-4" />
+            <ChevronRight aria-hidden="true" className="w-4 h-4" />
           </button>
         </div>
       )}

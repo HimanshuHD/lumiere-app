@@ -8,7 +8,7 @@ export function PdfViewer(props: PdfViewerProps) {
     return (
       <div className="flex items-center justify-center h-[calc(100vh-7rem)]">
         <div className="flex flex-col items-center gap-3">
-          <Loader2 className="w-8 h-8 text-amber-600 animate-spin" />
+          <Loader2 aria-hidden="true" className="w-8 h-8 text-amber-600 animate-spin" />
           <p className="text-sm text-stone-500">Loading PDF...</p>
         </div>
       </div>
@@ -55,7 +55,7 @@ export function PdfViewer(props: PdfViewerProps) {
           disabled={pageNum <= 1}
           className="p-1.5 rounded-lg text-stone-600 hover:bg-stone-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
         >
-          <ChevronLeft className="w-4 h-4" />
+          <ChevronLeft aria-hidden="true" className="w-4 h-4" />
         </button>
         <span className="text-sm text-stone-600 font-medium min-w-[80px] text-center">
           {pageNum} / {totalPages}
@@ -66,7 +66,7 @@ export function PdfViewer(props: PdfViewerProps) {
           disabled={pageNum >= totalPages}
           className="p-1.5 rounded-lg text-stone-600 hover:bg-stone-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
         >
-          <ChevronRight className="w-4 h-4" />
+          <ChevronRight aria-hidden="true" className="w-4 h-4" />
         </button>
         <div className="w-px h-5 bg-stone-200 mx-1" />
         <button
@@ -74,7 +74,7 @@ export function PdfViewer(props: PdfViewerProps) {
           aria-label="Zoom out"
           className="p-1.5 rounded-lg text-stone-600 hover:bg-stone-100 transition-colors"
         >
-          <ZoomOut className="w-4 h-4" />
+          <ZoomOut aria-hidden="true" className="w-4 h-4" />
         </button>
         <span className="text-xs text-stone-400 min-w-[40px] text-center">{Math.round(displayScale * 100)}%</span>
         <button
@@ -82,7 +82,7 @@ export function PdfViewer(props: PdfViewerProps) {
           aria-label="Zoom in"
           className="p-1.5 rounded-lg text-stone-600 hover:bg-stone-100 transition-colors"
         >
-          <ZoomIn className="w-4 h-4" />
+          <ZoomIn aria-hidden="true" className="w-4 h-4" />
         </button>
         <button
           onClick={fitToWidth}

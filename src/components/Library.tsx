@@ -93,7 +93,7 @@ export function Library({ documents, loading, onOpenDoc, onViewAll }: LibraryPro
           </div>
           <div className="relative p-8 sm:p-12 lg:p-16 min-h-[320px] sm:min-h-[380px] flex flex-col justify-end">
             <div className="flex items-center gap-2 mb-3">
-              <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
+              <Star aria-hidden="true" className="w-4 h-4 text-amber-400 fill-amber-400" />
               <span className="text-amber-400 text-xs font-medium uppercase tracking-widest">Featured Read</span>
             </div>
             <h1 className="text-3xl sm:text-4xl lg:text-5xl font-serif font-bold text-white tracking-tight mb-3 max-w-2xl">
@@ -106,13 +106,13 @@ export function Library({ documents, loading, onOpenDoc, onViewAll }: LibraryPro
             <div className="flex items-center gap-4 text-stone-400 text-sm">
               <span className="font-medium text-stone-200">{featured.author}</span>
               <span className="flex items-center gap-1">
-                <Clock className="w-3.5 h-3.5" />
+                <Clock aria-hidden="true" className="w-3.5 h-3.5" />
                 {featured.reading_time} min read
               </span>
               <span className="px-2.5 py-0.5 bg-white/10 rounded-full text-xs">{featured.category}</span>
             </div>
-            <button className="mt-6 inline-flex items-center gap-2 px-5 py-2.5 bg-amber-600 hover:bg-amber-500 text-white text-sm font-medium rounded-lg transition-all w-fit shadow-lg shadow-amber-600/20">
-              <Play className="w-4 h-4" />
+            <button onClick={(event) => { event.stopPropagation(); onOpenDoc(featured); }} className="mt-6 inline-flex items-center gap-2 px-5 py-2.5 bg-amber-600 hover:bg-amber-500 text-white text-sm font-medium rounded-lg transition-all w-fit shadow-lg shadow-amber-600/20">
+              <Play aria-hidden="true" className="w-4 h-4" />
               Start Reading
             </button>
           </div>
@@ -138,9 +138,7 @@ export function Library({ documents, loading, onOpenDoc, onViewAll }: LibraryPro
                 >
                   <DocumentCover document={doc} className="w-16 h-24 object-cover rounded-md flex-shrink-0" />
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-serif font-semibold text-stone-800 text-sm truncate group-hover:text-amber-700 transition-colors">
-                      {doc.title}
-                    </h3>
+                    <h3 className="font-serif font-semibold text-stone-800 text-sm truncate group-hover:text-amber-700 transition-colors"><button type="button" className="text-left rounded" disabled={isDocumentLockedForUser(doc, user?.id)} aria-label={`Open ${doc.title}`} onClick={(event) => { event.stopPropagation(); onOpenDoc(doc); }}>{doc.title}</button></h3>
                     <DemoBadge document={doc} />
                     <p className="text-xs text-stone-500 mb-2">{doc.author}</p>
                     {locked && <div className="mb-2"><DocumentAccessNotice /></div>}
@@ -163,7 +161,7 @@ export function Library({ documents, loading, onOpenDoc, onViewAll }: LibraryPro
         <div className="mb-10">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-amber-600" />
+              <Sparkles aria-hidden="true" className="w-5 h-5 text-amber-600" />
               <h2 className="text-lg font-serif font-bold text-stone-800">Recent Additions</h2>
             </div>
             <button
@@ -171,7 +169,7 @@ export function Library({ documents, loading, onOpenDoc, onViewAll }: LibraryPro
               className="inline-flex items-center gap-1 text-xs font-medium text-amber-600 hover:text-amber-700 transition-colors"
             >
               View All
-              <ChevronRight className="w-3.5 h-3.5" />
+              <ChevronRight aria-hidden="true" className="w-3.5 h-3.5" />
             </button>
           </div>
           <div className="overflow-hidden rounded-xl border border-stone-200 bg-white">
@@ -204,7 +202,7 @@ export function Library({ documents, loading, onOpenDoc, onViewAll }: LibraryPro
                         <div className="flex items-center gap-3">
                           <DocumentCover document={doc} className="w-8 h-11 object-cover rounded flex-shrink-0" />
                           <div className="min-w-0">
-                            <p className="text-sm font-medium text-stone-800 truncate group-hover:text-amber-700 transition-colors">{doc.title}</p>
+                            <p className="text-sm font-medium text-stone-800 truncate group-hover:text-amber-700 transition-colors"><button type="button" className="text-left rounded" disabled={isDocumentLockedForUser(doc, user?.id)} aria-label={`Open ${doc.title}`} onClick={(event) => { event.stopPropagation(); setSelectedDoc(doc); }}>{doc.title}</button></p>
                             <DemoBadge document={doc} />
                             {isDocumentLockedForUser(doc, user?.id) && <div className="mt-1 max-w-xs"><DocumentAccessNotice /></div>}
                             <p className="text-xs text-stone-400 sm:hidden">{doc.author}</p>
@@ -212,7 +210,7 @@ export function Library({ documents, loading, onOpenDoc, onViewAll }: LibraryPro
                               <span className="text-[10px] px-1.5 py-0.5 bg-stone-100 text-stone-500 rounded font-medium">{doc.category}</span>
                               {doc.page_count && (
                                 <span className="text-[10px] text-stone-400 flex items-center gap-0.5">
-                                  <Hash className="w-2.5 h-2.5" />
+                                  <Hash aria-hidden="true" className="w-2.5 h-2.5" />
                                   {doc.page_count}p
                                 </span>
                               )}
@@ -224,7 +222,7 @@ export function Library({ documents, loading, onOpenDoc, onViewAll }: LibraryPro
                       <td className="px-4 py-3 text-sm text-stone-600 hidden md:table-cell">
                         {doc.uploaded_by ? (
                           <span className="inline-flex items-center gap-1 text-stone-600">
-                            <User className="w-3 h-3 text-stone-400" />
+                            <User aria-hidden="true" className="w-3 h-3 text-stone-400" />
                             Member
                           </span>
                         ) : (
@@ -234,14 +232,15 @@ export function Library({ documents, loading, onOpenDoc, onViewAll }: LibraryPro
                       <td className="px-4 py-3 text-sm text-stone-500 hidden lg:table-cell">{timeLabel}</td>
                       <td className="px-4 py-3 text-sm text-stone-500 hidden sm:table-cell">
                         <span className="inline-flex items-center gap-1">
-                          <Clock className="w-3 h-3" />
+                          <Clock aria-hidden="true" className="w-3 h-3" />
                           {doc.reading_time}m
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right">
                         <button
                           disabled={isDocumentLockedForUser(doc, user?.id)}
-                          className="text-xs text-amber-600 font-medium opacity-0 group-hover:opacity-100 transition-opacity disabled:hidden"
+                          onClick={(event) => { event.stopPropagation(); setSelectedDoc(doc); }}
+                          className="text-xs text-amber-600 font-medium opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity disabled:hidden"
                         >
                           Details
                         </button>
@@ -267,7 +266,7 @@ export function Library({ documents, loading, onOpenDoc, onViewAll }: LibraryPro
               onClick={() => setSelectedDoc(null)}
               className="absolute top-4 right-4 w-8 h-8 rounded-full bg-stone-100 hover:bg-stone-200 flex items-center justify-center transition-colors z-10"
             >
-              <X className="w-4 h-4 text-stone-500" />
+              <X aria-hidden="true" className="w-4 h-4 text-stone-500" />
             </button>
             <div className="flex flex-col sm:flex-row gap-6 p-6">
               <DocumentCover document={selectedDoc} className="w-32 h-44 object-cover rounded-lg shadow-md flex-shrink-0 mx-auto sm:mx-0" />
@@ -287,21 +286,21 @@ export function Library({ documents, loading, onOpenDoc, onViewAll }: LibraryPro
                   <div className="p-2.5 bg-stone-50 rounded-lg">
                     <p className="text-xs text-stone-400 mb-0.5">Read Time</p>
                     <p className="text-sm font-medium text-stone-700 flex items-center gap-1">
-                      <Clock className="w-3 h-3" /> {selectedDoc.reading_time} min
+                      <Clock aria-hidden="true" className="w-3 h-3" /> {selectedDoc.reading_time} min
                     </p>
                   </div>
                   {selectedDoc.page_count && (
                     <div className="p-2.5 bg-stone-50 rounded-lg">
                       <p className="text-xs text-stone-400 mb-0.5">Pages</p>
                       <p className="text-sm font-medium text-stone-700 flex items-center gap-1">
-                        <Hash className="w-3 h-3" /> {selectedDoc.page_count}
+                        <Hash aria-hidden="true" className="w-3 h-3" /> {selectedDoc.page_count}
                       </p>
                     </div>
                   )}
                   <div className="p-2.5 bg-stone-50 rounded-lg">
                     <p className="text-xs text-stone-400 mb-0.5">Chapters</p>
                     <p className="text-sm font-medium text-stone-700 flex items-center gap-1">
-                      <FileText className="w-3 h-3" /> {selectedDoc.chapter_count}
+                      <FileText aria-hidden="true" className="w-3 h-3" /> {selectedDoc.chapter_count}
                     </p>
                   </div>
                 </div>
@@ -318,7 +317,7 @@ export function Library({ documents, loading, onOpenDoc, onViewAll }: LibraryPro
                       download={selectedDoc.file_name || undefined}
                       className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-stone-700 bg-stone-100 hover:bg-stone-200 border border-stone-200 rounded-lg transition-all"
                     >
-                      <Download className="w-4 h-4 text-stone-500" />
+                      <Download aria-hidden="true" className="w-4 h-4 text-stone-500" />
                       Download original {(selectedDoc.file_format || 'file').toUpperCase()}
                     </DocumentFileLink>
                   )}
@@ -329,7 +328,7 @@ export function Library({ documents, loading, onOpenDoc, onViewAll }: LibraryPro
                         onClick={() => { onOpenDoc(selectedDoc); setSelectedDoc(null); }}
                         className="inline-flex items-center gap-2 px-5 py-2.5 bg-amber-600 hover:bg-amber-500 text-white text-sm font-medium rounded-lg transition-all shadow-lg shadow-amber-600/20"
                       >
-                        <Play className="w-4 h-4" />
+                        <Play aria-hidden="true" className="w-4 h-4" />
                         {!selectedProgress
                           ? 'Start Reading'
                           : selectedDoc.page_count == null
@@ -348,7 +347,7 @@ export function Library({ documents, loading, onOpenDoc, onViewAll }: LibraryPro
       {/* Search and Filters */}
       <div className="mb-6 space-y-4">
         <div className="relative">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
+          <Search aria-hidden="true" className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
           <input
             type="text"
             value={search}
@@ -363,6 +362,7 @@ export function Library({ documents, loading, onOpenDoc, onViewAll }: LibraryPro
             <button
               key={cat}
               onClick={() => setActiveCategory(cat)}
+              aria-pressed={activeCategory === cat}
               className={`px-3.5 py-1.5 text-xs font-medium rounded-full transition-all ${
                 activeCategory === cat
                   ? 'bg-stone-900 text-white'
@@ -398,7 +398,7 @@ export function Library({ documents, loading, onOpenDoc, onViewAll }: LibraryPro
                 {locked && <DocumentAccessNotice overlay />}
                 {bookmarked && (
                   <div className="absolute top-2 right-2 w-7 h-7 rounded-full bg-white/90 flex items-center justify-center shadow-md">
-                    <BookMarked className="w-3.5 h-3.5 text-amber-600" />
+                    <BookMarked aria-hidden="true" className="w-3.5 h-3.5 text-amber-600" />
                   </div>
                 )}
                 {totalPercent > 0 && (
@@ -408,14 +408,12 @@ export function Library({ documents, loading, onOpenDoc, onViewAll }: LibraryPro
                 )}
                 {!locked && <div className="absolute bottom-3 left-3 right-3 opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 transition-all">
                   <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/95 text-stone-900 text-xs font-medium rounded-lg shadow-lg">
-                    <Play className="w-3 h-3" />
+                    <Play aria-hidden="true" className="w-3 h-3" />
                     {totalPercent > 0 ? 'Continue' : 'Read Now'}
                   </span>
                 </div>}
               </div>
-              <h3 className="font-serif font-semibold text-stone-800 text-sm leading-snug line-clamp-2 group-hover:text-amber-700 transition-colors">
-                {doc.title}
-              </h3>
+              <h3 className="font-serif font-semibold text-stone-800 text-sm leading-snug line-clamp-2 group-hover:text-amber-700 transition-colors"><button type="button" className="text-left rounded" disabled={isDocumentLockedForUser(doc, user?.id)} aria-label={`Open ${doc.title}`} onClick={(event) => { event.stopPropagation(); onOpenDoc(doc); }}>{doc.title}</button></h3>
               <DemoBadge document={doc} />
               <p className="text-xs text-stone-500 mt-0.5">{doc.author}</p>
               <div className="flex items-center gap-2 mt-1.5">
@@ -423,7 +421,7 @@ export function Library({ documents, loading, onOpenDoc, onViewAll }: LibraryPro
                   {doc.category}
                 </span>
                 <span className="flex items-center gap-0.5 text-[10px] text-stone-400">
-                  <Clock className="w-2.5 h-2.5" />
+                  <Clock aria-hidden="true" className="w-2.5 h-2.5" />
                   {doc.reading_time}m
                 </span>
               </div>

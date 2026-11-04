@@ -80,15 +80,15 @@ export function OnlineLibraryModal({ open, onClose, onBookAdded }: OnlineLibrary
                 title="Back to catalogs"
                 className="flex items-center text-stone-600 hover:text-stone-900 transition-colors flex-shrink-0"
               >
-                <ArrowLeft className="w-4 h-4" />
+                <ArrowLeft aria-hidden="true" className="w-4 h-4" />
               </button>
             ) : null}
             <div className="flex items-center gap-3 min-w-0">
               <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${selectedCatalog ? selectedCatalog.accent : 'from-blue-500 to-blue-600'} flex items-center justify-center shadow-md flex-shrink-0`}>
                 {selectedCatalog ? (
-                  <BookMarked className="w-5 h-5 text-white" />
+                  <BookMarked aria-hidden="true" className="w-5 h-5 text-white" />
                 ) : (
-                  <Globe className="w-5 h-5 text-white" />
+                  <Globe aria-hidden="true" className="w-5 h-5 text-white" />
                 )}
               </div>
               <div className="min-w-0">
@@ -103,9 +103,10 @@ export function OnlineLibraryModal({ open, onClose, onBookAdded }: OnlineLibrary
           </div>
           <button
             onClick={handleClose}
+            aria-label="Close online library"
             className="w-8 h-8 rounded-full bg-stone-100 hover:bg-stone-200 flex items-center justify-center transition-colors flex-shrink-0"
           >
-            <X className="w-4 h-4 text-stone-500" />
+            <X aria-hidden="true" className="w-4 h-4 text-stone-500" />
           </button>
         </div>
 
@@ -120,7 +121,7 @@ export function OnlineLibraryModal({ open, onClose, onBookAdded }: OnlineLibrary
           <div className="flex-1 overflow-y-auto">
             {loading ? (
               <div className="flex flex-col items-center justify-center py-20">
-                <Loader2 className="w-8 h-8 text-amber-600 animate-spin mb-3" />
+                <Loader2 aria-hidden="true" className="w-8 h-8 text-amber-600 animate-spin mb-3" />
                 <p className="text-sm text-stone-500">
                   {checkingSecurity
                     ? 'Complete the security check to browse this feed...'
@@ -130,7 +131,7 @@ export function OnlineLibraryModal({ open, onClose, onBookAdded }: OnlineLibrary
             ) : error ? (
               <div className="flex flex-col items-center justify-center py-20 px-6">
                 <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center mb-4">
-                  <AlertCircle className="w-6 h-6 text-red-500" />
+                  <AlertCircle aria-hidden="true" className="w-6 h-6 text-red-500" />
                 </div>
                 <p className="text-sm text-red-600 text-center mb-1">{error}</p>
                 <p className="text-xs text-stone-400 text-center mb-4">Could not load this feed. It may be temporarily unavailable or return an unsupported format.</p>
@@ -169,7 +170,7 @@ export function OnlineLibraryModal({ open, onClose, onBookAdded }: OnlineLibrary
                         />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center">
-                          <BookOpen className="w-5 h-5 text-stone-300" />
+                          <BookOpen aria-hidden="true" className="w-5 h-5 text-stone-300" />
                         </div>
                       )}
                     </div>
@@ -209,7 +210,7 @@ export function OnlineLibraryModal({ open, onClose, onBookAdded }: OnlineLibrary
                         })}
                         className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-stone-700 bg-stone-100 hover:bg-stone-200 border border-stone-200 rounded-lg transition-all flex-shrink-0 whitespace-nowrap"
                       >
-                        <BookOpen className="w-3.5 h-3.5" />
+                        <BookOpen aria-hidden="true" className="w-3.5 h-3.5" />
                         Browse
                       </button>
                     )}
@@ -223,8 +224,8 @@ export function OnlineLibraryModal({ open, onClose, onBookAdded }: OnlineLibrary
                         className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg transition-all flex-shrink-0 whitespace-nowrap"
                       >
                         {book.downloadType.includes('html')
-                          ? <ExternalLink className="w-3.5 h-3.5" />
-                          : <Download className="w-3.5 h-3.5" />}
+                          ? <ExternalLink aria-hidden="true" className="w-3.5 h-3.5" />
+                          : <Download aria-hidden="true" className="w-3.5 h-3.5" />}
                         {book.downloadType.includes('epub') ? 'EPUB'
                           : book.downloadType.includes('pdf') ? 'PDF'
                           : book.downloadType.includes('text') ? 'TXT'
@@ -239,8 +240,8 @@ export function OnlineLibraryModal({ open, onClose, onBookAdded }: OnlineLibrary
                         className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-green-700 hover:bg-green-600 disabled:opacity-60 disabled:cursor-wait rounded-lg transition-all flex-shrink-0 whitespace-nowrap"
                       >
                         {addingBookId === book.id
-                          ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                          : <BookPlus className="w-3.5 h-3.5" />}
+                          ? <Loader2 aria-hidden="true" className="w-3.5 h-3.5 animate-spin" />
+                          : <BookPlus aria-hidden="true" className="w-3.5 h-3.5" />}
                         {addingBookId === book.id ? 'Adding...' : 'Add to Shared Library'}
                       </button>
                     )}
@@ -255,7 +256,7 @@ export function OnlineLibraryModal({ open, onClose, onBookAdded }: OnlineLibrary
             {/* Search */}
             <div className="px-6 pt-4 pb-2 flex-shrink-0">
               <div className="relative">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
+                <Search aria-hidden="true" className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
                 <input
                   type="text"
                   value={query}
@@ -269,7 +270,7 @@ export function OnlineLibraryModal({ open, onClose, onBookAdded }: OnlineLibrary
             {/* Info banner */}
             <div className="px-6 py-2 flex-shrink-0">
               <p className="text-xs text-stone-400 flex items-center gap-1.5">
-                <BookOpen className="w-3.5 h-3.5" />
+                <BookOpen aria-hidden="true" className="w-3.5 h-3.5" />
                 Browse OPDS catalogs or enter an RSS/Atom feed URL to read its latest entries.
               </p>
             </div>
@@ -288,7 +289,7 @@ export function OnlineLibraryModal({ open, onClose, onBookAdded }: OnlineLibrary
                 type="submit"
                 className="inline-flex items-center gap-1.5 text-xs font-medium text-white bg-amber-600 hover:bg-amber-500 px-3 py-2.5 rounded-lg transition-all flex-shrink-0"
               >
-                <BookMarked className="w-3.5 h-3.5" />
+                <BookMarked aria-hidden="true" className="w-3.5 h-3.5" />
                 Read Feed
               </button>
             </form>
@@ -301,7 +302,7 @@ export function OnlineLibraryModal({ open, onClose, onBookAdded }: OnlineLibrary
                   className="flex items-start gap-4 p-4 rounded-xl border border-stone-200 hover:border-stone-300 hover:shadow-md transition-all group"
                 >
                   <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${catalog.accent} flex items-center justify-center flex-shrink-0 shadow-sm`}>
-                    <BookOpen className="w-5 h-5 text-white" />
+                    <BookOpen aria-hidden="true" className="w-5 h-5 text-white" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-2 mb-1">
@@ -316,7 +317,7 @@ export function OnlineLibraryModal({ open, onClose, onBookAdded }: OnlineLibrary
                         onClick={() => handleShowCatalog(catalog)}
                         className="inline-flex items-center gap-1.5 text-xs font-medium text-white bg-amber-600 hover:bg-amber-500 px-3 py-1.5 rounded-lg transition-all"
                       >
-                        <BookMarked className="w-3.5 h-3.5" />
+                        <BookMarked aria-hidden="true" className="w-3.5 h-3.5" />
                         Browse Books
                       </button>
                       <span className="text-stone-300">|</span>
@@ -326,7 +327,7 @@ export function OnlineLibraryModal({ open, onClose, onBookAdded }: OnlineLibrary
                         rel="noopener noreferrer"
                         className="inline-flex items-center gap-1.5 text-xs font-medium text-stone-600 hover:text-stone-800 transition-colors"
                       >
-                        <ExternalLink className="w-3.5 h-3.5" />
+                        <ExternalLink aria-hidden="true" className="w-3.5 h-3.5" />
                         Visit website
                       </a>
                     </div>

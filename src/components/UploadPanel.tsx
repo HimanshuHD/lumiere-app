@@ -33,7 +33,7 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="flex items-center gap-3 mb-8">
         <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center">
-          <Upload className="w-5 h-5 text-amber-700" />
+          <Upload aria-hidden="true" className="w-5 h-5 text-amber-700" />
         </div>
         <div>
           <h1 className="text-2xl font-serif font-bold text-stone-800">Upload Document</h1>
@@ -43,14 +43,14 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
 
       {success && (
         <div className="mb-6 flex items-center gap-3 p-4 bg-green-50 border border-green-200 rounded-xl">
-          <CheckCircle2 className="w-5 h-5 text-green-600 flex-shrink-0" />
+          <CheckCircle2 aria-hidden="true" className="w-5 h-5 text-green-600 flex-shrink-0" />
           <p className="text-sm text-green-700 font-medium">Document uploaded successfully! It's now available in the library.</p>
         </div>
       )}
 
       {error && (
         <div className="mb-6 flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-xl">
-          <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+          <AlertCircle aria-hidden="true" className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
           <p className="text-sm text-red-700">{error}</p>
         </div>
       )}
@@ -60,7 +60,7 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
         <div className="space-y-6">
           <div>
             <label className="flex items-center gap-2 text-sm font-medium text-stone-700 mb-2">
-              <FileText className="w-4 h-4 text-stone-400" />
+              <FileText aria-hidden="true" className="w-4 h-4 text-stone-400" />
               Document File <span className="text-red-500">*</span>
             </label>
             <div
@@ -83,7 +83,7 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
               {docFile ? (
                 <div className="space-y-2">
                   <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-green-100 mb-2">
-                    <FileCheck2 className="w-6 h-6 text-green-600" />
+                    <FileCheck2 aria-hidden="true" className="w-6 h-6 text-green-600" />
                   </div>
                   <p className="text-sm font-medium text-stone-700 break-all line-clamp-2">{docFile.name}</p>
                   <p className="text-xs text-stone-500">
@@ -94,7 +94,7 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
               ) : (
                 <div className="space-y-2">
                   <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-stone-100 group-hover:bg-amber-100 transition-colors mb-2">
-                    <Upload className="w-6 h-6 text-stone-400 group-hover:text-amber-600 transition-colors" />
+                    <Upload aria-hidden="true" className="w-6 h-6 text-stone-400 group-hover:text-amber-600 transition-colors" />
                   </div>
                   <p className="text-sm text-stone-600">Click or drag to upload</p>
                   <p className="text-xs text-stone-400">
@@ -110,14 +110,14 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
                 }}
                 className="mt-2 text-xs text-stone-500 hover:text-red-500 transition-colors flex items-center gap-1"
               >
-                <X className="w-3 h-3" /> Remove file
+                <X aria-hidden="true" className="w-3 h-3" /> Remove file
               </button>
             )}
           </div>
 
           <div>
             <label className="flex items-center gap-2 text-sm font-medium text-stone-700 mb-2">
-              <ImageIcon className="w-4 h-4 text-stone-400" />
+              <ImageIcon aria-hidden="true" className="w-4 h-4 text-stone-400" />
               Book Cover <span className="text-xs font-normal text-stone-400">(optional)</span>
             </label>
             <div
@@ -149,13 +149,13 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
                     }}
                     className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-red-500 text-white flex items-center justify-center shadow-md hover:bg-red-600 transition-colors"
                   >
-                    <X className="w-3.5 h-3.5" />
+                    <X aria-hidden="true" className="w-3.5 h-3.5" />
                   </button>
                 </div>
               ) : extractingPdfDetails && docFile?.name.toLowerCase().endsWith('.pdf') ? (
                 <div className="space-y-2">
                   <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-amber-100 mb-2">
-                    <Loader2 className="w-6 h-6 text-amber-700 animate-spin" />
+                    <Loader2 aria-hidden="true" className="w-6 h-6 text-amber-700 animate-spin" />
                   </div>
                   <p className="text-sm text-stone-600">Reading PDF metadata and extracting cover…</p>
                   <p className="text-xs text-stone-400">You can still upload a different cover image.</p>
@@ -171,7 +171,7 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
                   <div className="absolute inset-0 bg-stone-950/55 rounded-lg" />
                   <div className="relative z-10 space-y-2">
                     <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-white/15 mb-2">
-                      <ImageIcon className="w-6 h-6 text-white" />
+                      <ImageIcon aria-hidden="true" className="w-6 h-6 text-white" />
                     </div>
                     <p className="text-sm font-medium text-white">First page extracted from PDF</p>
                     <p className="text-xs text-stone-100">Click or drag a cover image here to replace it</p>
@@ -184,13 +184,13 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
                     aria-label="Remove extracted PDF cover"
                     className="absolute top-2 right-2 z-20 w-6 h-6 rounded-full bg-red-500 text-white flex items-center justify-center shadow-md hover:bg-red-600 transition-colors"
                   >
-                    <X className="w-3.5 h-3.5" />
+                    <X aria-hidden="true" className="w-3.5 h-3.5" />
                   </button>
                 </>
               ) : (
                 <div className="space-y-2">
                   <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-stone-100 group-hover:bg-amber-100 transition-colors mb-2">
-                    <ImageIcon className="w-6 h-6 text-stone-400 group-hover:text-amber-600 transition-colors" />
+                    <ImageIcon aria-hidden="true" className="w-6 h-6 text-stone-400 group-hover:text-amber-600 transition-colors" />
                   </div>
                   <p className="text-sm text-stone-600">Click or drag to upload a cover image</p>
                   <p className="text-xs text-stone-400">JPG, PNG, or WebP</p>
@@ -208,7 +208,7 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
         <div className="space-y-5">
           <div>
             <label className="flex items-center gap-2 text-sm font-medium text-stone-700 mb-2">
-              <BookOpen className="w-4 h-4 text-stone-400" />
+              <BookOpen aria-hidden="true" className="w-4 h-4 text-stone-400" />
               Book Name <span className="text-red-500">*</span>
             </label>
             <input
@@ -225,7 +225,7 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
 
           <div>
             <label className="flex items-center gap-2 text-sm font-medium text-stone-700 mb-2">
-              <User className="w-4 h-4 text-stone-400" />
+              <User aria-hidden="true" className="w-4 h-4 text-stone-400" />
               Author <span className="text-red-500">*</span>
             </label>
             <input
@@ -242,7 +242,7 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
 
           <div>
             <label className="flex items-center gap-2 text-sm font-medium text-stone-700 mb-2">
-              <Tag className="w-4 h-4 text-stone-400" />
+              <Tag aria-hidden="true" className="w-4 h-4 text-stone-400" />
               Category
             </label>
             <div className="flex flex-wrap gap-2">
@@ -326,14 +326,14 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
             <div className="grid grid-cols-2 gap-4">
               <div className="p-3 bg-stone-50 rounded-lg border border-stone-200">
                 <div className="flex items-center gap-1.5 text-xs text-stone-500 mb-1">
-                  <Hash className="w-3.5 h-3.5" />
+                  <Hash aria-hidden="true" className="w-3.5 h-3.5" />
                   Pages (auto-detected)
                 </div>
                 <p className="text-lg font-serif font-bold text-stone-800">{pageCount}</p>
               </div>
               <div className="p-3 bg-stone-50 rounded-lg border border-stone-200">
                 <div className="flex items-center gap-1.5 text-xs text-stone-500 mb-1">
-                  <Clock className="w-3.5 h-3.5" />
+                  <Clock aria-hidden="true" className="w-3.5 h-3.5" />
                   Est. Read Time
                 </div>
                 <p className="text-lg font-serif font-bold text-stone-800">{estimateReadingTime(pageCount)} min</p>
@@ -359,12 +359,12 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
         >
           {uploading ? (
             <>
-              <Loader2 className="w-4 h-4 animate-spin" />
+              <Loader2 aria-hidden="true" className="w-4 h-4 animate-spin" />
               Uploading...
             </>
           ) : (
             <>
-              <Upload className="w-4 h-4" />
+              <Upload aria-hidden="true" className="w-4 h-4" />
               Upload Document
             </>
           )}

@@ -21,7 +21,7 @@ function ReaderSession({ document: doc, onBack }: ReaderProps) {
           onClick={onBack}
           className="mb-8 inline-flex w-fit items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-stone-600 hover:bg-stone-100"
         >
-          <ArrowLeft className="h-4 w-4" /> Back to your library
+          <ArrowLeft aria-hidden="true" className="h-4 w-4" /> Back to your library
         </button>
         <DocumentAccessNotice />
       </div>
@@ -53,16 +53,18 @@ function ReaderSession({ document: doc, onBack }: ReaderProps) {
           <div className="flex items-center gap-2">
             <button
               onClick={onBack}
+              aria-label="Back to library"
               className={`p-1.5 rounded-lg hover:bg-stone-200/50 ${theme.text} transition-colors`}
             >
-              <ArrowLeft className="w-4 h-4" />
+              <ArrowLeft aria-hidden="true" className="w-4 h-4" />
             </button>
             {textMode && (
               <button
                 onClick={() => setShowToc(true)}
+                aria-label="Open contents" aria-expanded={showToc}
                 className={`p-1.5 rounded-lg hover:bg-stone-200/50 ${theme.text} transition-colors`}
               >
-                <List className="w-4 h-4" />
+                <List aria-hidden="true" className="w-4 h-4" />
               </button>
             )}
           </div>
@@ -77,20 +79,22 @@ function ReaderSession({ document: doc, onBack }: ReaderProps) {
               onClick={handleBookmark}
               disabled={isBookmarkPending(doc.id)}
               aria-label={isBookmarked(doc.id) ? "Remove bookmark" : "Bookmark document"}
+              aria-pressed={isBookmarked(doc.id)}
               className={`p-1.5 rounded-lg hover:bg-stone-200/50 ${theme.text} transition-colors`}
             >
               {isBookmarked(doc.id) ? (
-                <BookmarkCheck className="w-4 h-4 text-amber-600" />
+                <BookmarkCheck aria-hidden="true" className="w-4 h-4 text-amber-600" />
               ) : (
-                <Bookmark className="w-4 h-4" />
+                <Bookmark aria-hidden="true" className="w-4 h-4" />
               )}
             </button>
             {textMode && (
               <button
                 onClick={() => setShowSettings(!showSettings)}
+                aria-label="Reader settings" aria-expanded={showSettings} aria-controls="reader-settings"
                 className={`p-1.5 rounded-lg hover:bg-stone-200/50 ${theme.text} transition-colors`}
               >
-                <Settings className="w-4 h-4" />
+                <Settings aria-hidden="true" className="w-4 h-4" />
               </button>
             )}
           </div>
@@ -123,7 +127,7 @@ function ReaderSession({ document: doc, onBack }: ReaderProps) {
               {/* Font Size */}
               <div>
                 <label className={`flex items-center gap-2 text-xs font-medium ${theme.subText} uppercase tracking-wide mb-2`}>
-                  <Type className="w-3.5 h-3.5" />
+                  <Type aria-hidden="true" className="w-3.5 h-3.5" />
                   Font Size
                 </label>
                 <div className="flex gap-1.5">
@@ -206,8 +210,8 @@ function ReaderSession({ document: doc, onBack }: ReaderProps) {
           >
             <div className={`p-4 border-b ${theme.border} flex items-center justify-between`}>
               <h3 className={`font-serif font-bold ${theme.text} text-lg`}>Contents</h3>
-              <button onClick={() => setShowToc(false)} className={`p-1.5 rounded-lg hover:bg-stone-200/50 ${theme.text}`}>
-                <X className="w-4 h-4" />
+              <button aria-label="Close contents" onClick={() => setShowToc(false)} className={`p-1.5 rounded-lg hover:bg-stone-200/50 ${theme.text}`}>
+                <X aria-hidden="true" className="w-4 h-4" />
               </button>
             </div>
             <div className="p-2">
@@ -221,6 +225,7 @@ function ReaderSession({ document: doc, onBack }: ReaderProps) {
                 <button
                   key={idx}
                   onClick={() => goToChapter(idx)}
+                  aria-current={idx === chapterIndex ? "location" : undefined}
                   className={`w-full text-left px-3 py-2.5 rounded-lg text-sm transition-all flex items-center gap-3 ${
                     idx === chapterIndex
                       ? 'bg-amber-600/10 text-amber-700 font-medium'
@@ -280,7 +285,7 @@ function ReaderSession({ document: doc, onBack }: ReaderProps) {
                 aria-label="Previous EPUB page"
                 className="absolute left-2 top-1/2 z-10 -translate-y-1/2 rounded-full border border-stone-200 bg-white/90 p-2 text-stone-700 shadow-md transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-40 sm:left-6"
               >
-                <ChevronLeft className="h-5 w-5" />
+                <ChevronLeft aria-hidden="true" className="h-5 w-5" />
               </button>
               <button
                 onClick={() => void turnEpubPage('next')}
@@ -288,7 +293,7 @@ function ReaderSession({ document: doc, onBack }: ReaderProps) {
                 aria-label="Next EPUB page"
                 className="absolute right-2 top-1/2 z-10 -translate-y-1/2 rounded-full border border-stone-200 bg-white/90 p-2 text-stone-700 shadow-md transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-40 sm:right-6"
               >
-                <ChevronRight className="h-5 w-5" />
+                <ChevronRight aria-hidden="true" className="h-5 w-5" />
               </button>
               <div className="absolute bottom-3 left-1/2 z-10 -translate-x-1/2 rounded-full bg-white/90 px-3 py-1 text-xs text-stone-500 shadow">
                 Page {epubPosition.page} of {epubPosition.total} in this section · Overall progress is approximate
@@ -371,7 +376,7 @@ function ReaderSession({ document: doc, onBack }: ReaderProps) {
                     : `${theme.text} hover:bg-stone-200/50 border ${theme.border}`
                 }`}
               >
-                <ChevronLeft className="w-4 h-4" />
+                <ChevronLeft aria-hidden="true" className="w-4 h-4" />
                 Previous
               </button>
               <span className={`text-xs ${theme.subText}`}>
@@ -387,7 +392,7 @@ function ReaderSession({ document: doc, onBack }: ReaderProps) {
                 }`}
               >
                 Next
-                <ChevronRight className="w-4 h-4" />
+                <ChevronRight aria-hidden="true" className="w-4 h-4" />
               </button>
             </div>
 

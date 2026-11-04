@@ -64,7 +64,9 @@ function ReadLaterAction({ doc, variant = 'full', className = '' }: ReadLaterBut
       <button
         onClick={handleClick}
         disabled={pending}
+        aria-pressed={saved}
         title={saved ? 'Remove from Reading List' : 'Read Later'}
+        aria-label={saved ? `Remove ${doc.title} from Reading List` : `Read ${doc.title} later`}
         className={`p-1.5 rounded-lg transition-colors disabled:opacity-50 ${
           saved
             ? 'text-amber-600 hover:bg-amber-50'
@@ -80,6 +82,7 @@ function ReadLaterAction({ doc, variant = 'full', className = '' }: ReadLaterBut
     <button
       onClick={handleClick}
       disabled={pending}
+        aria-pressed={saved}
       className={`inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg border transition-all disabled:opacity-50 ${
         saved
           ? 'text-amber-700 bg-amber-50 border-amber-200 hover:bg-amber-100'

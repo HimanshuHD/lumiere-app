@@ -31,9 +31,9 @@ export function ImportMenu({ onUpload, onOnlineLibrary }: ImportMenuProps) {
             : 'text-stone-500 hover:text-stone-800 hover:bg-stone-100'
         }`}
       >
-        <Import className="w-4 h-4" />
+        <Import aria-hidden="true" className="w-4 h-4" />
         Import Books
-        <ChevronDown className={`w-3.5 h-3.5 transition-transform ${open ? 'rotate-180' : ''}`} />
+        <ChevronDown aria-hidden="true" className={`w-3.5 h-3.5 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
 
       {open && (
@@ -46,7 +46,7 @@ export function ImportMenu({ onUpload, onOnlineLibrary }: ImportMenuProps) {
             className="w-full flex items-start gap-3 px-4 py-3 hover:bg-stone-50 transition-colors text-left group"
           >
             <div className="w-9 h-9 rounded-lg bg-amber-100 flex items-center justify-center flex-shrink-0 group-hover:bg-amber-200 transition-colors">
-              <Upload className="w-4 h-4 text-amber-700" />
+              <Upload aria-hidden="true" className="w-4 h-4 text-amber-700" />
             </div>
             <div className="min-w-0">
               <p className="text-sm font-medium text-stone-800">Upload a book</p>
@@ -64,7 +64,7 @@ export function ImportMenu({ onUpload, onOnlineLibrary }: ImportMenuProps) {
             className="w-full flex items-start gap-3 px-4 py-3 hover:bg-stone-50 transition-colors text-left group"
           >
             <div className="w-9 h-9 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0 group-hover:bg-blue-200 transition-colors">
-              <Globe className="w-4 h-4 text-blue-700" />
+              <Globe aria-hidden="true" className="w-4 h-4 text-blue-700" />
             </div>
             <div className="min-w-0">
               <p className="text-sm font-medium text-stone-800">Online Library</p>
