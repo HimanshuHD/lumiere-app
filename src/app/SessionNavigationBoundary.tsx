@@ -1,21 +1,13 @@
-import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { useLayoutEffect, useState, type ReactNode } from 'react';
 import { useAuth } from '@/features/auth';
-import { appBase, navigate } from './navigation';
-import { clearOAuthReturn } from '@/infrastructure/browser/oauth-return';
 
 /** Survives account-keyed UI remounts; a new identity never inherits the old reader route. */
 export function SessionNavigationBoundary({children}: {children: ReactNode}) {
   const {user, loading} = useAuth();
   const id = user?.id ?? null;
-  const previous = useRef<string | null>(null);
   const [settled, setSettled] = useState<{id: string | null} | null>(null);
   useLayoutEffect(() => {
     if (loading) return;
-    if (previous.current && previous.current !== id) {
-      try { clearOAuthReturn(window.sessionStorage, appBase); } catch { /* Unavailable storage has no reusable intent. */ }
-      navigate({kind:'view',view:'library'}, {replace:true});
-    }
-    previous.current = id;
     setSettled({id});
   }, [id, loading]);
   // Do not mount a new account's reader even for a frame at the old URL.

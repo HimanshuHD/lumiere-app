@@ -4,7 +4,7 @@ import type { ReadingProgress } from '@/domain/documents';
 import { useAuth } from '@/features/auth';
 import { getProgressStore } from '@/app/progress-runtime';
 import type { ReaderPosition } from '@/domain/reading-position';
-import { getAccountStore } from '@/app/account-runtime';
+import { getAccountStore, isActiveAccount } from '@/app/account-runtime';
 import type { QueryCache } from '@/features/data';
 
 function useAccountStore() {
@@ -64,12 +64,14 @@ export function useDocumentContent(id: string) {
     return () => { active = false; };
   }, [query]);
   const refetch = useCallback(() => query?.load(true).then(() => setValidated(query)).catch(() => {}) ?? Promise.resolve(), [query]);
-  return { ...state, refetch, data: validated === query && state.status === 'success' ? state.data : null };
+  return { ...state, refetch,
+    loading: state.loading || (!!query && validated !== query && state.status !== 'error'),
+    data: validated === query && state.status === 'success' ? state.data : null };
 }
 
 export function useReadingProgress() {
   const { user } = useAuth();
-  const store = user ? getProgressStore(user.id) : undefined;
+  const store = user && isActiveAccount(user.id) ? getProgressStore(user.id) : undefined;
   const [, refresh] = useState(0);
   useEffect(() => {
     if (!store) return;

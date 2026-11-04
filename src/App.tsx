@@ -1,5 +1,5 @@
 import { IntegrationContext } from '@/shared/integrations';
-import { setActiveAccount } from '@/app/account-runtime';
+import { applySessionAccount } from '@/app/session-navigation';
 import { integrations } from '@/app/integrations';
 import { useState, useCallback, useEffect } from 'react';
 import { SessionNavigationBoundary } from '@/app/SessionNavigationBoundary';
@@ -224,7 +224,7 @@ function AccountContent() {
 
 export default function App() {
   return (
-    <IntegrationContext.Provider value={integrations}><AuthProvider onAccountChange={setActiveAccount}>
+    <IntegrationContext.Provider value={integrations}><AuthProvider onAccountChange={applySessionAccount}>
       <AccountContent />
     </AuthProvider></IntegrationContext.Provider>
   );
