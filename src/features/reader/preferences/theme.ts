@@ -1,36 +1,4 @@
-export type FontSize = 'small' | 'medium' | 'large';
-export type ReadingTheme = 'light' | 'sepia' | 'dark';
-export type LineSpacing = 'comfortable' | 'compact';
-
-export interface ReaderSettings {
-  fontSize: FontSize;
-  theme: ReadingTheme;
-  lineSpacing: LineSpacing;
-}
-
-const STORAGE_KEY = 'reader-settings';
-
-const defaultSettings: ReaderSettings = {
-  fontSize: 'medium',
-  theme: 'light',
-  lineSpacing: 'comfortable',
-};
-
-export function loadSettings(): ReaderSettings {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return defaultSettings;
-    const parsed = JSON.parse(raw);
-    return { ...defaultSettings, ...parsed };
-  } catch {
-    return defaultSettings;
-  }
-}
-
-export function saveSettings(settings: ReaderSettings) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
-}
-
+import type { FontSize, LineSpacing, ReadingTheme } from '@/domain/reader-preferences';
 export const fontSizeMap: Record<FontSize, string> = {
   small: 'text-base',
   medium: 'text-lg',

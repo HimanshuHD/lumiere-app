@@ -1,8 +1,8 @@
-import type { DocumentSummary } from '@/features/data/document-summary';
+import type {  DocumentSummary  } from '@/domain/document-summary';
 import { useDocumentContent } from '@/hooks/useData';
 import { Reader } from './Reader';
-import { QueryNotice } from './QueryNotice';
-import { useAuth } from '@/context/AuthContext';
+import { QueryNotice } from '@/shared/ui';
+import { useAuth } from '@/features/auth';
 import { isDocumentLockedForUser } from '@/lib/documentAccess';
 import { DocumentAccessNotice } from './DocumentAccessNotice';
 

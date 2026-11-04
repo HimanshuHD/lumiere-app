@@ -13,7 +13,12 @@
     "supabase:stop": "supabase stop",
     "supabase:status": "supabase status",
     "supabase:reset": "supabase db reset",
-    "supabase:seed:demo": "node scripts/seed-demo.mjs"
+    "supabase:seed:demo": "node scripts/seed-demo.mjs",
+    "check:boundaries": "node scripts/check-boundaries.mjs",
+    "test": "node --test tests/*.test.ts",
+    "db:types": "node scripts/generate-database-types.mjs",
+    "check:db-types": "node scripts/generate-database-types.mjs --check",
+    "test:browser": "node tests/browser/architecture.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",
@@ -34,6 +39,7 @@
     "eslint-plugin-react-hooks": "^5.1.0-rc.0",
     "eslint-plugin-react-refresh": "^0.4.11",
     "globals": "^15.9.0",
+    "playwright": "^1.64.1",
     "postcss": "^8.4.35",
     "supabase": "^2.120.0",
     "tailwindcss": "^3.4.1",

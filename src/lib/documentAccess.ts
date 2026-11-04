@@ -1,4 +1,4 @@
-import type { Document } from '@/lib/supabase';
+import type { Document } from '@/domain/documents';
 
 export function isDocumentLockedForUser(document: Pick<Document, 'origin' | 'visibility' | 'uploaded_by'>, userId: string | undefined): boolean {
   return document.origin === 'user_upload'

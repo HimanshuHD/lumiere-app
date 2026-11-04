@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { textScrollRange, textScrollProgress } from '../src/features/reader/progress/text-scroll.ts';
+import { textScrollRange, textScrollProgress } from '../src/features/reader/text/scroll.ts';
 test('restoration and tracking use the same bounded window coordinates',()=>{
  const range=textScrollRange(112,3000,800,3112,112);
  assert.deepEqual(range,{start:0,length:2312});

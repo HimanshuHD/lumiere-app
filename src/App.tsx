@@ -1,14 +1,18 @@
+import { IntegrationContext } from '@/shared/integrations';
+import { setActiveAccount } from '@/app/account-runtime';
+import { integrations } from '@/app/integrations';
 import { useState, useCallback, useEffect } from 'react';
 import { BookOpen, BookMarked, Library as LibraryIcon, Loader2, ListTodo } from 'lucide-react';
-import { AuthProvider, useAuth } from '@/context/AuthContext';
-import { ToastProvider } from '@/context/ToastContext';
+import { AuthProvider } from '@/context/AuthContext';
+import { useAuth } from '@/features/auth';
+import { ToastProvider, useToast } from '@/shared/ui';
 import { AuthScreen } from '@/components/AuthScreen';
 import { Library } from '@/components/Library';
 import { BookmarksView } from '@/components/BookmarksView';
 import { ReaderLoader } from '@/components/ReaderLoader';
-import { QueryNotice } from '@/components/QueryNotice';
-import type { DocumentSummary } from '@/features/data/document-summary';
-import { summarizeDocument } from '@/features/data/document-summary';
+import { QueryNotice } from '@/shared/ui';
+import type {  DocumentSummary  } from '@/domain/document-summary';
+import {  summarizeDocument  } from '@/domain/document-summary';
 import { UploadPanel } from '@/components/UploadPanel';
 import { Profile } from '@/components/Profile';
 import { MyUploads } from '@/components/MyUploads';
@@ -20,7 +24,7 @@ import { OnlineLibraryModal } from '@/components/OnlineLibraryModal';
 import { CatalogAdmin } from '@/components/CatalogAdmin';
 import { isCatalogAdmin } from '@/lib/catalogAdminAccess';
 import { useDocuments } from '@/hooks/useData';
-import { Document } from '@/lib/supabase';
+import type { Document } from '@/domain/documents';
 
 type View = 'library' | 'bookmarks' | 'reading-list' | 'upload' | 'profile' | 'my-uploads' | 'all-documents' | 'admin-catalog';
 
@@ -30,6 +34,8 @@ function getViewFromLocation(): View {
 
 function AppContent() {
   const { user, loading, signOut } = useAuth();
+  const { showToast } = useToast();
+  const handleSignOut = async () => { const result = await signOut(); if (!result.ok) showToast(result.error.message, 'error'); };
   const { documents, loading: docsLoading, error: docsError, refetch } = useDocuments();
   const [view, setView] = useState<View>(getViewFromLocation);
   const [activeDoc, setActiveDoc] = useState<DocumentSummary | null>(null);
@@ -121,7 +127,7 @@ function AppContent() {
               onProfile={() => navigateToView('profile')}
               onMyUploads={() => navigateToView('my-uploads')}
               onAdminCatalog={() => navigateToView('admin-catalog')}
-              onSignOut={signOut}
+              onSignOut={handleSignOut}
             />
           </div>
         </div>
@@ -223,8 +229,8 @@ function AccountContent() {
 
 export default function App() {
   return (
-    <AuthProvider>
+    <IntegrationContext.Provider value={integrations}><AuthProvider onAccountChange={setActiveAccount}>
       <AccountContent />
-    </AuthProvider>
+    </AuthProvider></IntegrationContext.Provider>
   );
 }

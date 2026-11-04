@@ -1,14 +1,14 @@
 import { DemoBadge } from '@/components/DemoBadge';
 import { useState, useMemo } from 'react';
 import { ArrowLeft, ChevronLeft, ChevronRight, Clock, User, Hash, Search, BookMinus } from 'lucide-react';
-import type { DocumentSummary as Document } from '@/features/data/document-summary';
+import type {  DocumentSummary as Document  } from '@/domain/document-summary';
 import { ReadLaterButton } from '@/components/ReadLaterButton';
 import { useReadingProgress } from '@/hooks/useData';
 import { DocumentCover } from '@/components/DocumentCover';
-import { useAuth } from '@/context/AuthContext';
-import { useToast } from '@/context/ToastContext';
+import { useAuth } from '@/features/auth';
+import { useToast } from '@/shared/ui';
 import { removeCatalogDocumentFromCollection } from '@/services/catalogCollection';
-import { supabaseCatalogCollectionStore } from '@/services/supabaseCatalogCollection';
+import { supabaseCatalogCollectionStore } from '@/app/document-operations';
 import { DocumentAccessNotice } from '@/components/DocumentAccessNotice';
 import { isDocumentLockedForUser } from '@/lib/documentAccess';
 

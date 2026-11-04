@@ -1,4 +1,5 @@
-import { supabase } from '@/lib/supabase';
+import { mapDocument } from './mappers';
+import { supabase } from '@/infrastructure/supabase/client';
 import type { CatalogImportRequest, CatalogImportStore } from '@/services/catalogImport';
 
 export const supabaseCatalogImportStore: CatalogImportStore = {
@@ -21,6 +22,6 @@ export const supabaseCatalogImportStore: CatalogImportStore = {
       }
       throw new Error(`Could not import catalog book: ${detail}`);
     }
-    return data;
+    return mapDocument(data);
   },
 };

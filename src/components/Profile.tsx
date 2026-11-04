@@ -1,113 +1,11 @@
-import { useState, useEffect, useRef } from 'react';
+import { useProfileController } from '@/features/profile';
+import { useState } from 'react';
 import { User, Camera, Loader2, Save, Lock, Mail, CheckCircle2, Eye, EyeOff } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
-import { useAuth } from '@/context/AuthContext';
-import { useToast } from '@/context/ToastContext';
 
 export function Profile() {
-  const { user, profile, refreshProfile } = useAuth();
-  const { showToast } = useToast();
-  const [fullName, setFullName] = useState('');
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [savingName, setSavingName] = useState(false);
-  const [avatarFile, setAvatarFile] = useState<File | null>(null);
-  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
-  const [uploadingAvatar, setUploadingAvatar] = useState(false);
-  const avatarInputRef = useRef<HTMLInputElement>(null);
-
-  // Password change state
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
+  const { user, fullName, setFullName, avatarUrl, loading, savingName, avatarFile, avatarPreview, uploadingAvatar, avatarInputRef, newPassword, setNewPassword, confirmPassword, setConfirmPassword, changingPassword, handleAvatarSelect, handleSaveName, handleSaveAvatar, handleChangePassword } = useProfileController();
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [changingPassword, setChangingPassword] = useState(false);
-
-  useEffect(() => {
-    setFullName(profile.fullName || '');
-    setAvatarUrl(profile.avatarUrl || null);
-    setLoading(false);
-  }, [profile.fullName, profile.avatarUrl]);
-
-  const handleAvatarSelect = (file: File) => {
-    setAvatarFile(file);
-    setAvatarPreview(URL.createObjectURL(file));
-  };
-
-  const handleSaveName = async () => {
-    if (!user) return;
-    setSavingName(true);
-    try {
-      const { error } = await supabase
-        .from('profiles')
-        .upsert({ id: user.id, full_name: fullName.trim() }, { onConflict: 'id' });
-      if (error) throw new Error(error.message);
-      await refreshProfile();
-      showToast('Profile name updated successfully.');
-    } catch (err) {
-      showToast(err instanceof Error ? err.message : 'Failed to update name.', 'error');
-    } finally {
-      setSavingName(false);
-    }
-  };
-
-  const handleSaveAvatar = async () => {
-    if (!user || !avatarFile) return;
-    setUploadingAvatar(true);
-    try {
-      const ext = avatarFile.name.split('.').pop()?.toLowerCase() || 'jpg';
-      const path = `${user.id}/avatar.${ext}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('avatars')
-        .upload(path, avatarFile, { upsert: true });
-      if (uploadError) throw new Error(uploadError.message);
-
-      const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(path);
-
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .upsert({ id: user.id, avatar_url: urlData.publicUrl }, { onConflict: 'id' });
-      if (updateError) throw new Error(updateError.message);
-
-      setAvatarUrl(urlData.publicUrl);
-      setAvatarFile(null);
-      setAvatarPreview(null);
-      await refreshProfile();
-      showToast('Profile picture updated successfully.');
-    } catch (err) {
-      showToast(err instanceof Error ? err.message : 'Failed to upload picture.', 'error');
-    } finally {
-      setUploadingAvatar(false);
-    }
-  };
-
-  const handleChangePassword = async () => {
-    if (!user) return;
-    if (newPassword !== confirmPassword) {
-      showToast('New passwords do not match.', 'error');
-      return;
-    }
-    if (newPassword.length < 6) {
-      showToast('Password must be at least 6 characters.', 'error');
-      return;
-    }
-    setChangingPassword(true);
-    try {
-      const { error: updateError } = await supabase.auth.updateUser({
-        password: newPassword,
-      });
-      if (updateError) throw new Error(updateError.message);
-      setNewPassword('');
-      setConfirmPassword('');
-      showToast('Password changed successfully.');
-    } catch (err) {
-      showToast(err instanceof Error ? err.message : 'Failed to change password.', 'error');
-    } finally {
-      setChangingPassword(false);
-    }
-  };
-
   if (loading) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center">

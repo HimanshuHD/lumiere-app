@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import type { Document } from '../src/lib/supabase.ts';
+import type { Document } from '../src/domain/documents.ts';
 import { updateUserDocument } from '../src/services/userDocumentVisibility.ts';
 
 const userDocument = {

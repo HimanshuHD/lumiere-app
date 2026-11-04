@@ -1,9 +1,9 @@
 import { useCatalogDocuments } from '@/hooks/useData';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, ArrowLeft, Loader2, Search, Shield, Trash2 } from 'lucide-react';
-import type { DocumentSummary as Document } from '@/features/data/document-summary';
+import type {  DocumentSummary as Document  } from '@/domain/document-summary';
 import { DocumentCover } from '@/components/DocumentCover';
-import { useToast } from '@/context/ToastContext';
+import { useToast } from '@/shared/ui';
 import {
   deleteCanonicalCatalogDocument,
   getCatalogCleanupCount,
@@ -12,7 +12,7 @@ import {
   type CatalogCleanupResult,
   type CatalogDocumentDeletionImpact,
 } from '@/services/catalogMaintenance';
-import { supabaseCatalogMaintenanceStore } from '@/services/supabaseCatalogMaintenance';
+import { supabaseCatalogMaintenanceStore } from '@/app/document-operations';
 
 interface CatalogAdminProps {
   onBack: () => void;

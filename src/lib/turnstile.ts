@@ -41,19 +41,25 @@ function loadTurnstileApi(): Promise<void> {
   return scriptPromise;
 }
 
-export async function requestTurnstileToken(container: HTMLElement, siteKey: string): Promise<string> {
+export async function requestTurnstileToken(container: HTMLElement, siteKey: string, signal?: AbortSignal): Promise<string> {
   if (!siteKey) {
     throw new Error('Public feed browsing is not configured. Sign in or contact the site administrator.');
   }
+  signal?.throwIfAborted();
   await loadTurnstileApi();
+  signal?.throwIfAborted();
   const turnstile = window.turnstile;
   if (!turnstile) throw new Error('The security check could not be loaded.');
 
   container.replaceChildren();
   let widgetId: string | null = null;
   let timeoutId: ReturnType<typeof setTimeout>;
+  let abort: (() => void) | undefined;
   try {
     return await new Promise<string>((resolve, reject) => {
+      abort = () => reject(new DOMException('The security check was cancelled.', 'AbortError'));
+      signal?.addEventListener('abort', abort, { once: true });
+      if (signal?.aborted) { abort(); return; }
       const finish = (callback: (value: string) => void, value: string) => {
         clearTimeout(timeoutId);
         callback(value);
@@ -71,6 +77,7 @@ export async function requestTurnstileToken(container: HTMLElement, siteKey: str
       });
     });
   } finally {
+    if (abort) signal?.removeEventListener('abort', abort);
     clearTimeout(timeoutId!);
     if (widgetId) turnstile.remove(widgetId);
     container.replaceChildren();

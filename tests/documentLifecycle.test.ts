@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import type { Document } from '../src/lib/supabase.ts';
+import type { Document } from '../src/domain/documents.ts';
 import {
   DocumentLifecycleError,
   recoverPendingUserUploadFiles,

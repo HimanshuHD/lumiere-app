@@ -1,4 +1,5 @@
-import { supabase, type Document } from '@/lib/supabase';
+import { supabase } from '@/infrastructure/supabase/client';
+import { mapDocument, record, text } from './mappers';
 import { USER_UPLOAD_RECOVERY_STAGES } from '@/services/documentLifecycle';
 import type {
   DocumentLifecycleDependencies,
@@ -70,7 +71,7 @@ export const supabaseDocumentLifecycleDependencies: DocumentLifecycleDependencie
         .eq('id', id)
         .maybeSingle();
       throwOnError(error, 'Could not look up document');
-      return data as Document | null;
+      return data ? mapDocument(data) : null;
     },
     async insert(document: UserDocumentInsert) {
       const { chapters, ...payload } = document;
@@ -95,7 +96,7 @@ export const supabaseDocumentLifecycleDependencies: DocumentLifecycleDependencie
         .single();
       throwOnError(error, 'Could not load finalized document');
       if (!data) throw new Error('The saved document was not returned.');
-      return data as Document;
+      return mapDocument(data);
     },
     async saveRecoveryRecords(records) {
       const rows = records.map((record) => ({
@@ -120,7 +121,13 @@ export const supabaseDocumentLifecycleDependencies: DocumentLifecycleDependencie
         .in('failure_stage', [...USER_UPLOAD_RECOVERY_STAGES])
         .order('created_at', { ascending: true });
       throwOnError(error, 'Could not load upload recovery details');
-      return ((data ?? []) as RecoveryRow[]).map(toRecoveryRecord);
+      return (data ?? []).map(value => {
+        const row = record(value);
+        const stage = text(row, 'failure_stage');
+        const status = text(row, 'status');
+        if (!USER_UPLOAD_RECOVERY_STAGES.some(allowed => allowed === stage) || !['cleanup_pending','reconciliation_pending','completed'].includes(status) || !Number.isSafeInteger(row.attempts) || Number(row.attempts) < 0) throw new Error('Invalid upload recovery record.');
+        return toRecoveryRecord({ ...value, failure_stage: stage as RecoveryRow['failure_stage'], status: status as RecoveryRow['status'] });
+      });
     },
     async markRecoveryRecordCompleted(record) {
       const { data, error } = await supabase

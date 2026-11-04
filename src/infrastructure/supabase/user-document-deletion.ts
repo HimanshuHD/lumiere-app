@@ -1,5 +1,4 @@
-import { activeAccountStore } from '@/features/data/account-store';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/infrastructure/supabase/client';
 import type { UserDocumentDeletionImpact, UserDocumentDeletionStore } from '@/services/userDocumentDeletion';
 
 function parseImpact(row: Record<string, unknown>): UserDocumentDeletionImpact {
@@ -39,7 +38,6 @@ export const supabaseUserDocumentDeletionStore: UserDocumentDeletionStore = {
   },
 
   async deleteOwnedUpload(documentId) {
-    const account = activeAccountStore();
     const { data, error } = await supabase.rpc('delete_owned_user_upload', {
       p_document_id: documentId,
     });
@@ -48,7 +46,6 @@ export const supabaseUserDocumentDeletionStore: UserDocumentDeletionStore = {
       throw new Error('The server did not confirm document deletion.');
     }
     const impact = parseImpact(data as Record<string, unknown>);
-    account?.changedDocument(documentId, true);
     return impact;
   },
 };

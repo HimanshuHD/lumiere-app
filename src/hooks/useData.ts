@@ -1,10 +1,11 @@
+import { ServiceError } from '@/domain/errors';
 import { useEffect, useState, useCallback, useSyncExternalStore } from 'react';
-import type { ReadingProgress } from '@/lib/supabase';
-import { useAuth } from '@/context/AuthContext';
-import { getProgressStore } from '@/features/reader/progress/progress-store';
-import type { ReaderPosition } from '@/features/reader/progress/position';
-import { getAccountStore } from '@/features/data/account-store';
-import type { QueryCache } from '@/features/data/query-cache';
+import type { ReadingProgress } from '@/domain/documents';
+import { useAuth } from '@/features/auth';
+import { getProgressStore } from '@/app/progress-runtime';
+import type { ReaderPosition } from '@/domain/reading-position';
+import { getAccountStore } from '@/app/account-runtime';
+import type { QueryCache } from '@/features/data';
 
 function useAccountStore() {
   const { user } = useAuth();
@@ -28,7 +29,7 @@ function useReferences(table: 'bookmarks' | 'reading_list') {
   const query = table === 'bookmarks' ? store?.bookmarks : store?.readingList;
   const state = useQuery(query);
   const pending = useSyncExternalStore(store?.mutations.subscribe ?? subscribeEmpty, store?.mutations.getSnapshot ?? getEmptyPending);
-  const toggle = useCallback((id: string) => store?.toggle(table, id) ?? Promise.resolve({ ok: false as const, message: 'Sign in to save documents.' }), [store, table]);
+  const toggle = useCallback((id: string) => store?.toggle(table, id) ?? Promise.resolve({ ok: false as const, error: new ServiceError('permission', 'Sign in to save documents.') }), [store, table]);
   const selected = useCallback((id: string) => state.data.some(row => row.document_id === id), [state.data]);
   const busy = useCallback((id: string) => pending.has(`${table}:${id}`), [pending, table]);
   return { ...state, toggle, selected, busy };

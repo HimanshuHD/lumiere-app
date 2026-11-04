@@ -1,4 +1,4 @@
-import { fraction } from './position.ts';
+import { fraction } from '../../../domain/reading-position.ts';
 /** Window scroll coordinates, with the sticky application/reader toolbar excluded. */
 export function textScrollRange(contentTop: number, contentHeight: number, viewportHeight: number, documentHeight: number, toolbarHeight: number) {
   const maximum = Math.max(0, documentHeight - viewportHeight);

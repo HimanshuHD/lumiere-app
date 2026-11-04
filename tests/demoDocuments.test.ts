@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { readFileSync } from 'node:fs';
-import type { Document } from '../src/lib/supabase.ts';
+import type { Document } from '../src/domain/documents.ts';
 import { selectLibraryDocuments } from '../src/lib/libraryDocuments.ts';
 import { addCatalogDocumentToCollection, removeCatalogDocumentFromCollection } from '../src/services/catalogCollection.ts';
 import { updateUserDocument } from '../src/services/userDocumentVisibility.ts';

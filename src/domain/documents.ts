@@ -1,20 +1,8 @@
-import { createClient } from '@supabase/supabase-js';
-
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error(
-    'Missing Supabase environment variables. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in .env.local, then restart the dev server.',
-  );
-}
-
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    persistSession: true,
-    autoRefreshToken: true,
-  },
-});
+export type DocumentOrigin = 'user_upload' | 'catalog_import' | 'legacy_unowned' | 'demo';
+export type DocumentVisibility = 'private' | 'shared';
+export const DOCUMENT_FORMATS = ['txt', 'pdf', 'epub'] as const;
+export type DocumentFormat = typeof DOCUMENT_FORMATS[number];
+export const DOCUMENT_CATEGORIES = ['Fiction', 'Non-Fiction', 'Science', 'History', 'Technology', 'Philosophy', 'Adventure'] as const;
 
 export interface Chapter {
   title: string;
@@ -33,8 +21,8 @@ export interface Document {
   chapter_count?: number;
   is_featured: boolean;
   created_at: string;
-  origin: 'user_upload' | 'catalog_import' | 'legacy_unowned' | 'demo';
-  visibility: 'private' | 'shared';
+  origin: DocumentOrigin;
+  visibility: DocumentVisibility;
   uploaded_by?: string | null;
   page_count?: number | null;
   file_url?: string | null;

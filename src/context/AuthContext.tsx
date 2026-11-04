@@ -1,49 +1,18 @@
-import { createContext, useContext, useEffect, useState, useCallback, useRef, ReactNode } from 'react';
-import { Session, User } from '@supabase/supabase-js';
-import { supabase } from '@/lib/supabase';
+import { useEffect, useState, useRef, ReactNode } from 'react';
+import type { AuthSession as Session, AuthUser as User } from '@/domain/auth';
+import { useIntegrations } from '@/shared/integrations';
 
-export interface ProfileData {
-  fullName: string;
-  avatarUrl: string | null;
-}
+import { useProfileData } from '@/features/profile';
 
-interface AuthContextValue {
-  user: User | null;
-  session: Session | null;
-  loading: boolean;
-  profile: ProfileData;
-  refreshProfile: () => Promise<void>;
-  signUp: (email: string, password: string) => Promise<{ error: string | null }>;
-  signIn: (email: string, password: string) => Promise<{ error: string | null }>;
-  signInWithGoogle: () => Promise<{ error: string | null }>;
-  signOut: () => Promise<void>;
-}
+import { AuthContext } from '@/features/auth';
 
-const AuthContext = createContext<AuthContextValue | undefined>(undefined);
-
-export function AuthProvider({ children }: { children: ReactNode }) {
+export function AuthProvider({ children, onAccountChange }: { children: ReactNode; onAccountChange: (id: string | undefined) => void }) {
+  const { auth: authIntegration, profile: profileRepository } = useIntegrations();
   const accountRef = useRef<string | undefined>(undefined);
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
-  const [profile, setProfile] = useState<ProfileData>({ fullName: '', avatarUrl: null });
-
-  const refreshProfile = useCallback(async () => {
-    if (!user) return;
-    const { data } = await supabase
-      .from('profiles')
-      .select('full_name, avatar_url')
-      .eq('id', user.id)
-      .maybeSingle();
-    if (accountRef.current !== user.id) return;
-    const googleName = [user.user_metadata.full_name, user.user_metadata.name]
-      .find((value): value is string => typeof value === 'string' && value.trim().length > 0)
-      ?.trim() ?? '';
-    setProfile({
-      fullName: data?.full_name?.trim() || googleName,
-      avatarUrl: data?.avatar_url || null,
-    });
-  }, [user]);
+  const { profile, refreshProfile, setProfile } = useProfileData(user, accountRef, profileRepository);
 
   useEffect(() => {
     let active = true;
@@ -52,50 +21,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!active) return;
       const id = next?.user.id;
       if (accountRef.current !== id) setProfile({ fullName: '', avatarUrl: null });
+      onAccountChange(id);
       accountRef.current = id;
       setSession(next); setUser(next?.user ?? null); setLoading(false);
     };
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, next) => {
+    const unsubscribe = authIntegration.subscribe(next => {
       eventObserved = true; apply(next);
     });
-    void supabase.auth.getSession().then(({ data }) => { if (!eventObserved) apply(data.session); });
-    return () => { active = false; listener.subscription.unsubscribe(); };
-  }, []);
+    void authIntegration.getSession().then(next => { if (!eventObserved) apply(next); }).catch(() => { if (!eventObserved) apply(null); });
+    return () => { active = false; unsubscribe(); };
+  }, [authIntegration, onAccountChange, setProfile]);
 
-  useEffect(() => {
-    if (user) {
-      refreshProfile();
-    } else {
-      setProfile({ fullName: '', avatarUrl: null });
-    }
-  }, [user, refreshProfile]);
-
-  const signUp = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signUp({ email, password });
-    if (error) return { error: error.message };
-    return { error: null };
-  };
-
-  const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) return { error: error.message };
-    return { error: null };
-  };
-
-  const signInWithGoogle = async () => {
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: window.location.origin,
-      },
-    });
-    if (error) return { error: error.message };
-    return { error: null };
-  };
-
-  const signOut = async () => {
-    await supabase.auth.signOut();
-  };
+  const signUp = authIntegration.signUp;
+  const signIn = authIntegration.signIn;
+  const signInWithGoogle = authIntegration.signInWithGoogle;
+  const signOut = authIntegration.signOut;
 
   return (
     <AuthContext.Provider value={{ user, session, loading, profile, refreshProfile, signUp, signIn, signInWithGoogle, signOut }}>
@@ -104,8 +44,3 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 }
 
-export function useAuth() {
-  const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error('useAuth must be used within AuthProvider');
-  return ctx;
-}

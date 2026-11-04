@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { it } from 'node:test';
-import type { Document } from '../src/lib/supabase.ts';
+import type { Document } from '../src/domain/documents.ts';
 import { attachLockedDocumentReferences } from '../src/services/lockedDocumentReferences.ts';
 
 it('hydrates denied joins with redacted entries without replacing readable documents', () => {

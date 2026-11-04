@@ -1,5 +1,5 @@
-import type { User } from '@supabase/supabase-js';
+import type { AuthUser } from '../domain/auth.ts';
 
-export function isCatalogAdmin(user: Pick<User, 'app_metadata'> | null): boolean {
+export function isCatalogAdmin(user: Pick<AuthUser, 'app_metadata'> | null): boolean {
   return user?.app_metadata?.role === 'admin';
 }

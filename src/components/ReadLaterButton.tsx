@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import { useReadingList } from '@/hooks/useData';
-import { useToast } from '@/context/ToastContext';
-import type { DocumentSummary as Document } from '@/features/data/document-summary';
+import { useToast } from '@/shared/ui';
+import type {  DocumentSummary as Document  } from '@/domain/document-summary';
 
 interface ReadLaterButtonProps {
   doc: Document;
@@ -52,8 +52,8 @@ function ReadLaterAction({ doc, variant = 'full', className = '' }: ReadLaterBut
       setBusy(true);
       try {
         const result = await toggleReadingList(doc.id);
-        if (!result.ok) { showToast(result.message, 'error'); return; }
-        showToast(result.selected ? `"${doc.title}" added to your Reading List` : `"${doc.title}" removed from your Reading List`, 'success');
+        if (!result.ok) { showToast(result.error.message, 'error'); return; }
+        showToast(result.value.selected ? `"${doc.title}" added to your Reading List` : `"${doc.title}" removed from your Reading List`, 'success');
       } finally { setBusy(false); }
     },
     [pending, toggleReadingList, doc.id, doc.title, showToast]

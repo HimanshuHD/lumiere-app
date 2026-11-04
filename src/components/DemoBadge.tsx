@@ -1,4 +1,4 @@
-import type { Document } from '@/lib/supabase';
+import type { Document } from '@/domain/documents';
 
 export function DemoBadge({ document }: { document: Pick<Document, 'origin'> }) {
   if (document.origin !== 'demo') return null;

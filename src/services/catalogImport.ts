@@ -1,4 +1,4 @@
-import type { Document } from '@/lib/supabase';
+import type { Document } from '@/domain/documents';
 import { addCatalogDocumentToCollection, type CatalogCollectionStore } from './catalogCollection.ts';
 
 export interface CatalogImportRequest {

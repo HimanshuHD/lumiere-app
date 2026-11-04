@@ -1,20 +1,21 @@
+import { DOCUMENT_CATEGORIES } from '@/domain/documents';
 import { useState } from 'react';
 import { AlertTriangle, FileEdit, Trash2, X, Loader2, BookOpen, Download, Pencil, Save } from 'lucide-react';
-import type { DocumentSummary as Document } from '@/features/data/document-summary';
+import type {  DocumentSummary as Document  } from '@/domain/document-summary';
 import { useDocuments } from '@/hooks/useData';
-import { cachedAccountStore } from '@/features/data/account-store';
-import { QueryNotice } from '@/components/QueryNotice';
-import { useAuth } from '@/context/AuthContext';
-import { useToast } from '@/context/ToastContext';
+import { cachedAccountStore } from '@/app/account-runtime';
+import { QueryNotice } from '@/shared/ui';
+import { useAuth } from '@/features/auth';
+import { useToast } from '@/shared/ui';
 import { DocumentCover } from '@/components/DocumentCover';
 import { DocumentFileLink } from '@/components/DocumentFileLink';
-import { supabaseDocumentLifecycleDependencies } from '@/services/supabaseDocumentLifecycle';
+import { supabaseDocumentLifecycleDependencies } from '@/app/document-operations';
 import { getUserDocumentDeletionImpact, deleteOwnedUserDocument, type UserDocumentDeletionImpact } from '@/services/userDocumentDeletion';
-import { supabaseUserDocumentDeletionStore } from '@/services/supabaseUserDocumentDeletion';
+import { supabaseUserDocumentDeletionStore } from '@/app/document-operations';
 import { updateUserDocument } from '@/services/userDocumentVisibility';
-import { supabaseUserDocumentVisibilityStore } from '@/services/supabaseUserDocumentVisibility';
+import { supabaseUserDocumentVisibilityStore } from '@/app/document-operations';
 
-const CATEGORIES = ['Fiction', 'Non-Fiction', 'Science', 'History', 'Technology', 'Philosophy', 'Adventure'];
+const CATEGORIES = DOCUMENT_CATEGORIES;
 
 export function MyUploads() {
   const { user } = useAuth();
