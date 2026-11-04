@@ -42,6 +42,6 @@ export function Modal({label, onClose, className = '', children}: {
       else if (event.shiftKey && (active === targets[0] || !targets.includes(active as HTMLElement))) { event.preventDefault(); targets[targets.length - 1].focus(); }
       else if (!event.shiftKey && (active === targets[targets.length - 1] || !targets.includes(active as HTMLElement))) { event.preventDefault(); targets[0].focus(); }
     }}
-    onCancel={event => { event.preventDefault(); close.current(); }}
+    onCancel={event => { event.preventDefault(); event.stopPropagation(); close.current(); }}
     onClick={() => close.current()}>{children}</dialog>, document.body);
 }
