@@ -32,9 +32,9 @@ export function createUserDataRepository(userId: string): UserDataRepository {
       if (error) throw error; return (data ?? []).map(mapReference);
     },
     async getDocument(id, signal) {
-      const { data, error } = await supabase.from('documents').select('*').eq('id', id).abortSignal(signal).single();
+      const { data, error } = await supabase.from('documents').select('*').eq('id', id).abortSignal(signal).maybeSingle();
       if (error) throw error;
-      return mapDocument(data);
+      return data ? mapDocument(data) : null;
     },
     async getSummary(id) {
       const { data, error } = await supabase.from('documents').select(DOCUMENT_SUMMARY_FIELDS).eq('id', id).single();
