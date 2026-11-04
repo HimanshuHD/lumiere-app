@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useDisclosure } from '@/shared/ui';
 import { Import, Upload, Globe, ChevronDown } from 'lucide-react';
 
 interface ImportMenuProps {
@@ -7,23 +7,11 @@ interface ImportMenuProps {
 }
 
 export function ImportMenu({ onUpload, onOnlineLibrary }: ImportMenuProps) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const handleClick = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
-  }, [open]);
+  const {open, setOpen, rootRef, triggerRef, id, onKeyDown, onBlur} = useDisclosure();
 
   return (
-    <div className="relative" ref={ref}>
-      <button
+    <div className="relative" ref={rootRef} onKeyDown={onKeyDown} onBlur={onBlur}>
+      <button ref={triggerRef} aria-expanded={open} aria-controls={open ? id : undefined}
         onClick={() => setOpen((v) => !v)}
         className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-medium transition-all ${
           open
@@ -37,7 +25,7 @@ export function ImportMenu({ onUpload, onOnlineLibrary }: ImportMenuProps) {
       </button>
 
       {open && (
-        <div className="absolute top-full right-0 mt-1.5 w-56 bg-white rounded-xl shadow-2xl border border-stone-200 overflow-hidden z-50 animate-in fade-in slide-in-from-top-1 duration-150">
+        <div id={id} className="absolute top-full right-0 mt-1.5 w-56 bg-white rounded-xl shadow-2xl border border-stone-200 overflow-hidden z-50 animate-in fade-in slide-in-from-top-1 duration-150">
           <button
             onClick={() => {
               setOpen(false);
@@ -59,6 +47,7 @@ export function ImportMenu({ onUpload, onOnlineLibrary }: ImportMenuProps) {
           <button
             onClick={() => {
               setOpen(false);
+              triggerRef.current?.focus();
               onOnlineLibrary();
             }}
             className="w-full flex items-start gap-3 px-4 py-3 hover:bg-stone-50 transition-colors text-left group"

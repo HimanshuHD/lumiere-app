@@ -76,6 +76,7 @@ function AppContent() {
 
   return (
     <div className="min-h-screen bg-stone-50">
+      <a href="#main-content" className="skip-link">Skip to content</a>
       {/* Navigation */}
       <nav className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-stone-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
@@ -95,6 +96,7 @@ function AppContent() {
                 <button
                   key={key}
                   onClick={() => navigateToView(key)}
+                  aria-current={view === key && !activeDoc ? 'page' : undefined}
                   className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-medium transition-all ${
                     view === key && !activeDoc
                       ? 'bg-stone-900 text-white'
@@ -128,6 +130,7 @@ function AppContent() {
             <button
               key={key}
               onClick={() => navigateToView(key)}
+                  aria-current={view === key && !activeDoc ? 'page' : undefined}
               className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
                 view === key && !activeDoc ? 'bg-stone-900 text-white' : 'text-stone-500 hover:bg-stone-100'
               }`}
@@ -141,7 +144,7 @@ function AppContent() {
 
       {/* Main content */}
       {!activeDoc && (view === 'library' || view === 'all-documents') && <QueryNotice error={docsError} retry={refetch} label="library" />}
-      <main>
+      <main id="main-content" tabIndex={-1}>
         {route.kind === 'not-found' ? (
           <div className="max-w-3xl mx-auto px-4 py-24 text-center">
             <h1 className="text-2xl font-serif font-bold">Page unavailable</h1>

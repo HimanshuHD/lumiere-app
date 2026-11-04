@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useDisclosure } from '@/shared/ui';
 import { User, FileEdit, LogOut, ChevronDown, Shield } from 'lucide-react';
 import { useAuth } from '@/features/auth';
 import { isCatalogAdmin } from '@/lib/catalogAdminAccess';
@@ -13,24 +13,13 @@ interface UserMenuProps {
 export function UserMenu({ onProfile, onMyUploads, onAdminCatalog, onSignOut }: UserMenuProps) {
   const { user, profile } = useAuth();
   const catalogAdmin = isCatalogAdmin(user);
-  const [open, setOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  const {open, setOpen, rootRef, triggerRef, id, onKeyDown, onBlur} = useDisclosure();
 
   const displayName = profile.fullName || user?.email?.split('@')[0] || 'User';
 
   return (
-    <div className="relative" ref={menuRef}>
-      <button
+    <div className="relative" ref={rootRef} onKeyDown={onKeyDown} onBlur={onBlur}>
+      <button ref={triggerRef} aria-label={displayName} aria-expanded={open} aria-controls={open ? id : undefined}
         onClick={() => setOpen(!open)}
         className="flex items-center gap-2 p-1 pr-2 rounded-full hover:bg-stone-100 transition-colors"
       >
@@ -46,7 +35,7 @@ export function UserMenu({ onProfile, onMyUploads, onAdminCatalog, onSignOut }: 
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full mt-2 w-52 bg-white rounded-xl shadow-2xl border border-stone-200 py-1.5 z-50 animate-[slideIn_0.15s_ease-out]">
+        <div id={id} className="absolute right-0 top-full mt-2 w-52 bg-white rounded-xl shadow-2xl border border-stone-200 py-1.5 z-50 animate-[slideIn_0.15s_ease-out]">
           <div className="px-4 py-2.5 border-b border-stone-100">
             <p className="text-xs text-stone-400">Signed in as</p>
             <p className="text-sm font-medium text-stone-700 truncate">{user?.email}</p>
