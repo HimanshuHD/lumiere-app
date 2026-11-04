@@ -1,7 +1,8 @@
 import { IntegrationContext } from '@/shared/integrations';
 import { setActiveAccount } from '@/app/account-runtime';
 import { integrations } from '@/app/integrations';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
+import { SessionNavigationBoundary } from '@/app/SessionNavigationBoundary';
 import { BookOpen, BookMarked, Library as LibraryIcon, Loader2, ListTodo } from 'lucide-react';
 import { AuthProvider } from '@/context/AuthContext';
 import { useAuth } from '@/features/auth';
@@ -37,6 +38,8 @@ function AppContent() {
   const view = route.kind === 'view' ? route.view : null;
   const activeDoc = route.kind === 'reader' ? route.documentId : null;
   const [showOnlineLibrary, setShowOnlineLibrary] = useState(false);
+  const routeIdentity = route.kind === 'view' ? route.view : route.kind === 'reader' ? route.documentId : route.kind;
+  useEffect(() => { setShowOnlineLibrary(false); }, [routeIdentity]);
   const openDocument = useCallback((doc: DocumentSummary | Document) => navigate({kind: 'reader', documentId: doc.id}), []);
   const catalogAdmin = isCatalogAdmin(user);
 
@@ -213,7 +216,7 @@ function AppContent() {
 
 function AccountContent() {
   const { user } = useAuth();
-  return <ToastProvider key={user?.id ?? 'signed-out'}><AppContent /></ToastProvider>;
+  return <SessionNavigationBoundary><ToastProvider key={user?.id ?? 'signed-out'}><AppContent /></ToastProvider></SessionNavigationBoundary>;
 }
 
 export default function App() {
