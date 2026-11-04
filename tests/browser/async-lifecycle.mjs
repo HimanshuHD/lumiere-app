@@ -11,16 +11,20 @@ const html = `<html><body><div id="root"></div><script type="module">
   import {AuthContext} from '/src/features/auth/index.ts';
   import {ToastProvider} from '/src/shared/ui/index.ts';
   import {useCatalogController} from '/src/features/catalog/index.ts';
+  import {useProfileController} from '/src/features/profile/index.ts';
   const user={id:'81000000-0000-4000-8000-000000000001',user_metadata:{},app_metadata:{}};
   const book={id:'1',title:'One',author:'QA',summary:'',downloadUrl:'https://www.gutenberg.org/ebooks/1.epub',downloadType:'application/epub+zip',rights:'Public domain in the USA',categories:[],catalogUrl:'',updated:'',coverUrl:''};
-  window.navigation=0;
-  const ports={catalogFeed:async()=>({title:'Feed',books:[book]})};
+  window.navigation=0;window.avatarRequests=[];window.revoked=[];
+  const revoke=URL.revokeObjectURL.bind(URL);
+  URL.revokeObjectURL=url=>{window.revoked.push(url);revoke(url);};
+  const ports={catalogFeed:async()=>({title:'Feed',books:[book]}),auth:{},profile:{saveAvatar:async(id,file)=>new Promise((resolve,reject)=>window.avatarRequests.push({file,resolve,reject}))}};
   const auth={user,profile:{fullName:'QA',avatarUrl:null},refreshProfile:async()=>{}};
   function Catalog(){const[open,setOpen]=useState(true);window.setCatalogOpen=setOpen;
     window.controller=useCatalogController(open,()=>setOpen(false),()=>window.navigation++);
     return React.createElement('p',null,open?'catalog open':'catalog closed');}
-  function Root(){return React.createElement(IntegrationContext.Provider,{value:ports},
-    React.createElement(AuthContext.Provider,{value:auth},React.createElement(ToastProvider,null,React.createElement(Catalog))));}
+  function Profile(){window.controller=useProfileController();return React.createElement('p',null,'profile');}
+  function Root(){const[mode,setMode]=useState('catalog');window.setMode=setMode;return React.createElement(IntegrationContext.Provider,{value:ports},
+    React.createElement(AuthContext.Provider,{value:auth},React.createElement(ToastProvider,null,mode==='profile'?React.createElement(Profile):React.createElement(Catalog))));}
   createRoot(document.getElementById('root')).render(React.createElement(Root));
 </script></body></html>`;
 const server=await createServer({server:{host:'127.0.0.1',port:0},plugins:[{
@@ -79,6 +83,32 @@ try{
   await page.evaluate(()=>window.controller.handleClose());await complete(closed);
   assert.equal(await page.evaluate(()=>window.navigation),0);
   assert.equal(await page.evaluate(()=>window.controller.addingBookId),null);
+  await page.evaluate(()=>window.setMode('profile'));
+  await page.waitForFunction(()=>!!window.controller.handleAvatarSelect);
+  await page.evaluate(()=>window.controller.handleAvatarSelect(new File(['A'],'a.png')));
+  await page.waitForFunction(()=>window.controller.avatarFile?.name==='a.png');
+  await page.evaluate(()=>{void window.controller.handleSaveAvatar();void window.controller.handleSaveAvatar();});
+  await page.waitForFunction(()=>window.avatarRequests.length===1);
+  await page.evaluate(()=>window.controller.handleAvatarSelect(new File(['B'],'b.png')));
+  await page.waitForFunction(()=>window.controller.avatarFile?.name==='b.png');
+  const previewB=await page.evaluate(()=>window.controller.avatarPreview);
+  await page.evaluate(()=>window.avatarRequests[0].resolve('https://example.test/a.png'));
+  await page.waitForFunction(()=>!window.controller.uploadingAvatar);
+  assert.equal(await page.evaluate(()=>window.controller.avatarFile?.name),'b.png');
+  assert.equal(await page.evaluate(()=>window.controller.avatarPreview),previewB);
+  assert.equal(await page.evaluate(url=>window.revoked.includes(url),previewB),false);
+  await page.evaluate(()=>{void window.controller.handleSaveAvatar();});
+  await page.waitForFunction(()=>window.avatarRequests.length===2);
+  await page.evaluate(()=>window.avatarRequests[1].resolve('https://example.test/b.png'));
+  await page.waitForFunction(()=>!window.controller.uploadingAvatar&&window.controller.avatarFile===null);
+  assert.equal(await page.evaluate(url=>window.revoked.includes(url),previewB),true);
+  await page.evaluate(()=>window.controller.handleAvatarSelect(new File(['C'],'c.png')));
+  await page.waitForFunction(()=>window.controller.avatarFile?.name==='c.png');
+  const previewC=await page.evaluate(()=>window.controller.avatarPreview);
+  await page.evaluate(()=>window.setMode('catalog'));
+  await page.waitForFunction(()=>!!window.controller.loadCatalog);
+  assert.equal(await page.evaluate(url=>window.revoked.includes(url),previewC),true);
+  console.log('PASS: older avatar upload preserves newer selection/preview; current save and unmount release previews.');
   assert.deepEqual(errors,[]);
   console.log('PASS: closed catalog ignores import completion; no browser exceptions.');
 }finally{await browser.close();await server.close();}
