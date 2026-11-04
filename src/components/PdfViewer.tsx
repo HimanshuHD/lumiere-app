@@ -9,8 +9,8 @@ export function PdfViewer(props: PdfViewerProps) {
     return (
       <div className="flex items-center justify-center h-[calc(100vh-7rem)]">
         <div className="flex flex-col items-center gap-3">
-          <Loader2 aria-hidden="true" className="w-8 h-8 text-amber-600 animate-spin" />
-          <p className="text-sm text-stone-500">Loading PDF...</p>
+          <Loader2 aria-hidden="true" className="w-8 h-8 text-amber-700 animate-spin" />
+          <p className="text-sm text-stone-600">Loading PDF...</p>
         </div>
       </div>
     );
@@ -21,10 +21,10 @@ export function PdfViewer(props: PdfViewerProps) {
       <div className="flex items-center justify-center h-[calc(100vh-7rem)] px-4">
         <div className="text-center max-w-md">
           <p role="alert" className="text-red-600 text-sm font-medium mb-2">Failed to load PDF</p>
-          <p className="text-stone-500 text-xs">{error}</p>
+          <p className="text-stone-600 text-xs">{error}</p>
           <button
             onClick={() => setLoadAttempt((attempt) => attempt + 1)}
-            className="block mx-auto mt-4 px-4 py-2 rounded-lg bg-amber-600 text-white text-sm hover:bg-amber-500"
+            className="block mx-auto mt-4 px-4 py-2 rounded-lg bg-amber-700 text-white text-sm hover:bg-amber-800"
           >
             Retry loading PDF
           </button>
@@ -32,7 +32,7 @@ export function PdfViewer(props: PdfViewerProps) {
             href={url}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 mt-4 px-4 py-2 text-sm font-medium text-white bg-amber-600 hover:bg-amber-500 rounded-lg transition-all"
+            className="inline-flex items-center gap-2 mt-4 px-4 py-2 text-sm font-medium text-white bg-amber-700 hover:bg-amber-800 rounded-lg transition-all"
           >
             Open in new tab
           </a>
@@ -77,7 +77,7 @@ export function PdfViewer(props: PdfViewerProps) {
         >
           <ZoomOut aria-hidden="true" className="w-4 h-4" />
         </button>
-        <span className="text-xs text-stone-400 min-w-[40px] text-center">{Math.round(displayScale * 100)}%</span>
+        <span className="text-xs text-stone-600 min-w-[40px] text-center">{Math.round(displayScale * 100)}%</span>
         <button
           onClick={() => adjustZoom(0.2)}
           aria-label="Zoom in"
@@ -106,7 +106,7 @@ export function PdfViewer(props: PdfViewerProps) {
         </div>
       )}
       <div className="h-5 flex-shrink-0">
-        {rendering && <p role="status" className="text-center text-xs text-stone-500">Rendering page…</p>}
+        {rendering && <p role="status" className="text-center text-xs text-stone-600">Rendering page…</p>}
       </div>
 
       {hasText === false && !rendering && <p role="status" className="p-2 text-sm text-stone-700">This page has no extractable text. It may be an image; text selection and screen-reader text are unavailable.</p>}

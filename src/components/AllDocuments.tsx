@@ -95,26 +95,26 @@ export function AllDocuments({
         <button
           onClick={onBack}
           aria-label="Back to library"
-          className="p-2 rounded-lg text-stone-500 hover:text-stone-800 hover:bg-stone-100 transition-colors"
+          className="p-2 rounded-lg text-stone-600 hover:text-stone-800 hover:bg-stone-100 transition-colors"
         >
           <ArrowLeft aria-hidden="true" className="w-5 h-5" />
         </button>
         <div>
           <h1 className="text-2xl font-serif font-bold text-stone-800">All Documents</h1>
-          <p className="text-sm text-stone-500">{filtered.length} documents · sorted by most recent</p>
+          <p className="text-sm text-stone-600">{filtered.length} documents · sorted by most recent</p>
         </div>
       </div>
 
       {/* Search */}
       <div className="mb-6">
         <div className="relative max-w-md">
-          <Search aria-hidden="true" className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
+          <Search aria-hidden="true" className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-600" />
           <input
             type="text"
             aria-label="Search documents" value={search}
             onChange={(e) => { setSearch(e.target.value); setPage(0); }}
             placeholder="Search by title or author..."
-            className="w-full pl-11 pr-4 py-3 bg-white border border-stone-200 rounded-xl text-stone-800 placeholder-stone-400 text-sm focus:outline-none focus:ring-2 focus:ring-amber-600/30 focus:border-amber-600/40 transition-all"
+            className="w-full pl-11 pr-4 py-3 bg-white border border-stone-200 rounded-xl text-stone-800 placeholder-stone-600 text-sm focus:outline-none focus:ring-2 focus:ring-amber-600/30 focus:border-amber-600/40 transition-all"
           />
         </div>
       </div>
@@ -125,11 +125,11 @@ export function AllDocuments({
           <table className="w-full min-w-[700px]">
             <thead>
               <tr className="border-b border-stone-200 bg-stone-50">
-                <th className="text-left px-4 py-3 text-xs font-medium text-stone-500 uppercase tracking-wider w-[35%]">Document</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-stone-500 uppercase tracking-wider hidden sm:table-cell">Author</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-stone-500 uppercase tracking-wider hidden md:table-cell">Uploaded By</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-stone-500 uppercase tracking-wider hidden lg:table-cell">Upload Time</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-stone-500 uppercase tracking-wider hidden sm:table-cell">Read Time</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-stone-600 uppercase tracking-wider w-[35%]">Document</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-stone-600 uppercase tracking-wider hidden sm:table-cell">Author</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-stone-600 uppercase tracking-wider hidden md:table-cell">Uploaded By</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-stone-600 uppercase tracking-wider hidden lg:table-cell">Upload Time</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-stone-600 uppercase tracking-wider hidden sm:table-cell">Read Time</th>
                 <th className="px-4 py-3 w-20"></th>
               </tr>
             </thead>
@@ -152,11 +152,11 @@ export function AllDocuments({
                           <p className="text-sm font-medium text-stone-800 truncate group-hover:text-amber-700 transition-colors"><button type="button" className="text-left rounded" disabled={isDocumentLockedForUser(doc, user?.id)} aria-label={`Open ${doc.title}`} onClick={(event) => { event.stopPropagation(); onOpenDoc(doc); }}>{doc.title}</button></p>
                           <DemoBadge document={doc} />
                           {locked && <div className="mt-1 max-w-xs"><DocumentAccessNotice /></div>}
-                          <p className="text-xs text-stone-400 sm:hidden truncate">{doc.author}</p>
+                          <p className="text-xs text-stone-600 sm:hidden truncate">{doc.author}</p>
                           <div className="flex items-center gap-1.5 mt-0.5">
-                            <span className="text-[10px] px-1.5 py-0.5 bg-stone-100 text-stone-500 rounded font-medium">{doc.category}</span>
+                            <span className="text-[10px] px-1.5 py-0.5 bg-stone-100 text-stone-600 rounded font-medium">{doc.category}</span>
                             {doc.page_count && (
-                              <span className="text-[10px] text-stone-400 flex items-center gap-0.5">
+                              <span className="text-[10px] text-stone-600 flex items-center gap-0.5">
                                 <Hash aria-hidden="true" className="w-2.5 h-2.5" />
                                 {doc.page_count}p
                               </span>
@@ -169,15 +169,15 @@ export function AllDocuments({
                     <td className="px-4 py-3 text-sm text-stone-600 hidden md:table-cell">
                       {doc.uploaded_by ? (
                         <span className="inline-flex items-center gap-1 text-stone-600">
-                          <User aria-hidden="true" className="w-3 h-3 text-stone-400" />
+                          <User aria-hidden="true" className="w-3 h-3 text-stone-600" />
                           Member
                         </span>
                       ) : (
-                        <span className="text-stone-400 text-xs">{doc.origin === 'demo' ? 'Demo' : 'Curated'}</span>
+                        <span className="text-stone-600 text-xs">{doc.origin === 'demo' ? 'Demo' : 'Curated'}</span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-sm text-stone-500 hidden lg:table-cell">{timeLabel}</td>
-                    <td className="px-4 py-3 text-sm text-stone-500 hidden sm:table-cell">
+                    <td className="px-4 py-3 text-sm text-stone-600 hidden lg:table-cell">{timeLabel}</td>
+                    <td className="px-4 py-3 text-sm text-stone-600 hidden sm:table-cell">
                       <span className="inline-flex items-center gap-1">
                         <Clock aria-hidden="true" className="w-3 h-3" />
                         {doc.reading_time}m
@@ -196,7 +196,7 @@ export function AllDocuments({
                               event.stopPropagation();
                               void handleRemoveFromCollection(doc);
                             }}
-                            className="p-1.5 rounded-md text-stone-400 hover:text-red-600 hover:bg-red-50 disabled:opacity-40 transition-colors"
+                            className="p-1.5 rounded-md text-stone-600 hover:text-red-600 hover:bg-red-50 disabled:opacity-40 transition-colors"
                           >
                             {removingDocumentId === doc.id ? (
                               <span className="block w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
@@ -206,7 +206,7 @@ export function AllDocuments({
                           </button>
                         )}
                         {!locked && (
-                          <span className="text-xs text-amber-600 font-medium opacity-0 group-hover:opacity-100 transition-opacity">
+                          <span className="text-xs text-amber-700 font-medium opacity-0 group-hover:opacity-100 transition-opacity">
                             Read
                           </span>
                         )}
@@ -220,7 +220,7 @@ export function AllDocuments({
         </div>
       ) : (
         <div className="text-center py-20">
-          <p className="text-stone-400 text-sm">No documents found matching your search.</p>
+          <p className="text-stone-600 text-sm">No documents found matching your search.</p>
         </div>
       )}
 

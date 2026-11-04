@@ -36,7 +36,7 @@ export function ReadingListView({ onOpenDoc }: ReadingListViewProps) {
         </div>
         <div>
           <h1 className="text-2xl font-serif font-bold text-stone-800">Reading List</h1>
-          <p className="text-sm text-stone-500">
+          <p className="text-sm text-stone-600">
             {readingList.length} {readingList.length === 1 ? 'book' : 'books'} saved to read later
           </p>
         </div>
@@ -45,10 +45,10 @@ export function ReadingListView({ onOpenDoc }: ReadingListViewProps) {
       {readingList.length === 0 ? (
         <div className="text-center py-24">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-stone-100 mb-4">
-            <BookOpen aria-hidden="true" className="w-8 h-8 text-stone-400" />
+            <BookOpen aria-hidden="true" className="w-8 h-8 text-stone-600" />
           </div>
-          <p className="text-stone-500 text-sm mb-1">Your reading list is empty</p>
-          <p className="text-stone-400 text-xs">
+          <p className="text-stone-600 text-sm mb-1">Your reading list is empty</p>
+          <p className="text-stone-600 text-xs">
             Browse the library and tap "Read Later" to save books for another time.
           </p>
         </div>
@@ -72,7 +72,7 @@ export function ReadingListView({ onOpenDoc }: ReadingListViewProps) {
                   <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
                   {locked && <DocumentAccessNotice overlay />}
                   <div className="absolute top-2 right-2 w-7 h-7 rounded-full bg-white/90 flex items-center justify-center shadow-md">
-                    <Clock aria-hidden="true" className="w-3.5 h-3.5 text-amber-600" />
+                    <Clock aria-hidden="true" className="w-3.5 h-3.5 text-amber-700" />
                   </div>
                   {!locked && <div className="absolute bottom-3 left-3 right-3 opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 transition-all">
                     <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/95 text-stone-900 text-xs font-medium rounded-lg shadow-lg">
@@ -82,12 +82,12 @@ export function ReadingListView({ onOpenDoc }: ReadingListViewProps) {
                 </div>
                 <h3 className="font-serif font-semibold text-stone-800 text-sm leading-snug line-clamp-2 group-hover:text-amber-700 transition-colors"><button type="button" className="text-left rounded" disabled={isDocumentLockedForUser(doc, user?.id)} aria-label={`Open ${doc.title}`} onClick={(event) => { event.stopPropagation(); onOpenDoc(doc); }}>{doc.title}</button></h3>
                 <DemoBadge document={doc} />
-                <p className="text-xs text-stone-500 mt-0.5">{doc.author}</p>
+                <p className="text-xs text-stone-600 mt-0.5">{doc.author}</p>
                 <div className="flex items-center gap-2 mt-2">
-                  <span className="text-[10px] px-1.5 py-0.5 bg-stone-100 text-stone-500 rounded font-medium">
+                  <span className="text-[10px] px-1.5 py-0.5 bg-stone-100 text-stone-600 rounded font-medium">
                     {doc.category}
                   </span>
-                  <span className="flex items-center gap-0.5 text-[10px] text-stone-400">
+                  <span className="flex items-center gap-0.5 text-[10px] text-stone-600">
                     <Clock aria-hidden="true" className="w-2.5 h-2.5" />
                     {doc.reading_time}m
                   </span>

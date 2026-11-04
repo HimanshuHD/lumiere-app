@@ -27,31 +27,31 @@ export function UserMenu({ onProfile, onMyUploads, onAdminCatalog, onSignOut }: 
           {profile.avatarUrl ? (
             <img src={profile.avatarUrl} alt="" className="w-full h-full object-cover" />
           ) : (
-            <User aria-hidden="true" className="w-4 h-4 text-stone-500" />
+            <User aria-hidden="true" className="w-4 h-4 text-stone-600" />
           )}
         </div>
         <span className="hidden sm:block text-sm font-medium text-stone-700 max-w-[120px] truncate">{displayName}</span>
-        <ChevronDown aria-hidden="true" className={`w-3.5 h-3.5 text-stone-400 transition-transform ${open ? 'rotate-180' : ''}`} />
+        <ChevronDown aria-hidden="true" className={`w-3.5 h-3.5 text-stone-600 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
 
       {open && (
         <div id={id} className="absolute right-0 top-full mt-2 w-52 bg-white rounded-xl shadow-2xl border border-stone-200 py-1.5 z-50 animate-[slideIn_0.15s_ease-out]">
           <div className="px-4 py-2.5 border-b border-stone-100">
-            <p className="text-xs text-stone-400">Signed in as</p>
+            <p className="text-xs text-stone-600">Signed in as</p>
             <p className="text-sm font-medium text-stone-700 truncate">{user?.email}</p>
           </div>
           <button
             onClick={() => { onProfile(); setOpen(false); }}
             className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-stone-700 hover:bg-stone-50 transition-colors"
           >
-            <User aria-hidden="true" className="w-4 h-4 text-stone-400" />
+            <User aria-hidden="true" className="w-4 h-4 text-stone-600" />
             Profile
           </button>
           <button
             onClick={() => { onMyUploads(); setOpen(false); }}
             className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-stone-700 hover:bg-stone-50 transition-colors"
           >
-            <FileEdit aria-hidden="true" className="w-4 h-4 text-stone-400" />
+            <FileEdit aria-hidden="true" className="w-4 h-4 text-stone-600" />
             My Uploads
           </button>
           {catalogAdmin && (
@@ -59,7 +59,7 @@ export function UserMenu({ onProfile, onMyUploads, onAdminCatalog, onSignOut }: 
               onClick={() => { onAdminCatalog(); setOpen(false); }}
               className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-stone-700 hover:bg-stone-50 transition-colors"
             >
-              <Shield aria-hidden="true" className="w-4 h-4 text-stone-400" />
+              <Shield aria-hidden="true" className="w-4 h-4 text-stone-600" />
               Catalog Admin
             </button>
           )}

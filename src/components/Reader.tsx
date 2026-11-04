@@ -100,7 +100,7 @@ function ReaderSession({ document: doc, onBack }: ReaderProps) {
             )}
           </div>
         </div>
-        <div className="flex flex-wrap justify-center items-center gap-2 px-3 pb-1 text-xs text-stone-500">
+        <div className={`flex flex-wrap justify-center items-center gap-2 px-3 pb-1 text-xs ${theme.subText}`}>
           <span role="status" aria-live="polite">{saveMessage}</span>
           {(saveState?.status === 'error' || saveState?.status === 'conflict') && (
             <button className="text-amber-700 underline" onClick={() => void retryProgress(doc.id)}>
@@ -111,7 +111,7 @@ function ReaderSession({ document: doc, onBack }: ReaderProps) {
         {/* Progress Bar */}
         <div className={`h-0.5 ${theme.border} border-t`}>
           <div
-            className="h-full bg-amber-600 transition-all duration-150"
+            className="h-full bg-amber-700 transition-all duration-150"
             style={{ width: textMode ? `${totalProgress}%` : '100%' }}
           />
         </div>
@@ -119,11 +119,12 @@ function ReaderSession({ document: doc, onBack }: ReaderProps) {
 
       {/* Settings Panel (text mode only) */}
       {textMode && showSettings && (
-        <Modal label="Contents"
+        <Modal label="Reader settings"
           className="fixed inset-0 z-50"
           onClose={() => setShowSettings(false)}
         >
-          <div className={`absolute top-28 right-4 w-72 ${theme.cardBg} border ${theme.border} rounded-xl shadow-2xl p-5 z-50`} onClick={(e) => e.stopPropagation()}>
+          <div id="reader-settings" className={`absolute top-28 right-4 w-72 ${theme.cardBg} border ${theme.border} rounded-xl shadow-2xl p-5 z-50`} onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4"><h2 className={`font-semibold ${theme.text}`}>Reader settings</h2><button aria-label="Close reader settings" onClick={() => setShowSettings(false)} className={`p-2 rounded ${theme.text}`}><X aria-hidden="true" className="w-4 h-4" /></button></div>
             <div className="space-y-5">
               {/* Font Size */}
               <div>
@@ -139,7 +140,7 @@ function ReaderSession({ document: doc, onBack }: ReaderProps) {
                       aria-pressed={settings.fontSize === size}
                       className={`flex-1 py-2 rounded-lg text-xs font-medium capitalize transition-all ${
                         settings.fontSize === size
-                          ? 'bg-amber-600 text-white'
+                          ? 'bg-amber-700 text-white'
                           : `${theme.text} hover:bg-stone-200/50`
                       } ${theme.border} border`}
                     >
@@ -165,7 +166,7 @@ function ReaderSession({ document: doc, onBack }: ReaderProps) {
                       onClick={() => setSettings({ ...settings, theme: key })}
                       className={`flex-1 py-2 rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-1.5 ${
                         settings.theme === key
-                          ? 'bg-amber-600 text-white'
+                          ? 'bg-amber-700 text-white'
                           : `${theme.text} hover:bg-stone-200/50`
                       } ${theme.border} border`}
                     >
@@ -189,7 +190,7 @@ function ReaderSession({ document: doc, onBack }: ReaderProps) {
                       aria-pressed={settings.lineSpacing === spacing}
                       className={`flex-1 py-2 rounded-lg text-xs font-medium capitalize transition-all ${
                         settings.lineSpacing === spacing
-                          ? 'bg-amber-600 text-white'
+                          ? 'bg-amber-700 text-white'
                           : `${theme.text} hover:bg-stone-200/50`
                       } ${theme.border} border`}
                     >
@@ -231,7 +232,7 @@ function ReaderSession({ document: doc, onBack }: ReaderProps) {
                   aria-current={idx === chapterIndex ? "location" : undefined}
                   className={`w-full text-left px-3 py-2.5 rounded-lg text-sm transition-all flex items-center gap-3 ${
                     idx === chapterIndex
-                      ? 'bg-amber-600/10 text-amber-700 font-medium'
+                      ? 'bg-amber-700/10 text-amber-700 font-medium'
                       : `${theme.text} hover:bg-stone-200/50`
                   }`}
                 >
@@ -316,7 +317,7 @@ function ReaderSession({ document: doc, onBack }: ReaderProps) {
                 <p className="mb-4 text-xs text-stone-500">{epubError}</p>
                 <button
                   onClick={() => setEpubLoadAttempt((attempt) => attempt + 1)}
-                  className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-amber-500"
+                  className="rounded-lg bg-amber-700 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-amber-800"
                 >
                   Try again
                 </button>

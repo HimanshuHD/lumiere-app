@@ -37,17 +37,17 @@ export function BookmarksView({ onOpenDoc }: BookmarksViewProps) {
         </div>
         <div>
           <h1 className="text-2xl font-serif font-bold text-stone-800">Bookmarks</h1>
-          <p className="text-sm text-stone-500">{bookmarks.length} saved {bookmarks.length === 1 ? 'document' : 'documents'}</p>
+          <p className="text-sm text-stone-600">{bookmarks.length} saved {bookmarks.length === 1 ? 'document' : 'documents'}</p>
         </div>
       </div>
 
       {bookmarks.length === 0 ? (
         <div className="text-center py-24">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-stone-100 mb-4">
-            <BookOpen aria-hidden="true" className="w-8 h-8 text-stone-400" />
+            <BookOpen aria-hidden="true" className="w-8 h-8 text-stone-600" />
           </div>
-          <p className="text-stone-500 text-sm mb-1">No bookmarks yet</p>
-          <p className="text-stone-400 text-xs">Bookmark documents from the reader to save them here.</p>
+          <p className="text-stone-600 text-sm mb-1">No bookmarks yet</p>
+          <p className="text-stone-600 text-xs">Bookmark documents from the reader to save them here.</p>
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-6">
@@ -72,7 +72,7 @@ export function BookmarksView({ onOpenDoc }: BookmarksViewProps) {
                   <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
                   {locked && <DocumentAccessNotice overlay />}
                   <div className="absolute top-2 right-2 w-7 h-7 rounded-full bg-white/90 flex items-center justify-center shadow-md">
-                    <BookMarked aria-hidden="true" className="w-3.5 h-3.5 text-amber-600" />
+                    <BookMarked aria-hidden="true" className="w-3.5 h-3.5 text-amber-700" />
                   </div>
                   {totalPercent > 0 && (
                     <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/20">
@@ -82,7 +82,7 @@ export function BookmarksView({ onOpenDoc }: BookmarksViewProps) {
                 </div>
                 <h3 className="font-serif font-semibold text-stone-800 text-sm leading-snug line-clamp-2 group-hover:text-amber-700 transition-colors"><button type="button" className="text-left rounded" disabled={isDocumentLockedForUser(doc, user?.id)} aria-label={`Open ${doc.title}`} onClick={(event) => { event.stopPropagation(); onOpenDoc(doc); }}>{doc.title}</button></h3>
                 <DemoBadge document={doc} />
-                <p className="text-xs text-stone-500 mt-0.5">{doc.author}</p>
+                <p className="text-xs text-stone-600 mt-0.5">{doc.author}</p>
               </div>
             );
           })}

@@ -9,7 +9,7 @@ export function Profile() {
   if (loading) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center">
-        <Loader2 aria-hidden="true" className="w-8 h-8 text-amber-600 animate-spin" />
+        <Loader2 aria-hidden="true" className="w-8 h-8 text-amber-700 animate-spin" />
       </div>
     );
   }
@@ -22,14 +22,14 @@ export function Profile() {
         </div>
         <div>
           <h1 className="text-2xl font-serif font-bold text-stone-800">Profile</h1>
-          <p className="text-sm text-stone-500">Manage your account settings</p>
+          <p className="text-sm text-stone-600">Manage your account settings</p>
         </div>
       </div>
 
       {/* Avatar section */}
       <div className="bg-white rounded-2xl border border-stone-200 p-6 mb-6">
         <h2 className="text-sm font-semibold text-stone-700 mb-4 flex items-center gap-2">
-          <Camera aria-hidden="true" className="w-4 h-4 text-stone-400" />
+          <Camera aria-hidden="true" className="w-4 h-4 text-stone-600" />
           Profile Picture
         </h2>
         <div className="flex items-center gap-6">
@@ -47,7 +47,7 @@ export function Profile() {
               onClick={() => avatarInputRef.current?.click()}
               className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-stone-700 bg-stone-100 hover:bg-stone-200 border border-stone-200 rounded-lg transition-all"
             >
-              <Camera aria-hidden="true" className="w-4 h-4 text-stone-500" />
+              <Camera aria-hidden="true" className="w-4 h-4 text-stone-600" />
               Choose Image
             </button>
             <input
@@ -61,7 +61,7 @@ export function Profile() {
               <button
                 onClick={handleSaveAvatar}
                 disabled={uploadingAvatar}
-                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-amber-600 hover:bg-amber-500 rounded-lg transition-all disabled:opacity-50 shadow-lg shadow-amber-600/20"
+                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-amber-700 hover:bg-amber-800 rounded-lg transition-all disabled:opacity-50 shadow-lg shadow-amber-600/20"
               >
                 {uploadingAvatar ? (
                   <><Loader2 aria-hidden="true" className="w-4 h-4 animate-spin" /> Uploading...</>
@@ -70,7 +70,7 @@ export function Profile() {
                 )}
               </button>
             )}
-            <p className="text-xs text-stone-400">JPG, PNG, or WebP. Recommended 256x256.</p>
+            <p className="text-xs text-stone-600">JPG, PNG, or WebP. Recommended 256x256.</p>
           </div>
         </div>
       </div>
@@ -78,33 +78,33 @@ export function Profile() {
       {/* Name & email section */}
       <div className="bg-white rounded-2xl border border-stone-200 p-6 mb-6">
         <h2 className="text-sm font-semibold text-stone-700 mb-4 flex items-center gap-2">
-          <User aria-hidden="true" className="w-4 h-4 text-stone-400" />
+          <User aria-hidden="true" className="w-4 h-4 text-stone-600" />
           Personal Information
         </h2>
         <div className="space-y-4">
           <div>
-            <label htmlFor="profile-name" className="block text-xs font-medium text-stone-500 mb-1.5">Full Name</label>
+            <label htmlFor="profile-name" className="block text-xs font-medium text-stone-600 mb-1.5">Full Name</label>
             <input
               type="text"
               id="profile-name" autoComplete="name" value={fullName}
               onChange={(e) => setFullName(e.target.value)}
               placeholder="Enter your full name"
-              className="w-full px-4 py-2.5 bg-white border border-stone-200 rounded-lg text-sm text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-600/30 focus:border-amber-600/40 transition-all"
+              className="w-full px-4 py-2.5 bg-white border border-stone-200 rounded-lg text-sm text-stone-800 placeholder-stone-600 focus:outline-none focus:ring-2 focus:ring-amber-600/30 focus:border-amber-600/40 transition-all"
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-stone-500 mb-1.5">Email</label>
+            <label className="block text-xs font-medium text-stone-600 mb-1.5">Email</label>
             <div className="flex items-center gap-2 px-4 py-2.5 bg-stone-50 border border-stone-200 rounded-lg">
-              <Mail aria-hidden="true" className="w-4 h-4 text-stone-400" />
+              <Mail aria-hidden="true" className="w-4 h-4 text-stone-600" />
               <span className="text-sm text-stone-600">{user?.email}</span>
               <CheckCircle2 aria-hidden="true" className="w-4 h-4 text-green-500 ml-auto" />
             </div>
-            <p className="text-xs text-stone-400 mt-1">Email cannot be changed</p>
+            <p className="text-xs text-stone-600 mt-1">Email cannot be changed</p>
           </div>
           <button
             onClick={handleSaveName}
             disabled={savingName}
-            className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-white bg-amber-600 hover:bg-amber-500 rounded-lg transition-all disabled:opacity-50 shadow-lg shadow-amber-600/20"
+            className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-white bg-amber-700 hover:bg-amber-800 rounded-lg transition-all disabled:opacity-50 shadow-lg shadow-amber-600/20"
           >
             {savingName ? (
               <><Loader2 aria-hidden="true" className="w-4 h-4 animate-spin" /> Saving...</>
@@ -118,26 +118,26 @@ export function Profile() {
       {/* Password change section */}
       <div className="bg-white rounded-2xl border border-stone-200 p-6">
         <h2 className="text-sm font-semibold text-stone-700 mb-4 flex items-center gap-2">
-          <Lock aria-hidden="true" className="w-4 h-4 text-stone-400" />
+          <Lock aria-hidden="true" className="w-4 h-4 text-stone-600" />
           Change Password
         </h2>
         <div className="space-y-4">
           <div>
-            <label htmlFor="profile-password" className="block text-xs font-medium text-stone-500 mb-1.5">New Password</label>
+            <label htmlFor="profile-password" className="block text-xs font-medium text-stone-600 mb-1.5">New Password</label>
             <div className="relative">
               <input
                 type={showNewPassword ? 'text' : 'password'}
                 id="profile-password" autoComplete="new-password" value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 placeholder="Enter new password"
-                className="w-full px-4 pr-11 py-2.5 bg-white border border-stone-200 rounded-lg text-sm text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-600/30 focus:border-amber-600/40 transition-all"
+                className="w-full px-4 pr-11 py-2.5 bg-white border border-stone-200 rounded-lg text-sm text-stone-800 placeholder-stone-600 focus:outline-none focus:ring-2 focus:ring-amber-600/30 focus:border-amber-600/40 transition-all"
               />
               <button
                 type="button"
                 onClick={() => setShowNewPassword((shown) => !shown)}
                 aria-label={showNewPassword ? 'Hide new password' : 'Show new password'}
                 aria-pressed={showNewPassword}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600 transition-colors"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-600 hover:text-stone-600 transition-colors"
               >
                 {showNewPassword
                   ? <EyeOff className="w-4 h-4" aria-hidden="true" />
@@ -146,21 +146,21 @@ export function Profile() {
             </div>
           </div>
           <div>
-            <label htmlFor="profile-confirm-password" className="block text-xs font-medium text-stone-500 mb-1.5">Confirm New Password</label>
+            <label htmlFor="profile-confirm-password" className="block text-xs font-medium text-stone-600 mb-1.5">Confirm New Password</label>
             <div className="relative">
               <input
                 type={showConfirmPassword ? 'text' : 'password'}
                 id="profile-confirm-password" autoComplete="new-password" aria-invalid={!!confirmPassword && newPassword !== confirmPassword} aria-describedby={confirmPassword && newPassword !== confirmPassword ? "password-mismatch" : undefined} value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 placeholder="Confirm new password"
-                className="w-full px-4 pr-11 py-2.5 bg-white border border-stone-200 rounded-lg text-sm text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-600/30 focus:border-amber-600/40 transition-all"
+                className="w-full px-4 pr-11 py-2.5 bg-white border border-stone-200 rounded-lg text-sm text-stone-800 placeholder-stone-600 focus:outline-none focus:ring-2 focus:ring-amber-600/30 focus:border-amber-600/40 transition-all"
               />
               <button
                 type="button"
                 onClick={() => setShowConfirmPassword((shown) => !shown)}
                 aria-label={showConfirmPassword ? 'Hide confirmation password' : 'Show confirmation password'}
                 aria-pressed={showConfirmPassword}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600 transition-colors"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-600 hover:text-stone-600 transition-colors"
               >
                 {showConfirmPassword
                   ? <EyeOff className="w-4 h-4" aria-hidden="true" />

@@ -69,8 +69,8 @@ function ReadLaterAction({ doc, variant = 'full', className = '' }: ReadLaterBut
         aria-label={saved ? `Remove ${doc.title} from Reading List` : `Read ${doc.title} later`}
         className={`p-1.5 rounded-lg transition-colors disabled:opacity-50 ${
           saved
-            ? 'text-amber-600 hover:bg-amber-50'
-            : 'text-stone-500 hover:text-amber-600 hover:bg-stone-100'
+            ? 'text-amber-700 hover:bg-amber-50'
+            : 'text-stone-600 hover:text-amber-700 hover:bg-stone-100'
         } ${className}`}
       >
         <ReadLaterIcon filled={saved} className="w-4 h-4" />
