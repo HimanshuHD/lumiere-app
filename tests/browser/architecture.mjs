@@ -147,7 +147,7 @@ try {
   await page.getByRole('button',{name:'Log Out',exact:true}).click();
   await page.getByRole('button',{name:'Sign In',exact:true}).first().waitFor();
   await page.goto(`http://127.0.0.1:${port}/__architecture-qa`,{waitUntil:'domcontentloaded'});
-  await page.getByRole('region').waitFor({timeout:20000});
+  await page.getByRole('region',{name:'QA PDF PDF reader',exact:true}).waitFor({timeout:20000});
   await page.waitForFunction(()=>document.querySelector('canvas')?.width>0);
   await page.getByRole('button',{name:'Zoom in',exact:true}).click();
   await page.waitForFunction(()=>window.qaEvents.some(p=>p.format==='pdf'&&p.page===2&&p.view.scale>1.3));
@@ -157,7 +157,7 @@ try {
   await page.getByRole('button',{name:'Next EPUB',exact:true}).click();
   await page.waitForFunction(()=>window.qaEvents.some(p=>p.format==='epub'&&p.cfi)).catch(async error => { console.log('EPUB diagnostics',await page.locator('body').innerText(),await page.evaluate(()=>window.qaEvents));throw error; });
   await page.goto(`http://127.0.0.1:${port}/__architecture-qa`,{waitUntil:'domcontentloaded'});
-  await page.getByRole('region').waitFor({timeout:20000});
+  await page.getByRole('region',{name:'QA PDF PDF reader',exact:true}).waitFor({timeout:20000});
   assert.deepEqual(errors,[]);
   console.log('PASS: auth/session, TXT, bookmark failure/success, profile/password, preferences, catalog cancellation, upload validation/reset, logout, PDF resume/zoom, EPUB navigation/disposal; no browser exceptions.');
 } finally { await browser.close(); await server.close(); }

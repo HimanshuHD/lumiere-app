@@ -1,4 +1,5 @@
 import 'pdfjs-dist/web/pdf_viewer.css';
+import './pdf-viewer.css';
 import { ChevronLeft, ChevronRight, Loader2, ZoomIn, ZoomOut } from 'lucide-react';
 import { usePdfController, type PdfViewerProps } from '@/features/reader/pdf';
 

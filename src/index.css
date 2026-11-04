@@ -67,6 +67,3 @@ body {
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
-.pdf-page .textLayer { z-index: 1; }
-.pdf-page .annotationLayer { z-index: 2; }
-.pdf-page .annotationLayer a:focus-visible { outline: 3px solid #1d4ed8 !important; outline-offset: 2px; background: rgb(37 99 235 / 0.12); }
