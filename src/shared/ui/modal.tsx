@@ -14,11 +14,13 @@ export function Modal({label, onClose, className = '', children}: {
     const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     if (locks++ === 0) { previousOverflow = document.body.style.overflow; document.body.style.overflow = 'hidden'; }
     dialog.showModal();
+    window.dispatchEvent(new Event('lumiere:dialog-change'));
     const initial = dialog.querySelector<HTMLElement>('[data-dialog-initial-focus], h1, h2, h3') ?? dialog;
     if (!initial.hasAttribute('tabindex')) initial.tabIndex = -1;
     initial.focus({preventScroll:true});
     return () => {
       dialog.close();
+      window.dispatchEvent(new Event('lumiere:dialog-change'));
       if (--locks === 0) document.body.style.overflow = previousOverflow;
       const dialogs = Array.from(document.querySelectorAll<HTMLDialogElement>('dialog[open]')).filter(d => d !== dialog);
       const remaining = dialogs[dialogs.length - 1];

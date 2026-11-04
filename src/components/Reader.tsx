@@ -164,13 +164,14 @@ function ReaderSession({ document: doc, onBack }: ReaderProps) {
                     <button
                       key={key}
                       onClick={() => setSettings({ ...settings, theme: key })}
+                      aria-pressed={settings.theme === key}
                       className={`flex-1 py-2 rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-1.5 ${
                         settings.theme === key
                           ? 'bg-amber-700 text-white'
                           : `${theme.text} hover:bg-stone-200/50`
                       } ${theme.border} border`}
                     >
-                      <Icon className="w-3.5 h-3.5" />
+                      <Icon aria-hidden="true" className="w-3.5 h-3.5" />
                       {label}
                     </button>
                   ))}
