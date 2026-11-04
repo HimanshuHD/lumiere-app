@@ -130,14 +130,14 @@ export function Profile() {
                 id="profile-password" autoComplete="new-password" value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 placeholder="Enter new password"
-                className="w-full px-4 pr-11 py-2.5 bg-white border border-stone-200 rounded-lg text-sm text-stone-800 placeholder-stone-600 focus:outline-none focus:ring-2 focus:ring-amber-600/30 focus:border-amber-600/40 transition-all"
+                className="w-full px-4 pr-12 py-2.5 bg-white border border-stone-200 rounded-lg text-sm text-stone-800 placeholder-stone-600 focus:outline-none focus:ring-2 focus:ring-amber-600/30 focus:border-amber-600/40 transition-all"
               />
               <button
                 type="button"
                 onClick={() => setShowNewPassword((shown) => !shown)}
                 aria-label={showNewPassword ? 'Hide new password' : 'Show new password'}
                 aria-pressed={showNewPassword}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-600 hover:text-stone-600 transition-colors"
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded text-stone-600 hover:text-stone-600 transition-colors"
               >
                 {showNewPassword
                   ? <EyeOff className="w-4 h-4" aria-hidden="true" />
@@ -153,14 +153,14 @@ export function Profile() {
                 id="profile-confirm-password" autoComplete="new-password" aria-invalid={!!confirmPassword && newPassword !== confirmPassword} aria-describedby={confirmPassword && newPassword !== confirmPassword ? "password-mismatch" : undefined} value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 placeholder="Confirm new password"
-                className="w-full px-4 pr-11 py-2.5 bg-white border border-stone-200 rounded-lg text-sm text-stone-800 placeholder-stone-600 focus:outline-none focus:ring-2 focus:ring-amber-600/30 focus:border-amber-600/40 transition-all"
+                className="w-full px-4 pr-12 py-2.5 bg-white border border-stone-200 rounded-lg text-sm text-stone-800 placeholder-stone-600 focus:outline-none focus:ring-2 focus:ring-amber-600/30 focus:border-amber-600/40 transition-all"
               />
               <button
                 type="button"
                 onClick={() => setShowConfirmPassword((shown) => !shown)}
                 aria-label={showConfirmPassword ? 'Hide confirmation password' : 'Show confirmation password'}
                 aria-pressed={showConfirmPassword}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-600 hover:text-stone-600 transition-colors"
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded text-stone-600 hover:text-stone-600 transition-colors"
               >
                 {showConfirmPassword
                   ? <EyeOff className="w-4 h-4" aria-hidden="true" />

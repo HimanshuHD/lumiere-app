@@ -151,14 +151,14 @@ export function AuthScreen() {
                     [mode]: { ...values[mode], password: e.target.value },
                   }))}
                   placeholder="At least 6 characters"
-                  className="w-full pl-10 pr-11 py-3 bg-stone-800/60 border border-stone-700 rounded-lg text-stone-100 placeholder-stone-400 text-sm focus:outline-none focus:ring-2 focus:ring-amber-600/50 focus:border-amber-600/50 transition-all"
+                  className="w-full pl-10 pr-12 py-3 bg-stone-800/60 border border-stone-700 rounded-lg text-stone-100 placeholder-stone-400 text-sm focus:outline-none focus:ring-2 focus:ring-amber-600/50 focus:border-amber-600/50 transition-all"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword((shown) => !shown)}
                   aria-label={showPassword ? 'Hide password' : 'Show password'}
                   aria-pressed={showPassword}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-300 transition-colors"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded text-stone-400 hover:text-stone-300 transition-colors"
                 >
                   {showPassword
                     ? <EyeOff className="w-4 h-4" aria-hidden="true" />

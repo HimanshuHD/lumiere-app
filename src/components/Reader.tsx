@@ -233,7 +233,7 @@ function ReaderSession({ document: doc, onBack }: ReaderProps) {
                   aria-current={idx === chapterIndex ? "location" : undefined}
                   className={`w-full text-left px-3 py-2.5 rounded-lg text-sm transition-all flex items-center gap-3 ${
                     idx === chapterIndex
-                      ? 'bg-amber-700/10 text-amber-700 font-medium'
+                      ? (settings.theme === 'dark' ? 'bg-amber-400/10 text-amber-300 font-medium' : 'bg-amber-700/10 text-amber-900 font-medium')
                       : `${theme.text} hover:bg-stone-200/50`
                   }`}
                 >

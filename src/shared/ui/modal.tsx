@@ -30,6 +30,18 @@ export function Modal({label, onClose, className = '', children}: {
   }, []);
   return createPortal(<dialog ref={ref} tabIndex={-1} aria-label={label} aria-modal="true"
     className={`lumiere-modal ${className}`}
+    onKeyDown={event => {
+      if (event.key !== 'Tab') return;
+      const dialog = ref.current!;
+      const dialogs = document.querySelectorAll('dialog[open]');
+      if (dialogs[dialogs.length - 1] !== dialog) return;
+      const targets = Array.from(dialog.querySelectorAll<HTMLElement>('button:not([disabled]), a[href], input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'))
+        .filter(element => element.getClientRects().length > 0 && !element.closest('[inert]') && element.tabIndex >= 0);
+      const active = document.activeElement;
+      if (!targets.length) { event.preventDefault(); dialog.focus(); }
+      else if (event.shiftKey && (active === targets[0] || !targets.includes(active as HTMLElement))) { event.preventDefault(); targets[targets.length - 1].focus(); }
+      else if (!event.shiftKey && (active === targets[targets.length - 1] || !targets.includes(active as HTMLElement))) { event.preventDefault(); targets[0].focus(); }
+    }}
     onCancel={event => { event.preventDefault(); close.current(); }}
     onClick={() => close.current()}>{children}</dialog>, document.body);
 }
