@@ -107,6 +107,10 @@ The later Node.js backend can be a separate project and connect to this local Po
 
 ### Browser test setup and installation troubleshooting
 
+Existing-flow keyboard/dialog/PDF accessibility work and its manual screen-reader checklist are
+documented in [accessibility validation](docs/development/accessibility.md). The browser command
+includes axe scans plus explicit focus and PDF text/link lifecycle checks using synthetic fixtures.
+
 Use Node.js 24 (matching CI) and run commands from the repository root. Browser tests
 start their own Vite server and mock Supabase; no local Supabase stack is required.
 

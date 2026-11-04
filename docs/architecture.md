@@ -166,6 +166,17 @@ return security and validation. No policy or database migration is introduced.
 
 ## Adding code
 
+### Existing-flow accessibility (#17)
+
+Shared UI owns native modal focus/scroll lifecycle, disclosure dismissal and accessible notification
+placement; feature consumers own open state and pending-operation dismissal policy. Document title
+buttons are keyboard-operable actions alongside existing collection controls, not nested buttons.
+PDF engines still own resources: the render queue coordinates a page's canvas, TextLayer and supported
+AnnotationLayer links with one viewport and generation. PageLayers clears obsolete DOM/cancels text;
+validated destinations report page navigation through the existing controller and typed progress path.
+No engine saves directly to persistence. See docs/development/accessibility.md for scope, reproduction
+and the separate manual screen-reader acceptance checklist.
+
 Put independent models/ports in domain; workflow controllers in the owning feature; concrete transport
 in infrastructure; account wiring/invalidation in app; engine resources in the matching reader feature;
 and generic presentation in shared UI. Inject ports in orchestration tests. Update the architecture,

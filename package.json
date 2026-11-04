@@ -18,7 +18,7 @@
     "test": "node --test tests/*.test.ts",
     "db:types": "node scripts/generate-database-types.mjs",
     "check:db-types": "node scripts/generate-database-types.mjs --check",
-    "test:browser": "node tests/browser/architecture.mjs && node tests/browser/async-lifecycle.mjs && node tests/browser/navigation.mjs",
+    "test:browser": "node tests/browser/architecture.mjs && node tests/browser/async-lifecycle.mjs && node tests/browser/navigation.mjs && node tests/browser/accessibility.mjs",
     "setup:browser": "playwright install chromium",
     "pretest:browser": "node scripts/check-browser-setup.mjs"
   },
@@ -37,6 +37,7 @@
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.1",
     "autoprefixer": "^10.4.18",
+    "axe-core": "4.14.0",
     "eslint": "^9.9.1",
     "eslint-plugin-react-hooks": "^5.1.0-rc.0",
     "eslint-plugin-react-refresh": "^0.4.11",
@@ -50,4 +51,3 @@
     "vite": "^5.4.2"
   }
 }
-
