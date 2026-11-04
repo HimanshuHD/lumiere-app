@@ -12,19 +12,21 @@ const html = `<html><body><div id="root"></div><script type="module">
   import {ToastProvider} from '/src/shared/ui/index.ts';
   import {useCatalogController} from '/src/features/catalog/index.ts';
   import {useProfileController} from '/src/features/profile/index.ts';
+  import {useDocumentStorageUrl} from '/src/hooks/useDocumentStorageUrl.ts';
   const user={id:'81000000-0000-4000-8000-000000000001',user_metadata:{},app_metadata:{}};
   const book={id:'1',title:'One',author:'QA',summary:'',downloadUrl:'https://www.gutenberg.org/ebooks/1.epub',downloadType:'application/epub+zip',rights:'Public domain in the USA',categories:[],catalogUrl:'',updated:'',coverUrl:''};
-  window.navigation=0;window.avatarRequests=[];window.revoked=[];
+  window.navigation=0;window.avatarRequests=[];window.revoked=[];window.urlRequests=[];
   const revoke=URL.revokeObjectURL.bind(URL);
   URL.revokeObjectURL=url=>{window.revoked.push(url);revoke(url);};
-  const ports={catalogFeed:async()=>({title:'Feed',books:[book]}),auth:{},profile:{saveAvatar:async(id,file)=>new Promise((resolve,reject)=>window.avatarRequests.push({file,resolve,reject}))}};
+  const ports={documentUrl:async path=>new Promise((resolve,reject)=>window.urlRequests.push({path,resolve,reject})),catalogFeed:async()=>({title:'Feed',books:[book]}),auth:{},profile:{saveAvatar:async(id,file)=>new Promise((resolve,reject)=>window.avatarRequests.push({file,resolve,reject}))}};
   const auth={user,profile:{fullName:'QA',avatarUrl:null},refreshProfile:async()=>{}};
   function Catalog(){const[open,setOpen]=useState(true);window.setCatalogOpen=setOpen;
     window.controller=useCatalogController(open,()=>setOpen(false),()=>window.navigation++);
     return React.createElement('p',null,open?'catalog open':'catalog closed');}
   function Profile(){window.controller=useProfileController();return React.createElement('p',null,'profile');}
+  function Storage(){const[path,setPath]=useState('one');const[enabled,setEnabled]=useState(true);window.setStoragePath=setPath;window.setStorageEnabled=setEnabled;window.controller=useDocumentStorageUrl(path,null,enabled);return React.createElement('p',null,'storage');}
   function Root(){const[mode,setMode]=useState('catalog');window.setMode=setMode;return React.createElement(IntegrationContext.Provider,{value:ports},
-    React.createElement(AuthContext.Provider,{value:auth},React.createElement(ToastProvider,null,mode==='profile'?React.createElement(Profile):React.createElement(Catalog))));}
+    React.createElement(AuthContext.Provider,{value:auth},React.createElement(ToastProvider,null,mode==='profile'?React.createElement(Profile):mode==='storage'?React.createElement(Storage):React.createElement(Catalog))));}
   createRoot(document.getElementById('root')).render(React.createElement(Root));
 </script></body></html>`;
 const server=await createServer({server:{host:'127.0.0.1',port:0},plugins:[{
@@ -109,6 +111,53 @@ try{
   await page.waitForFunction(()=>!!window.controller.loadCatalog);
   assert.equal(await page.evaluate(url=>window.revoked.includes(url),previewC),true);
   console.log('PASS: older avatar upload preserves newer selection/preview; current save and unmount release previews.');
+  await page.evaluate(()=>window.setMode('storage'));
+  await page.waitForFunction(()=>window.urlRequests.length===1);
+  await page.evaluate(()=>window.urlRequests[0].resolve({url:'https://example.test/one',refreshAt:Date.now()+80,expiresAt:Date.now()+10000}));
+  await page.waitForFunction(()=>window.urlRequests.length===2);
+  await page.evaluate(()=>window.urlRequests[1].reject({name:'StorageUnknownError',originalError:new TypeError('Failed to fetch')}));
+  await page.waitForFunction(()=>!!window.controller.error);
+  assert.equal(await page.evaluate(()=>window.controller.url),'https://example.test/one');
+  await page.evaluate(()=>window.dispatchEvent(new Event('online')));
+  await page.waitForFunction(()=>window.urlRequests.length===3);
+  await page.evaluate(()=>window.urlRequests[2].resolve({url:'https://example.test/recovered',refreshAt:Date.now()+60000,expiresAt:Date.now()+90000}));
+  await page.waitForFunction(()=>window.controller.url==='https://example.test/recovered'&&window.controller.error===null);
+  console.log('PASS: transient URL refresh retains access and reconnect recovers without a remount.');
+
+  await page.evaluate(()=>window.setStoragePath('denied'));
+  await page.waitForFunction(()=>window.urlRequests.length===4&&window.controller.url===null);
+  await page.evaluate(()=>window.urlRequests[3].reject({name:'StorageApiError',status:400,statusCode:'403',message:'Denied'}));
+  await page.waitForFunction(()=>window.controller.error?.includes('permission'));
+  await page.evaluate(()=>window.dispatchEvent(new Event('online')));
+  await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+  assert.equal(await page.evaluate(()=>window.urlRequests.length),4);
+  assert.equal(await page.evaluate(()=>window.controller.url),null);
+
+  await page.evaluate(()=>window.setStoragePath('old'));
+  await page.waitForFunction(()=>window.urlRequests.length===5);
+  await page.evaluate(()=>window.setStoragePath('new'));
+  await page.waitForFunction(()=>window.urlRequests.length===6);
+  await page.evaluate(()=>window.urlRequests[5].resolve({url:'https://example.test/new',refreshAt:Date.now()+60000,expiresAt:Date.now()+90000}));
+  await page.waitForFunction(()=>window.controller.url==='https://example.test/new');
+  await page.evaluate(()=>window.urlRequests[4].resolve({url:'https://example.test/old',refreshAt:Date.now()+60000,expiresAt:Date.now()+90000}));
+  await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+  assert.equal(await page.evaluate(()=>window.controller.url),'https://example.test/new');
+
+  await page.evaluate(()=>window.setStoragePath('expiry'));
+  await page.waitForFunction(()=>window.urlRequests.length===7);
+  await page.evaluate(()=>window.urlRequests[6].resolve({url:'https://example.test/expiring',refreshAt:Date.now()+20,expiresAt:Date.now()+150}));
+  await page.waitForFunction(()=>window.urlRequests.length===8);
+  await page.waitForFunction(()=>window.controller.url===null&&window.controller.error?.includes('expired'));
+  await page.evaluate(()=>window.urlRequests[7].resolve({url:'https://example.test/renewed',refreshAt:Date.now()+60000,expiresAt:Date.now()+90000}));
+  await page.waitForFunction(()=>window.controller.url==='https://example.test/renewed');
+  await page.evaluate(()=>window.setStorageEnabled(false));
+  await page.waitForFunction(()=>window.controller.url===null);
+  await page.evaluate(()=>window.setMode('catalog'));
+  await page.waitForFunction(()=>!!window.controller.loadCatalog);
+  await page.evaluate(()=>window.dispatchEvent(new Event('online')));
+  await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+  assert.equal(await page.evaluate(()=>window.urlRequests.length),8);
+  console.log('PASS: denied/expired access clears; stale paths are ignored; disable/unmount releases reconnect handling.');
   assert.deepEqual(errors,[]);
-  console.log('PASS: closed catalog ignores import completion; no browser exceptions.');
+  console.log('PASS: all asynchronous lifecycle regressions; no browser exceptions.');
 }finally{await browser.close();await server.close();}

@@ -11,9 +11,11 @@ export function toServiceError(error: unknown): ServiceError {
   if (error instanceof ServiceError) return error;
   const record = error && typeof error === 'object' ? error as Record<string, unknown> : {};
   const message = typeof record.message === 'string' ? record.message : 'The operation failed. Please retry.';
+  if (record.name === 'StorageUnknownError' && record.originalError && record.originalError !== error) return toServiceError(record.originalError);
+  const statuses = [record.status, record.statusCode].map(Number);
   if (record.name === 'AbortError') return new ServiceError('cancelled', 'The operation was cancelled.', error);
-  if (record.code === '42501' || record.status === 401 || record.status === 403 || record.code === 'PGRST301') return new ServiceError('permission', message, error);
-  if ((record.name === 'TypeError' && /failed to fetch|fetch failed|network/i.test(message)) || (typeof record.status === 'number' && record.status >= 500)) return new ServiceError('network', message, error);
+  if (record.code === '42501' || statuses.includes(401) || statuses.includes(403) || record.code === 'PGRST301') return new ServiceError('permission', message, error);
+  if ((record.name === 'TypeError' && /failed to fetch|fetch failed|network|load failed/i.test(message)) || record.name === 'AuthRetryableFetchError' || statuses.some(status => status >= 500 || status === 408 || status === 429)) return new ServiceError('network', message, error);
   return new ServiceError('unexpected', message, error);
 }
 
