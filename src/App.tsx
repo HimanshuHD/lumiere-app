@@ -3,6 +3,7 @@ import { setActiveAccount } from '@/app/account-runtime';
 import { integrations } from '@/app/integrations';
 import { useState, useCallback, useEffect } from 'react';
 import { SessionNavigationBoundary } from '@/app/SessionNavigationBoundary';
+import { OAuthCallback } from '@/app/OAuthCallback';
 import { BookOpen, BookMarked, Library as LibraryIcon, Loader2, ListTodo } from 'lucide-react';
 import { AuthProvider } from '@/context/AuthContext';
 import { useAuth } from '@/features/auth';
@@ -60,6 +61,8 @@ function AppContent() {
       </div>
     );
   }
+
+  if (route.kind === 'callback') return <OAuthCallback />;
 
   if (!user) {
     return <AuthScreen />;
@@ -139,7 +142,7 @@ function AppContent() {
       {/* Main content */}
       {!activeDoc && (view === 'library' || view === 'all-documents') && <QueryNotice error={docsError} retry={refetch} label="library" />}
       <main>
-        {route.kind === 'not-found' || route.kind === 'callback' ? (
+        {route.kind === 'not-found' ? (
           <div className="max-w-3xl mx-auto px-4 py-24 text-center">
             <h1 className="text-2xl font-serif font-bold">Page unavailable</h1>
             <button className="mt-6 underline" onClick={() => navigate({kind:'view',view:'library'},{replace:true})}>Return to library</button>
