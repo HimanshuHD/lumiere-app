@@ -81,6 +81,15 @@ SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET=your-google-client-secret
 
 The local Supabase config reads these server-side credentials to enable the Google provider. `supabase/.env` is ignored by Git; do not put either credential in `.env.local`, a `VITE_` variable, or committed files. Restart the local stack after changing provider credentials with `npm run supabase:stop` followed by `npm run supabase:start`. Open the app using a Vite URL on `localhost` or `127.0.0.1` at port `5173` or `5174` so its OAuth return URL is allowed.
 
+### URL navigation and hosting
+
+Existing views and documents have stable URLs, including `/bookmarks`, `/profile` and
+`/read/<document UUID>`. Refresh and browser Back/Forward retain route identity. Deployment must serve
+the app HTML for direct app-route requests. Google sign-in now returns through `/auth/callback`;
+allow that exact app URL in Supabase, separately from Google's Supabase provider callback.
+See [navigation setup and manual tests](docs/development/url-navigation.md) for subdirectory builds,
+OAuth allowlists, hosting fallback rules and account-transition behavior. No database migration is needed.
+
 ### Local Supabase services
 
 Supabase Studio is available at `http://127.0.0.1:54323`; the local PostgreSQL server listens on port `54322`. Use `npm run supabase:status` to view service status and local connection details, and `npm run supabase:stop` to stop the stack.
