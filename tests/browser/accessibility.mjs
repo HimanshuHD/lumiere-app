@@ -79,6 +79,7 @@ try{
  await page.getByRole('button',{name:'Next PDF page',exact:true}).click();await page.getByText(/This page has no extractable text/).waitFor();assert.equal(await page.locator('.annotationLayer a').count(),0);
  await page.getByRole('button',{name:'Previous PDF page',exact:true}).click();await ready();await page.evaluate(()=>window.renewPdf());await ready();await page.getByText('Landscape second page',{exact:true}).waitFor({state:'attached'});
  await page.getByRole('button',{name:'Switch fixture',exact:true}).click();assert.equal(await page.locator('.textLayer,.annotationLayer').count(),0);
+ await page.emulateMedia({reducedMotion:'reduce'});assert.equal(await page.evaluate(()=>{const indicator=document.createElement('span');indicator.className='animate-spin';document.body.append(indicator);const count=getComputedStyle(indicator).animationIterationCount;indicator.remove();return count;}),'1');
  console.log('PASS: keyboard document opening, disclosures, native/nested dialog focus, file picker, PDF text/links/zoom/resize/renewal/cleanup.');
  assert.deepEqual(errors,[]);assert.deepEqual(audits.filter(a=>a.violations.length),[]);console.log('PASS: representative WCAG axe checks; no browser exceptions.');
 }catch(error){if(page)console.error('A11y fixture failure',page.url(),await page.locator('h1,h2,[role=alert]').allTextContents().catch(()=>[]));throw error;}
