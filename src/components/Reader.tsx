@@ -55,7 +55,7 @@ function ReaderSession({ document: doc, onBack }: ReaderProps) {
             <button
               onClick={onBack}
               aria-label="Back to library"
-              className={`p-1.5 rounded-lg hover:bg-stone-200/50 ${theme.text} transition-colors`}
+              className={`p-1.5 rounded-lg ${theme.hoverBg} ${theme.text} transition-colors`}
             >
               <ArrowLeft aria-hidden="true" className="w-4 h-4" />
             </button>
@@ -63,7 +63,7 @@ function ReaderSession({ document: doc, onBack }: ReaderProps) {
               <button
                 onClick={() => setShowToc(true)}
                 aria-label="Open contents" aria-expanded={showToc}
-                className={`p-1.5 rounded-lg hover:bg-stone-200/50 ${theme.text} transition-colors`}
+                className={`p-1.5 rounded-lg ${theme.hoverBg} ${theme.text} transition-colors`}
               >
                 <List aria-hidden="true" className="w-4 h-4" />
               </button>
@@ -81,7 +81,7 @@ function ReaderSession({ document: doc, onBack }: ReaderProps) {
               disabled={isBookmarkPending(doc.id)}
               aria-label={isBookmarked(doc.id) ? "Remove bookmark" : "Bookmark document"}
               aria-pressed={isBookmarked(doc.id)}
-              className={`p-1.5 rounded-lg hover:bg-stone-200/50 ${theme.text} transition-colors`}
+              className={`p-1.5 rounded-lg ${theme.hoverBg} ${theme.text} transition-colors`}
             >
               {isBookmarked(doc.id) ? (
                 <BookmarkCheck aria-hidden="true" className="w-4 h-4 text-amber-600" />
@@ -93,7 +93,7 @@ function ReaderSession({ document: doc, onBack }: ReaderProps) {
               <button
                 onClick={() => setShowSettings(!showSettings)}
                 aria-label="Reader settings" aria-expanded={showSettings} aria-controls={showSettings ? "reader-settings" : undefined}
-                className={`p-1.5 rounded-lg hover:bg-stone-200/50 ${theme.text} transition-colors`}
+                className={`p-1.5 rounded-lg ${theme.hoverBg} ${theme.text} transition-colors`}
               >
                 <Settings aria-hidden="true" className="w-4 h-4" />
               </button>
@@ -141,7 +141,7 @@ function ReaderSession({ document: doc, onBack }: ReaderProps) {
                       className={`flex-1 py-2 rounded-lg text-xs font-medium capitalize transition-all ${
                         settings.fontSize === size
                           ? 'bg-amber-700 text-white'
-                          : `${theme.text} hover:bg-stone-200/50`
+                          : `${theme.text} ${theme.hoverBg}`
                       } ${theme.border} border`}
                     >
                       {size}
@@ -168,7 +168,7 @@ function ReaderSession({ document: doc, onBack }: ReaderProps) {
                       className={`flex-1 py-2 rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-1.5 ${
                         settings.theme === key
                           ? 'bg-amber-700 text-white'
-                          : `${theme.text} hover:bg-stone-200/50`
+                          : `${theme.text} ${theme.hoverBg}`
                       } ${theme.border} border`}
                     >
                       <Icon aria-hidden="true" className="w-3.5 h-3.5" />
@@ -192,7 +192,7 @@ function ReaderSession({ document: doc, onBack }: ReaderProps) {
                       className={`flex-1 py-2 rounded-lg text-xs font-medium capitalize transition-all ${
                         settings.lineSpacing === spacing
                           ? 'bg-amber-700 text-white'
-                          : `${theme.text} hover:bg-stone-200/50`
+                          : `${theme.text} ${theme.hoverBg}`
                       } ${theme.border} border`}
                     >
                       {spacing}
@@ -215,7 +215,7 @@ function ReaderSession({ document: doc, onBack }: ReaderProps) {
           >
             <div className={`p-4 border-b ${theme.border} flex items-center justify-between`}>
               <h3 className={`font-serif font-bold ${theme.text} text-lg`}>Contents</h3>
-              <button aria-label="Close contents" onClick={() => setShowToc(false)} className={`p-1.5 rounded-lg hover:bg-stone-200/50 ${theme.text}`}>
+              <button aria-label="Close contents" onClick={() => setShowToc(false)} className={`p-1.5 rounded-lg ${theme.hoverBg} ${theme.text}`}>
                 <X aria-hidden="true" className="w-4 h-4" />
               </button>
             </div>
@@ -234,7 +234,7 @@ function ReaderSession({ document: doc, onBack }: ReaderProps) {
                   className={`w-full text-left px-3 py-2.5 rounded-lg text-sm transition-all flex items-center gap-3 ${
                     idx === chapterIndex
                       ? (settings.theme === 'dark' ? 'bg-amber-400/10 text-amber-300 font-medium' : 'bg-amber-700/10 text-amber-900 font-medium')
-                      : `${theme.text} hover:bg-stone-200/50`
+                      : `${theme.text} ${theme.hoverBg}`
                   }`}
                 >
                   <span className={`text-xs ${theme.subText} font-mono w-5`}>
@@ -378,7 +378,7 @@ function ReaderSession({ document: doc, onBack }: ReaderProps) {
                 className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
                   chapterIndex === 0
                     ? `opacity-40 cursor-not-allowed ${theme.text}`
-                    : `${theme.text} hover:bg-stone-200/50 border ${theme.border}`
+                    : `${theme.text} ${theme.hoverBg} border ${theme.border}`
                 }`}
               >
                 <ChevronLeft aria-hidden="true" className="w-4 h-4" />
@@ -393,7 +393,7 @@ function ReaderSession({ document: doc, onBack }: ReaderProps) {
                 className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
                   chapterIndex === doc.chapters.length - 1
                     ? `opacity-40 cursor-not-allowed ${theme.text}`
-                    : `${theme.text} hover:bg-stone-200/50 border ${theme.border}`
+                    : `${theme.text} ${theme.hoverBg} border ${theme.border}`
                 }`}
               >
                 Next
