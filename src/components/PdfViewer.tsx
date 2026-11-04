@@ -1,9 +1,10 @@
+import 'pdfjs-dist/web/pdf_viewer.css';
 import { ChevronLeft, ChevronRight, Loader2, ZoomIn, ZoomOut } from 'lucide-react';
 import { usePdfController, type PdfViewerProps } from '@/features/reader/pdf';
 
 export function PdfViewer(props: PdfViewerProps) {
   const { url, title } = props;
-  const { canvasRef, canvasAreaRef, pageNum, totalPages, displayScale, fitMode, fitToWidth, loading, error, rendering, renderError, setLoadAttempt, setRenderAttempt, adjustZoom, goToPage } = usePdfController(props);
+  const { pageRef, textRef, linksRef, hasText, linkError, canvasRef, canvasAreaRef, pageNum, totalPages, displayScale, fitMode, fitToWidth, loading, error, rendering, renderError, setLoadAttempt, setRenderAttempt, adjustZoom, goToPage } = usePdfController(props);
   if (loading) {
     return (
       <div className="flex items-center justify-center h-[calc(100vh-7rem)]">
@@ -108,9 +109,15 @@ export function PdfViewer(props: PdfViewerProps) {
         {rendering && <p role="status" className="text-center text-xs text-stone-500">Rendering page…</p>}
       </div>
 
-      {/* PDF canvas area */}
+      {hasText === false && !rendering && <p role="status" className="p-2 text-sm text-stone-700">This page has no extractable text. It may be an image; text selection and screen-reader text are unavailable.</p>}
+      {linkError && <p role="alert" className="p-2 text-sm text-red-700">{linkError}</p>}
+      {/* Coordinated canvas, selectable text and document links */}
       <div ref={canvasAreaRef} className="flex-1 overflow-auto bg-stone-100 p-4" style={{ scrollbarGutter: 'stable' }}>
-        <canvas ref={canvasRef} className="block mx-auto shadow-lg rounded" />
+        <div ref={pageRef} className="pdf-page relative mx-auto bg-white shadow-lg" style={{width:"fit-content"}}>
+          <canvas ref={canvasRef} aria-hidden="true" className="block" />
+          <div ref={textRef} />
+          <div ref={linksRef} />
+        </div>
       </div>
     </div>
   );

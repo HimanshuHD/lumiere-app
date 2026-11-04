@@ -92,7 +92,7 @@ function ReaderSession({ document: doc, onBack }: ReaderProps) {
             {textMode && (
               <button
                 onClick={() => setShowSettings(!showSettings)}
-                aria-label="Reader settings" aria-expanded={showSettings} aria-controls="reader-settings"
+                aria-label="Reader settings" aria-expanded={showSettings} aria-controls={showSettings ? "reader-settings" : undefined}
                 className={`p-1.5 rounded-lg hover:bg-stone-200/50 ${theme.text} transition-colors`}
               >
                 <Settings aria-hidden="true" className="w-4 h-4" />
