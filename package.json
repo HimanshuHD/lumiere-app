@@ -18,7 +18,7 @@
     "test": "node --test tests/*.test.ts",
     "db:types": "node scripts/generate-database-types.mjs",
     "check:db-types": "node scripts/generate-database-types.mjs --check",
-    "test:browser": "node tests/browser/architecture.mjs",
+    "test:browser": "node tests/browser/architecture.mjs && node tests/browser/async-lifecycle.mjs",
     "setup:browser": "playwright install chromium",
     "pretest:browser": "node scripts/check-browser-setup.mjs"
   },
@@ -50,3 +50,4 @@
     "vite": "^5.4.2"
   }
 }
+

@@ -17,10 +17,11 @@ export interface ProfilePort {
   saveAvatar(id: string, file: File): Promise<string>;
 }
 export interface PreferencesPort { read(): unknown; write(settings: ReaderSettings): void }
+export interface SignedDocumentUrl { url: string; refreshAt: number; expiresAt: number }
 export interface IntegrationPorts {
   auth: AuthPort;
   profile: ProfilePort;
   preferences: PreferencesPort;
-  documentUrl(path: string): Promise<{ url: string; refreshAt: number }>;
+  documentUrl(path: string): Promise<SignedDocumentUrl>;
   catalogFeed(url: string, challenge: () => Promise<string>, signal?: AbortSignal): Promise<OpdsFeedResult>;
 }

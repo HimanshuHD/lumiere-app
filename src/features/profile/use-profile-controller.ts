@@ -19,6 +19,8 @@ export function useProfileController() {
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const avatarSelection = useRef(0);
+  const avatarUploadInFlight = useRef(false);
   const avatarInputRef = useRef<HTMLInputElement>(null);
 
   // Password change state
@@ -35,6 +37,7 @@ export function useProfileController() {
   useEffect(() => () => { if (avatarPreview) URL.revokeObjectURL(avatarPreview); }, [avatarPreview]);
 
   const handleAvatarSelect = (file: File) => {
+    avatarSelection.current++;
     setAvatarFile(file);
     setAvatarPreview(URL.createObjectURL(file));
   };
@@ -55,20 +58,25 @@ export function useProfileController() {
   };
 
   const handleSaveAvatar = async () => {
-    if (!user || !avatarFile) return;
+    if (!user || !avatarFile || avatarUploadInFlight.current) return;
+    const selection = avatarSelection.current;
+    avatarUploadInFlight.current = true;
     setUploadingAvatar(true);
     try {
       const publicUrl = requireValue(await commands.saveAvatar(user.id, avatarFile));
       if (!active.current) return;
       setAvatarUrl(publicUrl);
-      setAvatarFile(null);
-      setAvatarPreview(null);
+      if (avatarSelection.current === selection) {
+        setAvatarFile(null);
+        setAvatarPreview(null);
+      }
       await refreshProfile();
       if (!active.current) return;
       showToast('Profile picture updated successfully.');
     } catch (err) {
       if (active.current) showToast(err instanceof Error ? err.message : 'Failed to upload picture.', 'error');
     } finally {
+      avatarUploadInFlight.current = false;
       if (active.current) setUploadingAvatar(false);
     }
   };

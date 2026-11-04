@@ -41,7 +41,7 @@ export function canImportBook(catalogUrl: string | undefined, book: OpdsBook): b
 
 export function useCatalogController(open: boolean, onClose: () => void, onBookAdded: (document: Document) => void) {
   const { catalogFeed: fetchCatalogFeed } = useIntegrations();
-  const importGeneration = useRef(0);
+  const pendingImport = useRef<symbol | null>(null);
   const active = useRef(true);
   useEffect(() => { active.current = true; return () => { active.current = false; }; }, []);
   const { user } = useAuth();
@@ -59,9 +59,16 @@ export function useCatalogController(open: boolean, onClose: () => void, onBookA
   const turnstileContainerRef = useRef<HTMLDivElement>(null);
 
   const request = useRef<AbortController | null>(null);
-  useEffect(() => { if (!open) { request.current?.abort(); importGeneration.current++; } return () => { request.current?.abort(); }; }, [open]);
+  const invalidateImport = useCallback(() => {
+    pendingImport.current = null;
+    setAddingBookId(null);
+  }, []);
+  useEffect(() => {
+    if (!open) { request.current?.abort(); invalidateImport(); }
+    return () => { request.current?.abort(); pendingImport.current = null; };
+  }, [open, invalidateImport]);
   const loadCatalog = useCallback(async (catalog: OpdsCatalog) => {
-    importGeneration.current++;
+    invalidateImport();
     request.current?.abort();
     const controller = new AbortController();
     request.current = controller;
@@ -89,7 +96,7 @@ export function useCatalogController(open: boolean, onClose: () => void, onBookA
     } finally {
       if (!controller.signal.aborted) { setCheckingSecurity(false); setLoading(false); }
     }
-  }, [fetchCatalogFeed]);
+  }, [fetchCatalogFeed, invalidateImport]);
 
   const handleShowCatalog = useCallback((catalog: OpdsCatalog) => {
     setCatalogHistory([]);
@@ -104,6 +111,7 @@ export function useCatalogController(open: boolean, onClose: () => void, onBookA
   }, [loadCatalog, selectedCatalog]);
 
   const handleAddBook = useCallback(async (book: OpdsBook) => {
+    if (pendingImport.current) return;
     if (!user) {
       showToast('Sign in to add books to your library.', 'error');
       return;
@@ -118,7 +126,8 @@ export function useCatalogController(open: boolean, onClose: () => void, onBookA
       return;
     }
 
-    const generation = importGeneration.current;
+    const token = Symbol('catalog import');
+    pendingImport.current = token;
     const bookId = book.id;
     setAddingBookId(bookId);
     try {
@@ -133,13 +142,16 @@ export function useCatalogController(open: boolean, onClose: () => void, onBookA
           format,
         },
       )));
-      if (!active.current || generation !== importGeneration.current) return;
+      if (!active.current || pendingImport.current !== token) return;
       showToast('Book added to your collection. Opening it now.');
       onBookAdded(collectionDocument);
     } catch (err) {
-      if (active.current && generation === importGeneration.current) showToast(err instanceof Error ? err.message : 'Could not add this book to your library.', 'error');
+      if (active.current && pendingImport.current === token) showToast(err instanceof Error ? err.message : 'Could not add this book to your library.', 'error');
     } finally {
-      if (active.current && generation === importGeneration.current) setAddingBookId(null);
+      if (pendingImport.current === token) {
+        pendingImport.current = null;
+        if (active.current) setAddingBookId(null);
+      }
     }
   }, [onBookAdded, selectedCatalog, showToast, user]);
 
@@ -158,6 +170,7 @@ export function useCatalogController(open: boolean, onClose: () => void, onBookA
   }, [handleShowCatalog, rssFeedUrl]);
 
   const handleBack = useCallback(() => {
+    invalidateImport();
     const previousCatalog = catalogHistory[catalogHistory.length - 1];
     if (previousCatalog) {
       setCatalogHistory((history) => history.slice(0, -1));
@@ -170,14 +183,12 @@ export function useCatalogController(open: boolean, onClose: () => void, onBookA
     setBooks([]);
     setFeedTitle('');
     setError(null);
-  }, [catalogHistory, loadCatalog]);
+  }, [catalogHistory, loadCatalog, invalidateImport]);
 
   const handleClose = useCallback(() => {
-    importGeneration.current++;
-    setAddingBookId(null);
+    invalidateImport();
     request.current?.abort();
     onClose();
-    request.current?.abort();
     setLoading(false);
     setSelectedCatalog(null);
     setCatalogHistory([]);
@@ -186,7 +197,7 @@ export function useCatalogController(open: boolean, onClose: () => void, onBookA
     setError(null);
     setQuery('');
     setRssFeedUrl('');
-  }, [onClose]);
+  }, [onClose, invalidateImport]);
 
   return { loadCatalog, query, setQuery, rssFeedUrl, setRssFeedUrl, selectedCatalog, catalogHistory, books, feedTitle, loading, checkingSecurity, error, addingBookId, turnstileContainerRef, handleShowCatalog, handleBrowseCatalog, handleAddBook, handleLoadRssFeed, handleBack, handleClose };
 }

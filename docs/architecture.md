@@ -28,7 +28,7 @@ catalog and signed-in manual acceptance remain owner validation before merging o
 | Preferences | Validated appearance and device-local persistence | Server state or format resources | `features/reader/preferences` pure storage functions; app injects storage |
 | Shared user data | Query deduplication, cache generations, mutation gates, invalidation and account isolation | SDK query construction | `features/data` public API and injected UserDataRepository |
 | Database repositories | Typed queries and response mapping | Navigation, toasts or cache notifications | `infrastructure/supabase`, generated public-schema contracts and explicit mappers |
-| Storage adapter | Upload/removal, signed URLs and account-scoped URL cache | React state or collection membership | Document/profile/storage adapters; signed-URL hook schedules refresh through an injected port |
+| Storage adapter | Upload/removal, signed URLs and account-scoped URL cache | React state or collection membership | Document/profile/storage adapters; signed-URL hook delegates refresh/expiry/retry to an injected session |
 | Shared UI | Generic notices and notifications | Feature state or persistence | `shared/ui`; domain-aware covers/bookmarks remain feature presentation |
 | Configuration | Validate public browser configuration | Privileged keys or backend environment | `shared/config`; SDK construction only in infrastructure |
 | Backend enforcement | RLS/ownership/visibility, upload/catalog validation, remote-fetch restrictions | Browser presentation | `supabase/migrations` and `supabase/functions`, never imported into the browser |
@@ -138,6 +138,16 @@ CI runs schema drift checks, boundaries, TypeScript, lint, Node tests, productio
 Chromium architecture smoke test. The latter uses mocked transport and generated PDF/EPUB fixtures,
 not a real account. See `docs/development/architecture-refactor-validation.md` for reproduction and
 live/manual acceptance. Keep #15 open until that acceptance is recorded and the owner merges.
+
+
+## Signed-URL recovery ownership (#32)
+
+`features/documents/signed-url-session.ts` receives transport and owns bounded refresh/retry plus independent
+expiry. The URL hook owns the online listener and disposes the session on path/enable changes. The
+adapter supplies conservative expiration metadata. Transient failures may retain only unexpired URLs;
+permission failures clear access. See `docs/development/async-lifecycle-regressions.md` for the exact
+retry policy and catalog/avatar ownership regression checks.
+
 
 ## Adding code
 
