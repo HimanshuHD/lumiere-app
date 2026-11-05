@@ -1,12 +1,12 @@
 import { chromium } from 'playwright';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
+let number = 0;
 
 // These suites use synthetic accounts and mocked transport. Never enable tracing on real accounts.
 export async function launchBrowser(options) {
   const browser = await chromium.launch(options);
   const createContext = browser.newContext.bind(browser);
-  let number = 0;
   browser.newContext = async options => {
     const context = await createContext(options);
     const directory = resolve(process.env.BROWSER_ARTIFACTS || 'test-results/browser', `context-${++number}`);

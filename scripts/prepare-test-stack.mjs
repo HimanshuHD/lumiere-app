@@ -7,6 +7,7 @@ const target = resolve(root, '.test-stack');
 mkdirSync(resolve(target, 'supabase'), { recursive: true });
 let config = readFileSync(resolve(root, 'supabase/config.toml'), 'utf8');
 config = config.replace(/^project_id = .*/m, 'project_id = "lumiere-quality-test"');
+config = config.replace(/543(2[0-9])/g, '553$1');
 config = config.replace(/\[auth.external.google\][\s\S]*?(?=\n\[)/, '[auth.external.google]\nenabled = false\nclient_id = ""\nsecret = ""\n');
 // Synthetic credentials only; production OAuth is not part of the routine suite.
 writeFileSync(resolve(target, 'supabase/config.toml'), config);

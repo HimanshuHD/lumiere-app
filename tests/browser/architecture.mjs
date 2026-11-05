@@ -14,6 +14,9 @@ let profile = {full_name:'Architecture QA',avatar_url:null};
 let references = [];
 const progress = new Map();
 let failBookmark = false;
+let imports = 0;
+const memberships = new Set();
+const catalogDoc = {...docs[0],id:'82000000-0000-4000-8000-000000000099',title:'Deterministic import',origin:'catalog_import',source_identity:'project-gutenberg:999:pdf',file_format:'pdf',file_storage_path:'catalog/qa.pdf',chapters:[]};
 const errors = [];
 const server = await createServer({server:{host:'127.0.0.1',port:0},plugins:[{name:'architecture-fixtures',configureServer:fixtures}]});
 function fixtures(server) { server.middlewares.use(async (req,res,next) => {
@@ -56,6 +59,7 @@ try {
     const req=route.request(), url=new URL(req.url()), path=url.pathname;
     const body=req.postDataJSON?.();
     let data=[];
+    if(path.includes('/storage/v1/object/sign/documents/catalog/qa.pdf')&&req.method()==='GET') return route.fulfill({contentType:'application/pdf',body:pdf});
     if(path.startsWith('/auth/v1/logout')) return route.fulfill({status:204});
     if(path.startsWith('/auth/v1/user')) data={id:userId,email:'qa@example.test',user_metadata:{},app_metadata:{}};
     else if(path.endsWith('/profiles')) { if(req.method()==='POST') profile={...profile,...body}; data=profile; }
@@ -63,7 +67,7 @@ try {
       let rows=docs;
       const id=url.searchParams.get('id')?.replace('eq.','');
       if(id) rows=docs.filter(d=>d.id===id);
-      if(url.searchParams.get('origin')==='eq.catalog_import') rows=[];
+      if(url.searchParams.get('origin')==='eq.catalog_import') rows=rows.filter(d=>d.origin==='catalog_import');
       const select=url.searchParams.get('select');
       data=select==='*'?rows[0]:rows.map(({chapters: _chapters,...summary})=>summary);
     } else if(path.endsWith('/bookmarks')) {
@@ -76,10 +80,22 @@ try {
     else if(path.endsWith('/rpc/save_reading_position')) {
       const row={id:'progress',user_id:userId,document_id:body.p_document_id,position:body.p_position,chapter_index:body.p_chapter_index,scroll_percent:body.p_scroll_percent,revision:(progress.get(body.p_document_id)?.revision||0)+1,mutation_id:body.p_mutation_id,updated_at:new Date().toISOString()};
       progress.set(body.p_document_id,row);data={accepted:true,row};
+    } else if(path.includes('/storage/v1/object/sign/')) {
+      data={signedURL:`/object/sign/documents/catalog/qa.pdf?token=synthetic`};
+    } else if(path.includes('/storage/v1/object/sign/documents/catalog/qa.pdf')) {
+      return route.fulfill({contentType:'application/pdf',body:pdf});
+    } else if(path.endsWith('/document_library_memberships')) {
+      if(req.method()==='POST') memberships.add(body.document_id);
+      data=[...memberships].map(document_id=>({document_id}));
     } else if(path.endsWith('/functions/v1/opds-fetch')) {
+      if(req.method()==='POST') {
+        imports++;
+        if(!docs.some(d=>d.id===catalogDoc.id))docs.push(catalogDoc);
+        return route.fulfill({json:catalogDoc});
+      }
       const slow=url.searchParams.get('url')?.includes('gutenberg');
       if(slow) await new Promise(resolve=>setTimeout(resolve,350));
-      data={title:slow?'Obsolete feed':'Current feed',books:[],count:0,subtitle:''};
+      data={title:slow?'Obsolete feed':'Current feed',books:slow?[{id:'999',title:'Deterministic import',author:'QA',downloadUrl:'https://www.gutenberg.org/ebooks/999.pdf',downloadType:'application/pdf',rights:'Public domain in the USA'}]:[],count:slow?1:0,subtitle:''};
     }
     await route.fulfill({json:data});
   });
@@ -133,6 +149,22 @@ try {
   await page.getByRole('heading',{name:'Current feed',exact:true}).waitFor();
   await page.waitForTimeout(500);
   assert.equal(await page.getByRole('heading',{name:'Obsolete feed',exact:true}).count(),0);
+  // Full UI import uses deterministic transport; repeated import reuses the canonical ID.
+  await page.getByRole('button',{name:'Back to catalogs',exact:true}).click();
+  await page.getByRole('button',{name:'Browse Books',exact:true}).nth(0).click();
+  await page.getByRole('button',{name:'Add to Shared Library',exact:true}).click();
+  await page.getByRole('button',{name:'Bookmark document',exact:true}).waitFor();
+  assert.equal(new URL(page.url()).pathname,'/read/'+catalogDoc.id);
+  await page.getByRole('button',{name:'Library',exact:true}).click();
+  await page.getByRole('button',{name:'Import Books',exact:true}).click();
+  await page.getByRole('button',{name:/Online Library/}).click();
+  await page.getByRole('button',{name:'Browse Books',exact:true}).nth(0).click();
+  await page.getByRole('button',{name:'Add to Shared Library',exact:true}).click();
+  await page.getByRole('button',{name:'Bookmark document',exact:true}).waitFor();
+  assert.equal(imports,2);assert.equal(memberships.size,1);assert.equal(docs.filter(d=>d.id===catalogDoc.id).length,1);
+  await page.getByRole('button',{name:'Library',exact:true}).click();
+  await page.getByRole('button',{name:'Import Books',exact:true}).click();
+  await page.getByRole('button',{name:/Online Library/}).click();
   // Click backdrop, then upload a TXT using the actual workflow controller.
   await page.mouse.click(5,5);
   await page.getByRole('button',{name:'Import Books',exact:true}).click();
