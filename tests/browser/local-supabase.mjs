@@ -54,7 +54,12 @@ try {
   await page.locator('#upload-author').fill('Synthetic author');
   await page.getByRole('button', { name: 'Upload Document', exact: true }).click();
   let document;
-  await until(async () => { document = check(await owner.from('documents').select('*').eq('uploaded_by', users[0]).eq('title', 'Local quality fixture')).at(0); return document; });
+  await until(async () => {
+    const error = page.locator('#upload-error');
+    if (await error.count()) assert.fail(await error.textContent());
+    document = check(await owner.from('documents').select('*').eq('uploaded_by', users[0]).eq('title', 'Local quality fixture')).at(0);
+    return document;
+  });
   documents.push(document.id); paths.push(document.file_storage_path);
   assert.equal(document.chapters.length, 2);
   assert.equal(document.visibility, 'private');
