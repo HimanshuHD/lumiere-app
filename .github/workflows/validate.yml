@@ -24,6 +24,13 @@ jobs:
       - run: npm run build
       - run: npx playwright install --with-deps chromium
       - run: npm run test:browser
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: browser-failure
+          path: test-results/browser
+          if-no-files-found: ignore
+          retention-days: 3
   database:
     runs-on: ubuntu-latest
     timeout-minutes: 25

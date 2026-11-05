@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { pdf, epub } from './fixtures.mjs';
-import { chromium } from 'playwright';
+import { launchBrowser } from './diagnostics.mjs';
 import { createServer } from 'vite';
 const userId = '81000000-0000-4000-8000-000000000001';
 const api = 'http://127.0.0.1:54321';
@@ -42,7 +42,7 @@ function fixtures(server) { server.middlewares.use(async (req,res,next) => {
 }); }
 await server.listen();
 const port = server.httpServer.address().port;
-const browser = await chromium.launch({
+const browser = await launchBrowser({
   ...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE ? {executablePath:process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE} : {}),
   args: ['--no-sandbox','--disable-dev-shm-usage','--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader'],
 });
@@ -161,3 +161,4 @@ try {
   assert.deepEqual(errors,[]);
   console.log('PASS: auth/session, TXT, bookmark failure/success, profile/password, preferences, catalog cancellation, upload validation/reset, logout, PDF resume/zoom, EPUB navigation/disposal; no browser exceptions.');
 } finally { await browser.close(); await server.close(); }
+

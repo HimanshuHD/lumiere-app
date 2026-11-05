@@ -1,6 +1,6 @@
 // Actual application, synthetic accounts and mocked Supabase. No external account is accessed.
 import assert from 'node:assert/strict';
-import { chromium } from 'playwright';
+import { launchBrowser } from './diagnostics.mjs';
 import { createServer, build, preview } from 'vite';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -12,7 +12,7 @@ const id='82000000-0000-4000-8000-000000000001', hidden='82000000-0000-4000-8000
 const user=account=>({id:account,email:account===a?'a@example.test':'b@example.test',user_metadata:{},app_metadata:{},aud:'authenticated',role:'authenticated'});
 const session=account=>({access_token:account===a?'token-a':'token-b',refresh_token:'test-refresh',expires_in:3600,expires_at:Math.floor(Date.now()/1000)+3600,token_type:'bearer',user:user(account)});
 const doc={id,title:'Navigation story',author:'QA',category:'Fiction',summary:'QA',reading_time:1,cover_url:null,chapters:[{title:'First chapter',content:'A paragraph for the navigation regression. '.repeat(30)}],chapter_count:1,is_featured:false,created_at:'2026-11-04',origin:'demo',visibility:'shared',uploaded_by:null,file_format:'txt'};
-const launch=()=>chromium.launch({...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE?{executablePath:process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE}:{}),args:['--no-sandbox','--disable-dev-shm-usage',...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE?['--single-process','--no-zygote']:[])]});
+const launch=()=>launchBrowser({...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE?{executablePath:process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE}:{}),args:['--no-sandbox','--disable-dev-shm-usage',...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE?['--single-process','--no-zygote']:[])]});
 let browser=await launch();
 async function freshBrowser(){await browser.close();browser=await launch();}
 const errors=[];
@@ -136,3 +136,4 @@ try{
   for(const context of browser.contexts())for(const page of context.pages())console.error('Navigation fixture failure:',new URL(page.url()).pathname,await page.locator('h1,h2').allTextContents().catch(()=>[]));
   throw error;
 }finally{await browser.close();await server?.close();if(previewDirectory)rmSync(previewDirectory,{recursive:true,force:true});}
+
