@@ -1,3 +1,4 @@
+import { Modal } from '@/shared/ui';
 import { useCatalogDocuments } from '@/hooks/useData';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, ArrowLeft, Loader2, Search, Shield, Trash2 } from 'lucide-react';
@@ -129,16 +130,16 @@ export function CatalogAdmin({ onBack }: CatalogAdminProps) {
         <button
           onClick={onBack}
           aria-label="Back to library"
-          className="p-2 rounded-lg text-stone-500 hover:text-stone-800 hover:bg-stone-100"
+          className="p-2 rounded-lg text-stone-600 hover:text-stone-800 hover:bg-stone-100"
         >
-          <ArrowLeft className="w-5 h-5" />
+          <ArrowLeft aria-hidden="true" className="w-5 h-5" />
         </button>
         <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center">
-          <Shield className="w-5 h-5 text-amber-700" />
+          <Shield aria-hidden="true" className="w-5 h-5 text-amber-700" />
         </div>
         <div>
           <h1 className="text-2xl font-serif font-bold text-stone-800">Catalog maintenance</h1>
-          <p className="text-sm text-stone-500">Permanently remove canonical catalog documents from Lumiere.</p>
+          <p className="text-sm text-stone-600">Permanently remove canonical catalog documents from Lumiere.</p>
         </div>
       </div>
 
@@ -157,16 +158,16 @@ export function CatalogAdmin({ onBack }: CatalogAdminProps) {
             disabled={retryingCleanup}
             className="inline-flex items-center gap-2 rounded-lg bg-amber-700 px-3 py-2 text-sm font-medium text-white hover:bg-amber-800 disabled:opacity-50"
           >
-            {retryingCleanup && <Loader2 className="h-4 w-4 animate-spin" />}
+            {retryingCleanup && <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />}
             Retry cleanup
           </button>
         </div>
       )}
 
       <div className="relative mb-5 max-w-lg">
-        <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-400" />
+        <Search aria-hidden="true" className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-600" />
         <input
-          value={search}
+          aria-label="Search catalog documents" value={search}
           onChange={(event) => setSearch(event.target.value)}
           placeholder="Search title, author, or source..."
           className="w-full rounded-xl border border-stone-200 bg-white py-3 pl-10 pr-4 text-sm text-stone-800 focus:border-amber-600 focus:outline-none focus:ring-2 focus:ring-amber-600/20"
@@ -175,7 +176,7 @@ export function CatalogAdmin({ onBack }: CatalogAdminProps) {
 
       {(loading || catalogLoading) ? (
         <div className="flex min-h-48 items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-amber-600" />
+          <Loader2 aria-hidden="true" className="h-8 w-8 animate-spin text-amber-700" />
         </div>
       ) : (loadError || catalogError) ? (
         <div className="rounded-xl border border-red-200 bg-red-50 p-5 text-sm text-red-800">
@@ -183,7 +184,7 @@ export function CatalogAdmin({ onBack }: CatalogAdminProps) {
           <button onClick={() => void loadCatalog()} className="mt-3 font-semibold underline">Try again</button>
         </div>
       ) : filteredDocuments.length === 0 ? (
-        <div className="rounded-xl border border-stone-200 bg-white p-10 text-center text-sm text-stone-500">
+        <div className="rounded-xl border border-stone-200 bg-white p-10 text-center text-sm text-stone-600">
           {documents.length === 0 ? 'There are no canonical catalog documents.' : 'No documents match your search.'}
         </div>
       ) : (
@@ -191,9 +192,9 @@ export function CatalogAdmin({ onBack }: CatalogAdminProps) {
           <table className="w-full min-w-[700px]">
             <thead>
               <tr className="border-b border-stone-200 bg-stone-50">
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-stone-500">Document</th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-stone-500">Source identity</th>
-                <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-stone-500">Action</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-stone-600">Document</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-stone-600">Source identity</th>
+                <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-stone-600">Action</th>
               </tr>
             </thead>
             <tbody>
@@ -204,11 +205,11 @@ export function CatalogAdmin({ onBack }: CatalogAdminProps) {
                       <DocumentCover document={document} className="h-11 w-8 flex-shrink-0 rounded object-cover" />
                       <div className="min-w-0">
                         <p className="truncate text-sm font-medium text-stone-800">{document.title}</p>
-                        <p className="truncate text-xs text-stone-500">{document.author}</p>
+                        <p className="truncate text-xs text-stone-600">{document.author}</p>
                       </div>
                     </div>
                   </td>
-                  <td className="max-w-sm truncate px-4 py-3 text-xs text-stone-500">
+                  <td className="max-w-sm truncate px-4 py-3 text-xs text-stone-600">
                     {document.source_identity || document.source_url || 'No source identity'}
                   </td>
                   <td className="px-4 py-3 text-right">
@@ -216,7 +217,7 @@ export function CatalogAdmin({ onBack }: CatalogAdminProps) {
                       onClick={() => void prepareDelete(document)}
                       className="inline-flex items-center gap-2 rounded-lg border border-red-200 px-3 py-2 text-xs font-medium text-red-700 hover:bg-red-50"
                     >
-                      <Trash2 className="h-3.5 w-3.5" />
+                      <Trash2 aria-hidden="true" className="h-3.5 w-3.5" />
                       Global delete
                     </button>
                   </td>
@@ -228,28 +229,26 @@ export function CatalogAdmin({ onBack }: CatalogAdminProps) {
       )}
 
       {selectedDocument && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4">
+        <Modal onClose={() => { if (!deleting) { setSelectedDocument(null); setImpact(null); } }} label="Delete canonical document" className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4">
           <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="catalog-delete-title"
+            onClick={(event) => event.stopPropagation()}
             className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl"
           >
             <div className="mb-4 flex items-start gap-3">
               <div className="rounded-xl bg-red-100 p-2.5">
-                <AlertTriangle className="h-5 w-5 text-red-700" />
+                <AlertTriangle aria-hidden="true" className="h-5 w-5 text-red-700" />
               </div>
               <div>
                 <h2 id="catalog-delete-title" className="text-lg font-semibold text-stone-900">
                   Permanently delete canonical document?
                 </h2>
-                <p className="mt-1 text-sm text-stone-500">{selectedDocument.title}</p>
+                <p className="mt-1 text-sm text-stone-600">{selectedDocument.title}</p>
               </div>
             </div>
 
             {loadingImpact ? (
-              <div className="flex items-center gap-2 py-4 text-sm text-stone-500">
-                <Loader2 className="h-4 w-4 animate-spin" />
+              <div className="flex items-center gap-2 py-4 text-sm text-stone-600">
+                <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />
                 Loading affected-user counts...
               </div>
             ) : impactError ? (
@@ -282,12 +281,12 @@ export function CatalogAdmin({ onBack }: CatalogAdminProps) {
                 disabled={!impact || loadingImpact || Boolean(impactError) || deleting}
                 className="inline-flex items-center gap-2 rounded-lg bg-red-700 px-4 py-2 text-sm font-medium text-white hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {deleting && <Loader2 className="h-4 w-4 animate-spin" />}
+                {deleting && <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />}
                 Permanently delete
               </button>
             </div>
           </div>
-        </div>
+        </Modal>
       )}
     </div>
   );

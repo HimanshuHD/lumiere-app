@@ -1,0 +1,5 @@
+/* Structural layer containment must work even when this component is mounted outside the app shell. */
+.pdf-page { position: relative; isolation: isolate; margin-inline: auto; background: white; }
+.pdf-page .textLayer { z-index: 1; }
+.pdf-page .annotationLayer { z-index: 2; }
+.pdf-page .annotationLayer a:focus-visible { outline: 3px solid #1d4ed8 !important; outline-offset: 2px; background: rgb(37 99 235 / 0.12); }

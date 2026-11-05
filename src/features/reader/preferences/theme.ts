@@ -19,28 +19,29 @@ export interface ThemeColors {
   cardBg: string;
   sidebarBg: string;
   headerBg: string;
+  hoverBg: string;
 }
 
 export const themeMap: Record<ReadingTheme, ThemeColors> = {
   light: {
     bg: 'bg-white',
     text: 'text-stone-900',
-    subText: 'text-stone-500',
+    subText: 'text-stone-600',
     accent: 'text-amber-700',
     border: 'border-stone-200',
     cardBg: 'bg-white',
     sidebarBg: 'bg-stone-50',
-    headerBg: 'bg-white/95',
+    headerBg: 'bg-white/95', hoverBg:'hover:bg-stone-200/50',
   },
   sepia: {
     bg: 'bg-[#f4ecd8]',
     text: 'text-[#5b4636]',
-    subText: 'text-[#8a7a65]',
+    subText: 'text-[#6b5945]',
     accent: 'text-amber-800',
     border: 'border-[#e0d5bf]',
     cardBg: 'bg-[#f4ecd8]',
     sidebarBg: 'bg-[#ede2c9]',
-    headerBg: 'bg-[#f4ecd8]/95',
+    headerBg: 'bg-[#f4ecd8]/95', hoverBg:'hover:bg-stone-200/50',
   },
   dark: {
     bg: 'bg-stone-900',
@@ -49,7 +50,7 @@ export const themeMap: Record<ReadingTheme, ThemeColors> = {
     accent: 'text-amber-400',
     border: 'border-stone-700',
     cardBg: 'bg-stone-800',
-    sidebarBg: 'bg-stone-850',
-    headerBg: 'bg-stone-900/95',
+    sidebarBg: 'bg-stone-800',
+    headerBg: 'bg-stone-900/95', hoverBg:'hover:bg-stone-700',
   },
 };

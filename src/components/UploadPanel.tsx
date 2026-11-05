@@ -33,24 +33,24 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="flex items-center gap-3 mb-8">
         <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center">
-          <Upload className="w-5 h-5 text-amber-700" />
+          <Upload aria-hidden="true" className="w-5 h-5 text-amber-700" />
         </div>
         <div>
           <h1 className="text-2xl font-serif font-bold text-stone-800">Upload Document</h1>
-          <p className="text-sm text-stone-500">Add a new document to the library</p>
+          <p className="text-sm text-stone-600">Add a new document to the library</p>
         </div>
       </div>
 
       {success && (
-        <div className="mb-6 flex items-center gap-3 p-4 bg-green-50 border border-green-200 rounded-xl">
-          <CheckCircle2 className="w-5 h-5 text-green-600 flex-shrink-0" />
+        <div role="status" className="mb-6 flex items-center gap-3 p-4 bg-green-50 border border-green-200 rounded-xl">
+          <CheckCircle2 aria-hidden="true" className="w-5 h-5 text-green-600 flex-shrink-0" />
           <p className="text-sm text-green-700 font-medium">Document uploaded successfully! It's now available in the library.</p>
         </div>
       )}
 
       {error && (
-        <div className="mb-6 flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-xl">
-          <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+        <div id="upload-error" role="alert" className="mb-6 flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-xl">
+          <AlertCircle aria-hidden="true" className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
           <p className="text-sm text-red-700">{error}</p>
         </div>
       )}
@@ -59,8 +59,8 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
         {/* Left: Document file upload */}
         <div className="space-y-6">
           <div>
-            <label className="flex items-center gap-2 text-sm font-medium text-stone-700 mb-2">
-              <FileText className="w-4 h-4 text-stone-400" />
+            <label htmlFor="upload-document" className="flex items-center gap-2 text-sm font-medium text-stone-700 mb-2">
+              <FileText aria-hidden="true" className="w-4 h-4 text-stone-600" />
               Document File <span className="text-red-500">*</span>
             </label>
             <div
@@ -70,7 +70,7 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
               className="relative border-2 border-dashed border-stone-300 rounded-xl p-8 text-center hover:border-amber-500 hover:bg-amber-50/30 transition-all cursor-pointer group"
             >
               <input
-                ref={docInputRef}
+                id="upload-document" aria-required="true" aria-describedby={error ? "upload-error" : undefined} ref={docInputRef}
                 type="file"
                 accept={ACCEPTED_FORMATS}
                 onChange={(e) => {
@@ -83,10 +83,10 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
               {docFile ? (
                 <div className="space-y-2">
                   <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-green-100 mb-2">
-                    <FileCheck2 className="w-6 h-6 text-green-600" />
+                    <FileCheck2 aria-hidden="true" className="w-6 h-6 text-green-600" />
                   </div>
                   <p className="text-sm font-medium text-stone-700 break-all line-clamp-2">{docFile.name}</p>
-                  <p className="text-xs text-stone-500">
+                  <p className="text-xs text-stone-600">
                     {(docFile.size / 1024 / 1024).toFixed(2)} MB
                     {pageCount !== null && pageCount > 0 && ` · ${pageCount} pages`}
                   </p>
@@ -94,31 +94,32 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
               ) : (
                 <div className="space-y-2">
                   <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-stone-100 group-hover:bg-amber-100 transition-colors mb-2">
-                    <Upload className="w-6 h-6 text-stone-400 group-hover:text-amber-600 transition-colors" />
+                    <Upload aria-hidden="true" className="w-6 h-6 text-stone-600 group-hover:text-amber-700 transition-colors" />
                   </div>
                   <p className="text-sm text-stone-600">Click or drag to upload</p>
-                  <p className="text-xs text-stone-400">
+                  <p className="text-xs text-stone-600">
                     PDF, TXT, or EPUB · up to {MAX_DOCUMENT_SIZE_BYTES / 1024 / 1024} MB
                   </p>
                 </div>
               )}
             </div>
+            <button type="button" className="mt-2 underline text-sm text-amber-800" onClick={() => docInputRef.current?.click()}>Choose document file</button>
             {docFile && (
               <button
                 onClick={() => {
                   clearDocument();
                 }}
-                className="mt-2 text-xs text-stone-500 hover:text-red-500 transition-colors flex items-center gap-1"
+                className="mt-2 text-xs text-stone-600 hover:text-red-500 transition-colors flex items-center gap-1"
               >
-                <X className="w-3 h-3" /> Remove file
+                <X aria-hidden="true" className="w-3 h-3" /> Remove file
               </button>
             )}
           </div>
 
           <div>
-            <label className="flex items-center gap-2 text-sm font-medium text-stone-700 mb-2">
-              <ImageIcon className="w-4 h-4 text-stone-400" />
-              Book Cover <span className="text-xs font-normal text-stone-400">(optional)</span>
+            <label htmlFor="upload-cover" className="flex items-center gap-2 text-sm font-medium text-stone-700 mb-2">
+              <ImageIcon aria-hidden="true" className="w-4 h-4 text-stone-600" />
+              Book Cover <span className="text-xs font-normal text-stone-600">(optional)</span>
             </label>
             <div
               onDragOver={(e) => e.preventDefault()}
@@ -127,7 +128,7 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
               className="relative border-2 border-dashed border-stone-300 rounded-xl p-6 text-center hover:border-amber-500 hover:bg-amber-50/30 transition-all cursor-pointer group"
             >
               <input
-                ref={coverInputRef}
+                id="upload-cover" ref={coverInputRef}
                 type="file"
                 accept=".jpg,.jpeg,.png,.webp,.gif,image/jpeg,image/png,image/webp,image/gif"
                 onChange={(e) => {
@@ -141,6 +142,7 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
                 <div className="relative inline-block">
                   <img src={coverPreview} alt="Cover preview" className="max-h-48 rounded-lg shadow-md mx-auto" />
                   <button
+                    aria-label="Remove cover image"
                     onClick={(e) => {
                       e.stopPropagation();
                       invalidateOperation();
@@ -149,16 +151,16 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
                     }}
                     className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-red-500 text-white flex items-center justify-center shadow-md hover:bg-red-600 transition-colors"
                   >
-                    <X className="w-3.5 h-3.5" />
+                    <X aria-hidden="true" className="w-3.5 h-3.5" />
                   </button>
                 </div>
               ) : extractingPdfDetails && docFile?.name.toLowerCase().endsWith('.pdf') ? (
                 <div className="space-y-2">
                   <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-amber-100 mb-2">
-                    <Loader2 className="w-6 h-6 text-amber-700 animate-spin" />
+                    <Loader2 aria-hidden="true" className="w-6 h-6 text-amber-700 animate-spin" />
                   </div>
                   <p className="text-sm text-stone-600">Reading PDF metadata and extracting cover…</p>
-                  <p className="text-xs text-stone-400">You can still upload a different cover image.</p>
+                  <p className="text-xs text-stone-600">You can still upload a different cover image.</p>
                 </div>
               ) : pdfCoverPreview ? (
                 <>
@@ -171,7 +173,7 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
                   <div className="absolute inset-0 bg-stone-950/55 rounded-lg" />
                   <div className="relative z-10 space-y-2">
                     <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-white/15 mb-2">
-                      <ImageIcon className="w-6 h-6 text-white" />
+                      <ImageIcon aria-hidden="true" className="w-6 h-6 text-white" />
                     </div>
                     <p className="text-sm font-medium text-white">First page extracted from PDF</p>
                     <p className="text-xs text-stone-100">Click or drag a cover image here to replace it</p>
@@ -184,71 +186,73 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
                     aria-label="Remove extracted PDF cover"
                     className="absolute top-2 right-2 z-20 w-6 h-6 rounded-full bg-red-500 text-white flex items-center justify-center shadow-md hover:bg-red-600 transition-colors"
                   >
-                    <X className="w-3.5 h-3.5" />
+                    <X aria-hidden="true" className="w-3.5 h-3.5" />
                   </button>
                 </>
               ) : (
                 <div className="space-y-2">
                   <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-stone-100 group-hover:bg-amber-100 transition-colors mb-2">
-                    <ImageIcon className="w-6 h-6 text-stone-400 group-hover:text-amber-600 transition-colors" />
+                    <ImageIcon aria-hidden="true" className="w-6 h-6 text-stone-600 group-hover:text-amber-700 transition-colors" />
                   </div>
                   <p className="text-sm text-stone-600">Click or drag to upload a cover image</p>
-                  <p className="text-xs text-stone-400">JPG, PNG, or WebP</p>
-                  <p className="text-xs text-stone-500">Without one, we’ll use the first page of a PDF when possible, or show the Lumiere fallback cover.</p>
+                  <p className="text-xs text-stone-600">JPG, PNG, or WebP</p>
+                  <p className="text-xs text-stone-600">Without one, we’ll use the first page of a PDF when possible, or show the Lumiere fallback cover.</p>
                 </div>
               )}
             </div>
-            <p className="mt-2 text-xs text-stone-400">
+            <p className="mt-2 text-xs text-stone-600">
               JPEG, PNG, WebP, or GIF · up to {MAX_COVER_SIZE_BYTES / 1024 / 1024} MB
             </p>
           </div>
+          <button type="button" className="underline text-sm text-amber-800" onClick={() => coverInputRef.current?.click()}>Choose cover image</button>
         </div>
 
         {/* Right: Form fields */}
         <div className="space-y-5">
           <div>
-            <label className="flex items-center gap-2 text-sm font-medium text-stone-700 mb-2">
-              <BookOpen className="w-4 h-4 text-stone-400" />
+            <label htmlFor="upload-title" className="flex items-center gap-2 text-sm font-medium text-stone-700 mb-2">
+              <BookOpen aria-hidden="true" className="w-4 h-4 text-stone-600" />
               Book Name <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
-              value={title}
+              id="upload-title" aria-describedby={error ? "upload-error" : undefined} aria-required="true" aria-invalid={!!error && !title.trim()} value={title}
               onChange={(e) => {
                 invalidateOperation();
                 setTitle(e.target.value);
               }}
               placeholder="Enter the book title"
-              className="w-full px-4 py-2.5 bg-white border border-stone-200 rounded-lg text-sm text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-600/30 focus:border-amber-600/40 transition-all"
+              className="w-full px-4 py-2.5 bg-white border border-stone-200 rounded-lg text-sm text-stone-800 placeholder-stone-600 focus:outline-none focus:ring-2 focus:ring-amber-600/30 focus:border-amber-600/40 transition-all"
             />
           </div>
 
           <div>
-            <label className="flex items-center gap-2 text-sm font-medium text-stone-700 mb-2">
-              <User className="w-4 h-4 text-stone-400" />
+            <label htmlFor="upload-author" className="flex items-center gap-2 text-sm font-medium text-stone-700 mb-2">
+              <User aria-hidden="true" className="w-4 h-4 text-stone-600" />
               Author <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
-              value={author}
+              id="upload-author" aria-describedby={error ? "upload-error" : undefined} aria-required="true" aria-invalid={!!error && !author.trim()} value={author}
               onChange={(e) => {
                 invalidateOperation();
                 setAuthor(e.target.value);
               }}
               placeholder="Enter the author name"
-              className="w-full px-4 py-2.5 bg-white border border-stone-200 rounded-lg text-sm text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-600/30 focus:border-amber-600/40 transition-all"
+              className="w-full px-4 py-2.5 bg-white border border-stone-200 rounded-lg text-sm text-stone-800 placeholder-stone-600 focus:outline-none focus:ring-2 focus:ring-amber-600/30 focus:border-amber-600/40 transition-all"
             />
           </div>
 
           <div>
-            <label className="flex items-center gap-2 text-sm font-medium text-stone-700 mb-2">
-              <Tag className="w-4 h-4 text-stone-400" />
+            <span id="upload-category-label" className="flex items-center gap-2 text-sm font-medium text-stone-700 mb-2">
+              <Tag aria-hidden="true" className="w-4 h-4 text-stone-600" />
               Category
-            </label>
-            <div className="flex flex-wrap gap-2">
+            </span>
+            <div role="group" aria-labelledby="upload-category-label" className="flex flex-wrap gap-2">
               {CATEGORIES.map((cat) => (
                 <button
                   key={cat}
+                  aria-pressed={category === cat}
                   onClick={() => {
                     invalidateOperation();
                     setCategory(cat);
@@ -266,18 +270,18 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
           </div>
 
           <div>
-            <label className="flex items-center gap-2 text-sm font-medium text-stone-700 mb-2">
+            <label htmlFor="upload-summary" className="flex items-center gap-2 text-sm font-medium text-stone-700 mb-2">
               Book Description
             </label>
             <textarea
-              value={summary}
+              id="upload-summary" aria-describedby={error ? "upload-error" : undefined} value={summary}
               onChange={(e) => {
                 invalidateOperation();
                 setSummary(e.target.value);
               }}
               placeholder="A brief summary of the document (optional)"
               rows={3}
-              className="w-full px-4 py-2.5 bg-white border border-stone-200 rounded-lg text-sm text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-600/30 focus:border-amber-600/40 transition-all resize-none"
+              className="w-full px-4 py-2.5 bg-white border border-stone-200 rounded-lg text-sm text-stone-800 placeholder-stone-600 focus:outline-none focus:ring-2 focus:ring-amber-600/30 focus:border-amber-600/40 transition-all resize-none"
             />
           </div>
 
@@ -298,7 +302,7 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
                 />
                 <span>
                   <span className="block text-sm font-medium text-stone-800">Private</span>
-                  <span className="block text-xs text-stone-500">Only you can view this document and its files.</span>
+                  <span className="block text-xs text-stone-600">Only you can view this document and its files.</span>
                 </span>
               </label>
               <label className="flex items-start gap-3 p-3 border border-stone-200 rounded-lg cursor-pointer flex-1">
@@ -315,7 +319,7 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
                 />
                 <span>
                   <span className="block text-sm font-medium text-stone-800">Shared</span>
-                  <span className="block text-xs text-stone-500">Any signed-in Lumiere user can view and download it.</span>
+                  <span className="block text-xs text-stone-600">Any signed-in Lumiere user can view and download it.</span>
                 </span>
               </label>
             </div>
@@ -325,15 +329,15 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
           {pageCount !== null && pageCount > 0 && (
             <div className="grid grid-cols-2 gap-4">
               <div className="p-3 bg-stone-50 rounded-lg border border-stone-200">
-                <div className="flex items-center gap-1.5 text-xs text-stone-500 mb-1">
-                  <Hash className="w-3.5 h-3.5" />
+                <div className="flex items-center gap-1.5 text-xs text-stone-600 mb-1">
+                  <Hash aria-hidden="true" className="w-3.5 h-3.5" />
                   Pages (auto-detected)
                 </div>
                 <p className="text-lg font-serif font-bold text-stone-800">{pageCount}</p>
               </div>
               <div className="p-3 bg-stone-50 rounded-lg border border-stone-200">
-                <div className="flex items-center gap-1.5 text-xs text-stone-500 mb-1">
-                  <Clock className="w-3.5 h-3.5" />
+                <div className="flex items-center gap-1.5 text-xs text-stone-600 mb-1">
+                  <Clock aria-hidden="true" className="w-3.5 h-3.5" />
                   Est. Read Time
                 </div>
                 <p className="text-lg font-serif font-bold text-stone-800">{estimateReadingTime(pageCount)} min</p>
@@ -355,16 +359,16 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
         <button
           onClick={handleSubmit}
           disabled={!canSubmit}
-          className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-white bg-amber-600 hover:bg-amber-500 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-amber-600/20"
+          className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-white bg-amber-700 hover:bg-amber-800 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-amber-600/20"
         >
           {uploading ? (
             <>
-              <Loader2 className="w-4 h-4 animate-spin" />
+              <Loader2 aria-hidden="true" className="w-4 h-4 animate-spin" />
               Uploading...
             </>
           ) : (
             <>
-              <Upload className="w-4 h-4" />
+              <Upload aria-hidden="true" className="w-4 h-4" />
               Upload Document
             </>
           )}

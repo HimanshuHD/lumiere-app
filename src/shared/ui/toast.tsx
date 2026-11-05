@@ -1,4 +1,5 @@
-import { useState, useCallback, ReactNode } from 'react';
+import { useState, useCallback, useEffect, ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { CheckCircle2, AlertCircle, X } from 'lucide-react';
 
 import { ToastContext, type ToastType } from './toast-context';
@@ -10,6 +11,12 @@ interface Toast {
 }
 
 export function ToastProvider({ children }: { children: ReactNode }) {
+  const [host, setHost] = useState<Element | null>(null);
+  useEffect(() => {
+    const update = () => { const dialogs = document.querySelectorAll('dialog[open]'); setHost(dialogs[dialogs.length - 1] ?? document.body); };
+    update(); window.addEventListener('lumiere:dialog-change', update);
+    return () => window.removeEventListener('lumiere:dialog-change', update);
+  }, []);
   const [toasts, setToasts] = useState<Toast[]>([]);
 
   const showToast = useCallback((message: string, type: ToastType = 'success') => {
@@ -25,7 +32,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={{ showToast }}>
       {children}
-      <div className="fixed bottom-6 right-6 z-[100] flex flex-col gap-2 pointer-events-none">
+      {host && createPortal(<div onClick={event => event.stopPropagation()} aria-live="polite" aria-relevant="additions text" className="fixed bottom-6 right-6 z-[100] flex flex-col gap-2 pointer-events-none">
         {toasts.map((toast) => (
           <div
             key={toast.id}
@@ -36,22 +43,23 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             }`}
           >
             {toast.type === 'success' ? (
-              <CheckCircle2 className="w-5 h-5 text-green-600 flex-shrink-0" />
+              <CheckCircle2 aria-hidden="true" className="w-5 h-5 text-green-700 flex-shrink-0" />
             ) : (
-              <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0" />
+              <AlertCircle aria-hidden="true" className="w-5 h-5 text-red-700 flex-shrink-0" />
             )}
             <p className={`text-sm font-medium ${toast.type === 'success' ? 'text-green-700' : 'text-red-700'}`}>
               {toast.message}
             </p>
             <button
+              aria-label="Dismiss notification"
               onClick={() => dismiss(toast.id)}
-              className={`ml-2 ${toast.type === 'success' ? 'text-green-400 hover:text-green-600' : 'text-red-400 hover:text-red-600'} transition-colors`}
+              className={`ml-2 ${toast.type === 'success' ? 'text-green-700 hover:text-green-600' : 'text-red-700 hover:text-red-600'} transition-colors`}
             >
-              <X className="w-4 h-4" />
+              <X aria-hidden="true" className="w-4 h-4" />
             </button>
           </div>
         ))}
-      </div>
+      </div>, host)}
     </ToastContext.Provider>
   );
 }

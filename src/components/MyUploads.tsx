@@ -1,3 +1,4 @@
+import { Modal } from '@/shared/ui';
 import { DOCUMENT_CATEGORIES } from '@/domain/documents';
 import { useState } from 'react';
 import { AlertTriangle, FileEdit, Trash2, X, Loader2, BookOpen, Download, Pencil, Save } from 'lucide-react';
@@ -76,7 +77,7 @@ export function MyUploads() {
   if (loading && docs.length === 0) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center">
-        <Loader2 className="w-8 h-8 text-amber-600 animate-spin" />
+        <Loader2 aria-hidden="true" className="w-8 h-8 text-amber-700 animate-spin" />
       </div>
     );
   }
@@ -86,33 +87,33 @@ export function MyUploads() {
       <QueryNotice error={error} retry={refetch} label="uploads" />
       <div className="flex items-center gap-3 mb-8">
         <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center">
-          <FileEdit className="w-5 h-5 text-amber-700" />
+          <FileEdit aria-hidden="true" className="w-5 h-5 text-amber-700" />
         </div>
         <div>
           <h1 className="text-2xl font-serif font-bold text-stone-800">My Uploads</h1>
-          <p className="text-sm text-stone-500">{docs.length} {docs.length === 1 ? 'document' : 'documents'} uploaded by you</p>
+          <p className="text-sm text-stone-600">{docs.length} {docs.length === 1 ? 'document' : 'documents'} uploaded by you</p>
         </div>
       </div>
 
       {docs.length === 0 ? (
         <div className="text-center py-24">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-stone-100 mb-4">
-            <BookOpen className="w-8 h-8 text-stone-400" />
+            <BookOpen aria-hidden="true" className="w-8 h-8 text-stone-600" />
           </div>
-          <p className="text-stone-500 text-sm mb-1">No uploads yet</p>
-          <p className="text-stone-400 text-xs">Documents you upload will appear here.</p>
+          <p className="text-stone-600 text-sm mb-1">No uploads yet</p>
+          <p className="text-stone-600 text-xs">Documents you upload will appear here.</p>
         </div>
       ) : (
         <div className="overflow-x-auto rounded-xl border border-stone-200 bg-white">
           <table className="w-full min-w-[600px]">
             <thead>
               <tr className="border-b border-stone-200 bg-stone-50">
-                <th className="text-left px-4 py-3 text-xs font-medium text-stone-500 uppercase tracking-wider w-[40%]">Document</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-stone-500 uppercase tracking-wider hidden sm:table-cell">Category</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-stone-500 uppercase tracking-wider hidden md:table-cell">Format</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-stone-500 uppercase tracking-wider hidden md:table-cell">Visibility</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-stone-500 uppercase tracking-wider hidden lg:table-cell">Uploaded</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-stone-500 uppercase tracking-wider w-24">Actions</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-stone-600 uppercase tracking-wider w-[40%]">Document</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-stone-600 uppercase tracking-wider hidden sm:table-cell">Category</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-stone-600 uppercase tracking-wider hidden md:table-cell">Format</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-stone-600 uppercase tracking-wider hidden md:table-cell">Visibility</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-stone-600 uppercase tracking-wider hidden lg:table-cell">Uploaded</th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-stone-600 uppercase tracking-wider w-24">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -123,40 +124,40 @@ export function MyUploads() {
                       <DocumentCover document={doc} className="w-8 h-11 object-cover rounded flex-shrink-0" />
                       <div className="min-w-0 overflow-hidden">
                         <p className="text-sm font-medium text-stone-800 truncate max-w-[180px]">{doc.title}</p>
-                        <p className="text-xs text-stone-400 truncate max-w-[180px]">{doc.author}</p>
+                        <p className="text-xs text-stone-600 truncate max-w-[180px]">{doc.author}</p>
                       </div>
                     </div>
                   </td>
                   <td className="px-4 py-3 hidden sm:table-cell">
-                    <span className="text-xs px-2 py-0.5 bg-stone-100 text-stone-500 rounded font-medium">{doc.category}</span>
+                    <span className="text-xs px-2 py-0.5 bg-stone-100 text-stone-600 rounded font-medium">{doc.category}</span>
                   </td>
                   <td className="px-4 py-3 hidden md:table-cell">
-                    <span className="text-xs text-stone-500 uppercase">{doc.file_format || 'txt'}</span>
+                    <span className="text-xs text-stone-600 uppercase">{doc.file_format || 'txt'}</span>
                     {doc.file_format && doc.file_format !== 'txt' && !doc.file_storage_path && !doc.file_url && (
                       <span className="block text-[10px] text-amber-700 normal-case">Original file unavailable</span>
                     )}
                   </td>
                   <td className="px-4 py-3 hidden md:table-cell">
-                    <span className="text-xs text-stone-500 capitalize">{doc.visibility}</span>
+                    <span className="text-xs text-stone-600 capitalize">{doc.visibility}</span>
                   </td>
-                  <td className="px-4 py-3 text-sm text-stone-500 hidden lg:table-cell">
+                  <td className="px-4 py-3 text-sm text-stone-600 hidden lg:table-cell">
                     {new Date(doc.created_at).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}
                   </td>
                   <td className="px-4 py-3 w-24">
                     <div className="flex items-center justify-end gap-1">
                       <button
                         onClick={() => setEditDoc(doc)}
-                        className="p-2 rounded-lg text-stone-500 hover:text-amber-600 hover:bg-amber-50 transition-colors"
-                        title="Edit"
+                        className="p-2 rounded-lg text-stone-600 hover:text-amber-700 hover:bg-amber-50 transition-colors"
+                        title="Edit" aria-label={`Edit ${doc.title}`}
                       >
-                        <Pencil className="w-4 h-4" />
+                        <Pencil aria-hidden="true" className="w-4 h-4" />
                       </button>
                       <button
                         onClick={() => void prepareDelete(doc)}
-                        className="p-2 rounded-lg text-stone-500 hover:text-red-600 hover:bg-red-50 transition-colors"
-                        title="Delete"
+                        className="p-2 rounded-lg text-stone-600 hover:text-red-600 hover:bg-red-50 transition-colors"
+                        title="Delete" aria-label={`Delete ${doc.title}`}
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <Trash2 aria-hidden="true" className="w-4 h-4" />
                       </button>
                     </div>
                   </td>
@@ -182,24 +183,24 @@ export function MyUploads() {
 
       {/* Delete confirmation */}
       {deleteDoc && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => !deleting && setDeleteDoc(null)}>
+        <Modal label="Delete document" className="fixed inset-0 z-50 flex items-center justify-center p-4" onClose={() => !deleting && setDeleteDoc(null)}>
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
           <div className="relative bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6" onClick={(e) => e.stopPropagation()}>
-            <button onClick={() => !deleting && setDeleteDoc(null)} className="absolute top-4 right-4 w-8 h-8 rounded-full bg-stone-100 hover:bg-stone-200 flex items-center justify-center transition-colors">
-              <X className="w-4 h-4 text-stone-500" />
+            <button aria-label="Close delete confirmation" disabled={deleting} onClick={() => !deleting && setDeleteDoc(null)} className="absolute top-4 right-4 w-8 h-8 rounded-full bg-stone-100 hover:bg-stone-200 flex items-center justify-center transition-colors">
+              <X aria-hidden="true" className="w-4 h-4 text-stone-600" />
             </button>
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center">
-                <Trash2 className="w-5 h-5 text-red-600" />
+                <Trash2 aria-hidden="true" className="w-5 h-5 text-red-600" />
               </div>
               <h3 className="text-lg font-serif font-bold text-stone-800">Delete Document?</h3>
             </div>
-            <p className="text-sm text-stone-500 mb-6">
+            <p className="text-sm text-stone-600 mb-6">
               Deleting <span className="font-medium text-stone-700">"{deleteDoc.title}"</span> permanently removes the document and all user bookmarks, reading progress, and Read Later references. This action is irreversible.
             </p>
             {loadingDeletionImpact ? (
-              <div className="flex items-center gap-2 text-sm text-stone-500 mb-6">
-                <Loader2 className="h-4 w-4 animate-spin" /> Checking who will be affected...
+              <div className="flex items-center gap-2 text-sm text-stone-600 mb-6">
+                <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" /> Checking who will be affected...
               </div>
             ) : deletionImpactError ? (
               <div className="mb-6 space-y-3">
@@ -214,7 +215,7 @@ export function MyUploads() {
             ) : deletionImpact && (
               <div className="mb-6 rounded-lg border border-red-100 bg-red-50 p-3">
                 <p className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-red-800">
-                  <AlertTriangle className="h-4 w-4" /> Distinct affected users by reference type
+                  <AlertTriangle aria-hidden="true" className="h-4 w-4" /> Distinct affected users by reference type
                 </p>
                 <ul className="space-y-1 text-sm text-red-800">
                   <li>{deletionImpact.bookmarkUsers} bookmarked</li>
@@ -238,14 +239,14 @@ export function MyUploads() {
                 className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-500 rounded-lg transition-all disabled:opacity-50"
               >
                 {deleting ? (
-                  <><Loader2 className="w-4 h-4 animate-spin" /> Deleting...</>
+                  <><Loader2 aria-hidden="true" className="w-4 h-4 animate-spin" /> Deleting...</>
                 ) : (
-                  <><Trash2 className="w-4 h-4" /> Delete</>
+                  <><Trash2 aria-hidden="true" className="w-4 h-4" /> Delete</>
                 )}
               </button>
             </div>
           </div>
-        </div>
+        </Modal>
       )}
     </div>
   );
@@ -299,30 +300,30 @@ function EditDocumentModal({ doc, onClose, onSaved }: { doc: Document; onClose: 
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
+    <Modal label="Edit document" className="fixed inset-0 z-50 flex items-center justify-center p-4" onClose={() => { if (!saving) onClose(); }}>
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
       <div className="relative bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between p-6 border-b border-stone-200">
           <h3 className="text-lg font-serif font-bold text-stone-800 flex items-center gap-2">
-            <Pencil className="w-4 h-4 text-amber-600" />
+            <Pencil aria-hidden="true" className="w-4 h-4 text-amber-700" />
             Edit Document
           </h3>
-          <button onClick={onClose} className="w-8 h-8 rounded-full bg-stone-100 hover:bg-stone-200 flex items-center justify-center transition-colors">
-            <X className="w-4 h-4 text-stone-500" />
+          <button aria-label="Close edit document" disabled={saving} onClick={onClose} className="w-8 h-8 rounded-full bg-stone-100 hover:bg-stone-200 flex items-center justify-center transition-colors">
+            <X aria-hidden="true" className="w-4 h-4 text-stone-600" />
           </button>
         </div>
         <div className="p-6 space-y-5">
           <div className="flex items-center gap-4 pb-4 border-b border-stone-100">
             <DocumentCover document={doc} className="w-14 h-20 object-cover rounded-lg shadow-md flex-shrink-0" />
             <div className="min-w-0">
-              <p className="text-xs text-stone-400 uppercase tracking-wide">{doc.file_format || 'txt'} file</p>
+              <p className="text-xs text-stone-600 uppercase tracking-wide">{doc.file_format || 'txt'} file</p>
               {(doc.file_storage_path || doc.file_url) && (
                 <DocumentFileLink
                   document={doc}
                   download={doc.file_name || undefined}
-                  className="inline-flex items-center gap-1.5 text-xs text-amber-600 hover:text-amber-700 font-medium mt-1"
+                  className="inline-flex items-center gap-1.5 text-xs text-amber-700 hover:text-amber-700 font-medium mt-1"
                 >
-                  <Download className="w-3 h-3" />
+                  <Download aria-hidden="true" className="w-3 h-3" />
                   Download original
                 </DocumentFileLink>
               )}
@@ -331,7 +332,7 @@ function EditDocumentModal({ doc, onClose, onSaved }: { doc: Document; onClose: 
               <div className="absolute inset-0 z-10 flex items-center justify-center rounded-2xl bg-black/40 p-5">
                 <div className="w-full rounded-xl bg-white p-5 shadow-xl">
                   <div className="mb-3 flex items-center gap-2 text-amber-800">
-                    <AlertTriangle className="h-5 w-5" />
+                    <AlertTriangle aria-hidden="true" className="h-5 w-5" />
                     <h4 className="font-semibold">Make this document private?</h4>
                   </div>
                   <p className="mb-5 text-sm leading-relaxed text-stone-600">
@@ -350,7 +351,7 @@ function EditDocumentModal({ doc, onClose, onSaved }: { doc: Document; onClose: 
                       disabled={saving}
                       className="inline-flex items-center gap-2 rounded-lg bg-amber-700 px-4 py-2 text-sm font-medium text-white hover:bg-amber-800 disabled:opacity-50"
                     >
-                      {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+                      {saving && <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />}
                       Make Private
                     </button>
                   </div>
@@ -359,44 +360,45 @@ function EditDocumentModal({ doc, onClose, onSaved }: { doc: Document; onClose: 
             )}
           </div>
           <div>
-            <label className="block text-xs font-medium text-stone-500 mb-1.5">Title</label>
+            <label htmlFor="edit-title" className="block text-xs font-medium text-stone-600 mb-1.5">Title</label>
             <input
               type="text"
-              value={title}
+              id="edit-title" value={title}
               onChange={(e) => setTitle(e.target.value)}
               className="w-full px-4 py-2.5 bg-white border border-stone-200 rounded-lg text-sm text-stone-800 focus:outline-none focus:ring-2 focus:ring-amber-600/30 focus:border-amber-600/40 transition-all"
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-stone-500 mb-1.5">Visibility</label>
+            <label htmlFor="edit-visibility" className="block text-xs font-medium text-stone-600 mb-1.5">Visibility</label>
             <select
-              value={visibility}
+              id="edit-visibility" value={visibility}
               onChange={(event) => setVisibility(event.target.value as 'private' | 'shared')}
               className="w-full px-4 py-2.5 bg-white border border-stone-200 rounded-lg text-sm text-stone-800 focus:outline-none focus:ring-2 focus:ring-amber-600/30 focus:border-amber-600/40"
             >
               <option value="private">Private — only you can access it</option>
               <option value="shared">Shared — all signed-in users can access it</option>
             </select>
-            <p className="text-xs text-stone-400 mt-1.5">
+            <p className="text-xs text-stone-600 mt-1.5">
               Private documents are available only to you. Other users may still see a locked entry when they have saved a reference; already-issued download links remain usable until they expire.
             </p>
           </div>
           <div>
-            <label className="block text-xs font-medium text-stone-500 mb-1.5">Author</label>
+            <label htmlFor="edit-author" className="block text-xs font-medium text-stone-600 mb-1.5">Author</label>
             <input
               type="text"
-              value={author}
+              id="edit-author" value={author}
               onChange={(e) => setAuthor(e.target.value)}
               className="w-full px-4 py-2.5 bg-white border border-stone-200 rounded-lg text-sm text-stone-800 focus:outline-none focus:ring-2 focus:ring-amber-600/30 focus:border-amber-600/40 transition-all"
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-stone-500 mb-1.5">Category</label>
-            <div className="flex flex-wrap gap-2">
+            <span id="edit-category-label" className="block text-xs font-medium text-stone-600 mb-1.5">Category</span>
+            <div role="group" aria-labelledby="edit-category-label" className="flex flex-wrap gap-2">
               {CATEGORIES.map((cat) => (
                 <button
                   key={cat}
                   onClick={() => setCategory(cat)}
+                  aria-pressed={category === cat}
                   className={`px-3 py-1.5 text-xs font-medium rounded-full transition-all ${
                     category === cat
                       ? 'bg-stone-900 text-white'
@@ -409,9 +411,9 @@ function EditDocumentModal({ doc, onClose, onSaved }: { doc: Document; onClose: 
             </div>
           </div>
           <div>
-            <label className="block text-xs font-medium text-stone-500 mb-1.5">Summary</label>
+            <label htmlFor="edit-summary" className="block text-xs font-medium text-stone-600 mb-1.5">Summary</label>
             <textarea
-              value={summary}
+              id="edit-summary" value={summary}
               onChange={(e) => setSummary(e.target.value)}
               rows={3}
               className="w-full px-4 py-2.5 bg-white border border-stone-200 rounded-lg text-sm text-stone-800 focus:outline-none focus:ring-2 focus:ring-amber-600/30 focus:border-amber-600/40 transition-all resize-none"
@@ -420,6 +422,7 @@ function EditDocumentModal({ doc, onClose, onSaved }: { doc: Document; onClose: 
           <div className="flex items-center gap-3 justify-end pt-4 border-t border-stone-200">
             <button
               onClick={onClose}
+              disabled={saving}
               className="px-4 py-2.5 text-sm font-medium text-stone-600 bg-white border border-stone-200 rounded-lg hover:bg-stone-50 transition-all"
             >
               Cancel
@@ -427,17 +430,17 @@ function EditDocumentModal({ doc, onClose, onSaved }: { doc: Document; onClose: 
             <button
               onClick={() => void handleSave()}
               disabled={saving || !title.trim() || !author.trim()}
-              className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-white bg-amber-600 hover:bg-amber-500 rounded-lg transition-all disabled:opacity-50 shadow-lg shadow-amber-600/20"
+              className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-white bg-amber-700 hover:bg-amber-800 rounded-lg transition-all disabled:opacity-50 shadow-lg shadow-amber-600/20"
             >
               {saving ? (
-                <><Loader2 className="w-4 h-4 animate-spin" /> Saving...</>
+                <><Loader2 aria-hidden="true" className="w-4 h-4 animate-spin" /> Saving...</>
               ) : (
-                <><Save className="w-4 h-4" /> Save Changes</>
+                <><Save aria-hidden="true" className="w-4 h-4" /> Save Changes</>
               )}
             </button>
           </div>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 }

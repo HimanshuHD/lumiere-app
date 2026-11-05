@@ -4,6 +4,7 @@ import { parsePosition, fraction } from '@/domain/reading-position';
 import type { ReaderPosition } from '@/domain/reading-position';
 import { PdfSession } from './pdf-session';
 import { PdfRenderQueue } from './pdf-render-queue';
+import { PdfPageLayers } from './pdf-page-layers';
 
 export interface PdfViewerProps {
   url: string;
@@ -14,6 +15,13 @@ export interface PdfViewerProps {
 }
 
 export function usePdfController({ url, initialProgress = 0, initialPosition, onPositionChange }: PdfViewerProps) {
+  const pageRef = useRef<HTMLDivElement>(null);
+  const textRef = useRef<HTMLDivElement>(null);
+  const linksRef = useRef<HTMLDivElement>(null);
+  const layersRef = useRef<PdfPageLayers | null>(null);
+  const navigateRef = useRef<(page: number) => void>(() => {});
+  const [hasText, setHasText] = useState<boolean | null>(null);
+  const [linkError, setLinkError] = useState<string | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const canvasAreaRef = useRef<HTMLDivElement>(null);
   const pdfDocRef = useRef<PDFDocumentProxy | null>(null);
@@ -67,6 +75,7 @@ export function usePdfController({ url, initialProgress = 0, initialPosition, on
         const pdf = await session.load(() => pdfjsLib.getDocument(url));
         if (!pdf || !active) return;
         pdfDocRef.current = pdf;
+        layersRef.current = new PdfPageLayers(pdf, () => ({page:pageRef.current,text:textRef.current,links:linksRef.current}), page => navigateRef.current(page), setHasText, setLinkError);
         setTotalPages(pdf.numPages);
         const boundedCurrentPage = Math.min(Math.max(1, currentPageRef.current), pdf.numPages);
         const boundedProgress = fraction(initialProgressRef.current);
@@ -92,6 +101,7 @@ export function usePdfController({ url, initialProgress = 0, initialPosition, on
     return () => {
       active = false;
       pdfDocRef.current = null;
+      layersRef.current?.cancel(); layersRef.current = null;
       renderQueueRef.current = null;
       void renderQueue.dispose();
       void session.dispose();
@@ -112,10 +122,10 @@ export function usePdfController({ url, initialProgress = 0, initialPosition, on
     const queue = renderQueueRef.current;
     if (loading || !document || !canvas || !queue || (fitWidth !== undefined && fitWidth <= 0)) return;
     void queue.request({
-      document, canvas, page: pageNum, scale: manualScale, fitWidth,
+      document, canvas, layers:layersRef.current ?? undefined, page: pageNum, scale: manualScale, fitWidth,
       pixelRatio: window.devicePixelRatio || 1,
     }, {
-      onStart: () => { setRendering(true); setRenderError(null); },
+      onStart: () => { setRendering(true); setRenderError(null); setHasText(null); setLinkError(null); },
       onScale: (scale) => {
         setDisplayScale(scale);
         if (requestedZoomRef.current.mode === 'width') requestedZoomRef.current.scale = scale;
@@ -166,6 +176,7 @@ export function usePdfController({ url, initialProgress = 0, initialPosition, on
     setPageNum(n);
   };
 
+  navigateRef.current = goToPage;
   const fitToWidth = () => { requestedZoomRef.current.mode = 'width'; reportPosition(currentPageRef.current, 'width', requestedZoomRef.current.scale); setFitMode('width'); };
-  return { canvasRef, canvasAreaRef, pageNum, totalPages, displayScale, fitMode, fitToWidth, loading, error, rendering, renderError, setLoadAttempt, setRenderAttempt, adjustZoom, goToPage };
+  return { pageRef, textRef, linksRef, hasText, linkError, canvasRef, canvasAreaRef, pageNum, totalPages, displayScale, fitMode, fitToWidth, loading, error, rendering, renderError, setLoadAttempt, setRenderAttempt, adjustZoom, goToPage };
 }

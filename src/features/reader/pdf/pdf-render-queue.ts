@@ -1,5 +1,6 @@
 import type { PDFDocumentProxy, RenderTask } from 'pdfjs-dist';
 import { fitPdfPageWidth } from './pdf-fit.ts';
+import type { PageLayers } from './pdf-page-layers.ts';
 
 export interface PdfRenderRequest {
   document: PDFDocumentProxy;
@@ -8,6 +9,7 @@ export interface PdfRenderRequest {
   fitWidth?: number;
   canvas: HTMLCanvasElement;
   pixelRatio: number;
+  layers?: PageLayers;
 }
 export interface PdfRenderCallbacks {
   onStart(): void;
@@ -21,12 +23,16 @@ export class PdfRenderQueue {
   private generation = 0;
   private disposed = false;
   private task: RenderTask | null = null;
+  private layers?: PageLayers;
   private tail: Promise<void> = Promise.resolve();
 
   request(request: PdfRenderRequest, callbacks: PdfRenderCallbacks): Promise<void> {
     if (this.disposed) return Promise.resolve();
     const generation = ++this.generation;
     this.task?.cancel();
+    this.layers?.cancel();
+    this.layers = request.layers;
+    this.layers?.cancel();
     const isCurrent = () => !this.disposed && generation === this.generation;
     this.tail = this.tail.catch(() => undefined).then(async () => {
       if (!isCurrent()) return;
@@ -44,14 +50,15 @@ export class PdfRenderQueue {
         const ratio = request.pixelRatio;
         canvas.width = Math.max(1, Math.floor(viewport.width * ratio));
         canvas.height = Math.max(1, Math.floor(viewport.height * ratio));
-        canvas.style.width = `${Math.floor(viewport.width)}px`;
-        canvas.style.height = `${Math.floor(viewport.height)}px`;
+        canvas.style.width = `${viewport.width}px`;
+        canvas.style.height = `${viewport.height}px`;
         const task = page.render({
           canvasContext: context, viewport,
           transform: ratio !== 1 ? [ratio, 0, 0, ratio, 0, 0] : undefined,
         });
         this.task = task;
         await task.promise;
+        if (isCurrent()) await request.layers?.render(page, viewport, isCurrent);
       } catch (error) {
         // Our cancellations invalidate the request first. A current failure is real.
         if (isCurrent()) callbacks.onError(error);
@@ -67,6 +74,7 @@ export class PdfRenderQueue {
     this.disposed = true;
     this.generation += 1;
     this.task?.cancel();
+    this.layers?.cancel();
     return this.tail.catch(() => undefined);
   }
 }

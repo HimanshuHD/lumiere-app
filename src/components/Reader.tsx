@@ -1,3 +1,4 @@
+import { Modal } from '@/shared/ui';
 import { DemoBadge } from '@/components/DemoBadge';
 import { ArrowLeft, ChevronLeft, ChevronRight, Bookmark, BookmarkCheck, Settings, List, X, Type, Moon, Sun, ScrollText } from 'lucide-react';
 import type { Document } from '@/domain/documents';
@@ -21,7 +22,7 @@ function ReaderSession({ document: doc, onBack }: ReaderProps) {
           onClick={onBack}
           className="mb-8 inline-flex w-fit items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-stone-600 hover:bg-stone-100"
         >
-          <ArrowLeft className="h-4 w-4" /> Back to your library
+          <ArrowLeft aria-hidden="true" className="h-4 w-4" /> Back to your library
         </button>
         <DocumentAccessNotice />
       </div>
@@ -53,16 +54,18 @@ function ReaderSession({ document: doc, onBack }: ReaderProps) {
           <div className="flex items-center gap-2">
             <button
               onClick={onBack}
-              className={`p-1.5 rounded-lg hover:bg-stone-200/50 ${theme.text} transition-colors`}
+              aria-label="Back to library"
+              className={`p-1.5 rounded-lg ${theme.hoverBg} ${theme.text} transition-colors`}
             >
-              <ArrowLeft className="w-4 h-4" />
+              <ArrowLeft aria-hidden="true" className="w-4 h-4" />
             </button>
             {textMode && (
               <button
                 onClick={() => setShowToc(true)}
-                className={`p-1.5 rounded-lg hover:bg-stone-200/50 ${theme.text} transition-colors`}
+                aria-label="Open contents" aria-expanded={showToc}
+                className={`p-1.5 rounded-lg ${theme.hoverBg} ${theme.text} transition-colors`}
               >
-                <List className="w-4 h-4" />
+                <List aria-hidden="true" className="w-4 h-4" />
               </button>
             )}
           </div>
@@ -77,25 +80,27 @@ function ReaderSession({ document: doc, onBack }: ReaderProps) {
               onClick={handleBookmark}
               disabled={isBookmarkPending(doc.id)}
               aria-label={isBookmarked(doc.id) ? "Remove bookmark" : "Bookmark document"}
-              className={`p-1.5 rounded-lg hover:bg-stone-200/50 ${theme.text} transition-colors`}
+              aria-pressed={isBookmarked(doc.id)}
+              className={`p-1.5 rounded-lg ${theme.hoverBg} ${theme.text} transition-colors`}
             >
               {isBookmarked(doc.id) ? (
-                <BookmarkCheck className="w-4 h-4 text-amber-600" />
+                <BookmarkCheck aria-hidden="true" className="w-4 h-4 text-amber-600" />
               ) : (
-                <Bookmark className="w-4 h-4" />
+                <Bookmark aria-hidden="true" className="w-4 h-4" />
               )}
             </button>
             {textMode && (
               <button
                 onClick={() => setShowSettings(!showSettings)}
-                className={`p-1.5 rounded-lg hover:bg-stone-200/50 ${theme.text} transition-colors`}
+                aria-label="Reader settings" aria-expanded={showSettings} aria-controls={showSettings ? "reader-settings" : undefined}
+                className={`p-1.5 rounded-lg ${theme.hoverBg} ${theme.text} transition-colors`}
               >
-                <Settings className="w-4 h-4" />
+                <Settings aria-hidden="true" className="w-4 h-4" />
               </button>
             )}
           </div>
         </div>
-        <div className="flex flex-wrap justify-center items-center gap-2 px-3 pb-1 text-xs text-stone-500">
+        <div className={`flex flex-wrap justify-center items-center gap-2 px-3 pb-1 text-xs ${theme.subText}`}>
           <span role="status" aria-live="polite">{saveMessage}</span>
           {(saveState?.status === 'error' || saveState?.status === 'conflict') && (
             <button className="text-amber-700 underline" onClick={() => void retryProgress(doc.id)}>
@@ -106,7 +111,7 @@ function ReaderSession({ document: doc, onBack }: ReaderProps) {
         {/* Progress Bar */}
         <div className={`h-0.5 ${theme.border} border-t`}>
           <div
-            className="h-full bg-amber-600 transition-all duration-150"
+            className="h-full bg-amber-700 transition-all duration-150"
             style={{ width: textMode ? `${totalProgress}%` : '100%' }}
           />
         </div>
@@ -114,27 +119,29 @@ function ReaderSession({ document: doc, onBack }: ReaderProps) {
 
       {/* Settings Panel (text mode only) */}
       {textMode && showSettings && (
-        <div
+        <Modal label="Reader settings"
           className="fixed inset-0 z-50"
-          onClick={() => setShowSettings(false)}
+          onClose={() => setShowSettings(false)}
         >
-          <div className={`absolute top-28 right-4 w-72 ${theme.cardBg} border ${theme.border} rounded-xl shadow-2xl p-5 z-50`} onClick={(e) => e.stopPropagation()}>
+          <div id="reader-settings" className={`absolute top-28 right-4 w-72 ${theme.cardBg} border ${theme.border} rounded-xl shadow-2xl p-5 z-50`} onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4"><h2 className={`font-semibold ${theme.text}`}>Reader settings</h2><button aria-label="Close reader settings" onClick={() => setShowSettings(false)} className={`p-2 rounded ${theme.text}`}><X aria-hidden="true" className="w-4 h-4" /></button></div>
             <div className="space-y-5">
               {/* Font Size */}
               <div>
-                <label className={`flex items-center gap-2 text-xs font-medium ${theme.subText} uppercase tracking-wide mb-2`}>
-                  <Type className="w-3.5 h-3.5" />
+                <span className={`flex items-center gap-2 text-xs font-medium ${theme.subText} uppercase tracking-wide mb-2`}>
+                  <Type aria-hidden="true" className="w-3.5 h-3.5" />
                   Font Size
-                </label>
+                </span>
                 <div className="flex gap-1.5">
                   {(['small', 'medium', 'large'] as FontSize[]).map((size) => (
                     <button
                       key={size}
                       onClick={() => setSettings({ ...settings, fontSize: size })}
+                      aria-pressed={settings.fontSize === size}
                       className={`flex-1 py-2 rounded-lg text-xs font-medium capitalize transition-all ${
                         settings.fontSize === size
-                          ? 'bg-amber-600 text-white'
-                          : `${theme.text} hover:bg-stone-200/50`
+                          ? 'bg-amber-700 text-white'
+                          : `${theme.text} ${theme.hoverBg}`
                       } ${theme.border} border`}
                     >
                       {size}
@@ -145,9 +152,9 @@ function ReaderSession({ document: doc, onBack }: ReaderProps) {
 
               {/* Theme */}
               <div>
-                <label className={`flex items-center gap-2 text-xs font-medium ${theme.subText} uppercase tracking-wide mb-2`}>
+                <span className={`flex items-center gap-2 text-xs font-medium ${theme.subText} uppercase tracking-wide mb-2`}>
                   Theme
-                </label>
+                </span>
                 <div className="flex gap-1.5">
                   {([
                     { key: 'light' as ReadingTheme, icon: Sun, label: 'Light' },
@@ -157,13 +164,14 @@ function ReaderSession({ document: doc, onBack }: ReaderProps) {
                     <button
                       key={key}
                       onClick={() => setSettings({ ...settings, theme: key })}
+                      aria-pressed={settings.theme === key}
                       className={`flex-1 py-2 rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-1.5 ${
                         settings.theme === key
-                          ? 'bg-amber-600 text-white'
-                          : `${theme.text} hover:bg-stone-200/50`
+                          ? 'bg-amber-700 text-white'
+                          : `${theme.text} ${theme.hoverBg}`
                       } ${theme.border} border`}
                     >
-                      <Icon className="w-3.5 h-3.5" />
+                      <Icon aria-hidden="true" className="w-3.5 h-3.5" />
                       {label}
                     </button>
                   ))}
@@ -172,18 +180,19 @@ function ReaderSession({ document: doc, onBack }: ReaderProps) {
 
               {/* Line Spacing */}
               <div>
-                <label className={`text-xs font-medium ${theme.subText} uppercase tracking-wide mb-2`}>
+                <span className={`text-xs font-medium ${theme.subText} uppercase tracking-wide mb-2`}>
                   Line Spacing
-                </label>
+                </span>
                 <div className="flex gap-1.5">
                   {(['comfortable', 'compact'] as LineSpacing[]).map((spacing) => (
                     <button
                       key={spacing}
                       onClick={() => setSettings({ ...settings, lineSpacing: spacing })}
+                      aria-pressed={settings.lineSpacing === spacing}
                       className={`flex-1 py-2 rounded-lg text-xs font-medium capitalize transition-all ${
                         settings.lineSpacing === spacing
-                          ? 'bg-amber-600 text-white'
-                          : `${theme.text} hover:bg-stone-200/50`
+                          ? 'bg-amber-700 text-white'
+                          : `${theme.text} ${theme.hoverBg}`
                       } ${theme.border} border`}
                     >
                       {spacing}
@@ -193,12 +202,12 @@ function ReaderSession({ document: doc, onBack }: ReaderProps) {
               </div>
             </div>
           </div>
-        </div>
+        </Modal>
       )}
 
       {/* TOC Drawer (text mode only) */}
       {textMode && showToc && (
-        <div className="fixed inset-0 z-50" onClick={() => setShowToc(false)}>
+        <Modal label="Contents" className="fixed inset-0 z-50" onClose={() => setShowToc(false)}>
           <div className="absolute inset-0 bg-black/30" />
           <div
             className={`absolute left-0 top-0 bottom-0 w-80 ${theme.sidebarBg} border-r ${theme.border} shadow-2xl overflow-y-auto`}
@@ -206,8 +215,8 @@ function ReaderSession({ document: doc, onBack }: ReaderProps) {
           >
             <div className={`p-4 border-b ${theme.border} flex items-center justify-between`}>
               <h3 className={`font-serif font-bold ${theme.text} text-lg`}>Contents</h3>
-              <button onClick={() => setShowToc(false)} className={`p-1.5 rounded-lg hover:bg-stone-200/50 ${theme.text}`}>
-                <X className="w-4 h-4" />
+              <button aria-label="Close contents" onClick={() => setShowToc(false)} className={`p-1.5 rounded-lg ${theme.hoverBg} ${theme.text}`}>
+                <X aria-hidden="true" className="w-4 h-4" />
               </button>
             </div>
             <div className="p-2">
@@ -221,10 +230,11 @@ function ReaderSession({ document: doc, onBack }: ReaderProps) {
                 <button
                   key={idx}
                   onClick={() => goToChapter(idx)}
+                  aria-current={idx === chapterIndex ? "location" : undefined}
                   className={`w-full text-left px-3 py-2.5 rounded-lg text-sm transition-all flex items-center gap-3 ${
                     idx === chapterIndex
-                      ? 'bg-amber-600/10 text-amber-700 font-medium'
-                      : `${theme.text} hover:bg-stone-200/50`
+                      ? (settings.theme === 'dark' ? 'bg-amber-400/10 text-amber-300 font-medium' : 'bg-amber-700/10 text-amber-900 font-medium')
+                      : `${theme.text} ${theme.hoverBg}`
                   }`}
                 >
                   <span className={`text-xs ${theme.subText} font-mono w-5`}>
@@ -235,7 +245,7 @@ function ReaderSession({ document: doc, onBack }: ReaderProps) {
               ))}
             </div>
           </div>
-        </div>
+        </Modal>
       )}
 
       {/* PDF Reader (pdfjs-dist canvas) */}
@@ -280,7 +290,7 @@ function ReaderSession({ document: doc, onBack }: ReaderProps) {
                 aria-label="Previous EPUB page"
                 className="absolute left-2 top-1/2 z-10 -translate-y-1/2 rounded-full border border-stone-200 bg-white/90 p-2 text-stone-700 shadow-md transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-40 sm:left-6"
               >
-                <ChevronLeft className="h-5 w-5" />
+                <ChevronLeft aria-hidden="true" className="h-5 w-5" />
               </button>
               <button
                 onClick={() => void turnEpubPage('next')}
@@ -288,7 +298,7 @@ function ReaderSession({ document: doc, onBack }: ReaderProps) {
                 aria-label="Next EPUB page"
                 className="absolute right-2 top-1/2 z-10 -translate-y-1/2 rounded-full border border-stone-200 bg-white/90 p-2 text-stone-700 shadow-md transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-40 sm:right-6"
               >
-                <ChevronRight className="h-5 w-5" />
+                <ChevronRight aria-hidden="true" className="h-5 w-5" />
               </button>
               <div className="absolute bottom-3 left-1/2 z-10 -translate-x-1/2 rounded-full bg-white/90 px-3 py-1 text-xs text-stone-500 shadow">
                 Page {epubPosition.page} of {epubPosition.total} in this section · Overall progress is approximate
@@ -308,7 +318,7 @@ function ReaderSession({ document: doc, onBack }: ReaderProps) {
                 <p className="mb-4 text-xs text-stone-500">{epubError}</p>
                 <button
                   onClick={() => setEpubLoadAttempt((attempt) => attempt + 1)}
-                  className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-amber-500"
+                  className="rounded-lg bg-amber-700 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-amber-800"
                 >
                   Try again
                 </button>
@@ -368,10 +378,10 @@ function ReaderSession({ document: doc, onBack }: ReaderProps) {
                 className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
                   chapterIndex === 0
                     ? `opacity-40 cursor-not-allowed ${theme.text}`
-                    : `${theme.text} hover:bg-stone-200/50 border ${theme.border}`
+                    : `${theme.text} ${theme.hoverBg} border ${theme.border}`
                 }`}
               >
-                <ChevronLeft className="w-4 h-4" />
+                <ChevronLeft aria-hidden="true" className="w-4 h-4" />
                 Previous
               </button>
               <span className={`text-xs ${theme.subText}`}>
@@ -383,11 +393,11 @@ function ReaderSession({ document: doc, onBack }: ReaderProps) {
                 className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
                   chapterIndex === doc.chapters.length - 1
                     ? `opacity-40 cursor-not-allowed ${theme.text}`
-                    : `${theme.text} hover:bg-stone-200/50 border ${theme.border}`
+                    : `${theme.text} ${theme.hoverBg} border ${theme.border}`
                 }`}
               >
                 Next
-                <ChevronRight className="w-4 h-4" />
+                <ChevronRight aria-hidden="true" className="w-4 h-4" />
               </button>
             </div>
 
