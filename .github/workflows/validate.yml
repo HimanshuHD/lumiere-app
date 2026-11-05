@@ -16,6 +16,8 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      - name: Check runtime dependency advisories
+        run: npm audit --omit=dev --audit-level=high
       - run: npm run check:db-types
       - run: npm run check:boundaries
       - run: npm run typecheck
