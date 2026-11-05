@@ -50,7 +50,7 @@ const browser = await launchBrowser({
   args: ['--no-sandbox','--disable-dev-shm-usage','--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader'],
 });
 try {
-  const context = await browser.newContext({viewport:{width:1280,height:900}});
+  let context = await browser.newContext({viewport:{width:1280,height:900}});
   await context.addInitScript(({userId}) => {
     localStorage.setItem('sb-127-auth-token',JSON.stringify({access_token:'test-token',refresh_token:'test-refresh',expires_at:Math.floor(Date.now()/1000)+3600,token_type:'bearer',user:{id:userId,email:'qa@example.test',user_metadata:{},app_metadata:{},aud:'authenticated',role:'authenticated'}}));
     localStorage.setItem('reader-settings',JSON.stringify({theme:'invalid',fontSize:'huge',lineSpacing:null}));
@@ -99,7 +99,7 @@ try {
     }
     await route.fulfill({json:data});
   });
-  const page=await context.newPage();
+  let page=await context.newPage();
   page.setDefaultTimeout(20000);
   page.setDefaultNavigationTimeout(60000);
   page.on('pageerror',error=>{ errors.push(error.message); console.error('Browser exception:',error.message); });
@@ -179,6 +179,12 @@ try {
   await page.getByRole('button',{name:'Refactored Profile',exact:true}).click();
   await page.getByRole('button',{name:'Log Out',exact:true}).click();
   await page.getByRole('button',{name:'Sign In',exact:true}).first().waitFor();
+  // The standalone engine fixture owns a fresh context, independent of app/auth routes.
+  await context.close();
+  context=await browser.newContext({viewport:{width:1280,height:900}});
+  page=await context.newPage();
+  page.setDefaultTimeout(20000);page.setDefaultNavigationTimeout(60000);
+  page.on('pageerror',error=>errors.push(error.message));
   await page.goto(`http://127.0.0.1:${port}/__architecture-qa`,{waitUntil:'domcontentloaded'});
   await page.getByRole('region',{name:'QA PDF PDF reader',exact:true}).waitFor({timeout:20000});
   await page.waitForFunction(()=>document.querySelector('canvas')?.width>0);
