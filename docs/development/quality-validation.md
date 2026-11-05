@@ -24,7 +24,7 @@ A forced process/browser crash can prevent final screenshots/trace closure; the 
 
 Docker must be running. This stack has project ID `lumiere-quality-test`, API port 55321 and
 database port 55322, separate from the normal developer stack. The preparation script copies
-committed migrations/functions and disables Google only in the generated test config.
+committed migrations/functions/source and disables Google only in the generated test config.
 Do not edit the generated config to point at a hosted database.
 
 ```sh

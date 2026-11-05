@@ -43,6 +43,8 @@ advisory's affected builder path is therefore unused here; no parser-major migra
 Reproduce this separate review using an isolated npm manifest with those two exact dependencies.
 Docker images, credentials and deployed infrastructure were not comprehensively scanned.
 
-The upload finalizer's TXT parser now lives in the functions bundle under `_shared`, so serving or
-deploying it does not require the frontend `src` tree. A parity regression checks that server TXT
+The upload finalizer's TXT parser lives under `_shared`. A parity regression checks that server TXT
 sections match browser previews. This copy is deliberate across independently deployed runtimes.
+The existing upload validation helper still imports pure validation/domain contracts from `src`;
+the disposable test preparation includes those sources. No claim is made that all function imports
+are independent of the repository source tree.

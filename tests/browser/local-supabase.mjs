@@ -52,6 +52,8 @@ try {
   await page.locator('#upload-document').setInputFiles({ name: 'quality.txt', mimeType: 'text/plain', buffer: Buffer.from('First synthetic section.\n\n\nSecond synthetic section.') });
   await page.locator('#upload-title').fill('Local quality fixture');
   await page.locator('#upload-author').fill('Synthetic author');
+  const cover = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl6PjAAAAAASUVORK5CYII=', 'base64');
+  await page.locator('#upload-cover').setInputFiles({ name: 'cover.png', mimeType: 'image/png', buffer: cover });
   const finalization = page.waitForResponse(response => response.url().endsWith('/functions/v1/finalize-user-document-upload') && response.request().method() === 'POST');
   await page.getByRole('button', { name: 'Upload Document', exact: true }).click();
   const finalized = await finalization;
@@ -64,6 +66,8 @@ try {
     return document;
   });
   documents.push(document.id); paths.push(document.file_storage_path);
+  paths.push(document.cover_storage_path);
+  assert.deepEqual(Buffer.from(await check(await owner.storage.from('documents').download(document.cover_storage_path)).arrayBuffer()), cover);
   assert.equal(document.chapters.length, 2);
   assert.equal(document.visibility, 'private');
   assert.deepEqual(check(await other.from('documents').select('id').eq('id', document.id)), []);
