@@ -24,3 +24,24 @@ jobs:
       - run: npm run build
       - run: npx playwright install --with-deps chromium
       - run: npm run test:browser
+  database:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: node scripts/prepare-test-stack.mjs
+      - name: Start disposable Supabase
+        run: npx supabase start --workdir .test-stack
+      - name: Apply migrations from an empty test database
+        run: npx supabase db reset --local --workdir .test-stack
+      - name: Run SQL authorization and lifecycle regressions
+        run: npx supabase test db --workdir .test-stack
+      - name: Stop disposable Supabase
+        if: always()
+        run: npx supabase stop --no-backup --workdir .test-stack
+
