@@ -34,6 +34,15 @@ Registry results can change. Never run `npm audit fix --force` as a routine CI r
 Validation includes typecheck, lint, boundaries, migrated DB contracts, unit/build checks and
 the full browser suites. Real manual source-document acceptance remains separate.
 
-The npm audit covers npm manifests/lockfile, not a complete audit of Deno's Edge Function imports,
-Docker images, credentials or deployed infrastructure. Existing OPDS dependency/policy unit tests
-remain in place; this document does not claim those external components were comprehensively scanned.
+The frontend npm audit does not automatically cover Deno imports. A separate temporary npm manifest
+was audited for the Edge Functions' exact npm imports: Supabase JS 2.57.4 and fast-xml-parser 4.5.7
+(updated from 4.5.3). Function SDK imports are pinned rather than floating on major version 2.
+This reports one moderate XMLBuilder delimiter-injection advisory, GHSA-gh4j-gqv2-49f6. The OPDS
+function imports only XMLParser/XMLValidator and does not construct XML with XMLBuilder. The
+advisory's affected builder path is therefore unused here; no parser-major migration is forced.
+Reproduce this separate review using an isolated npm manifest with those two exact dependencies.
+Docker images, credentials and deployed infrastructure were not comprehensively scanned.
+
+The upload finalizer's TXT parser now lives in the functions bundle under `_shared`, so serving or
+deploying it does not require the frontend `src` tree. A parity regression checks that server TXT
+sections match browser previews. This copy is deliberate across independently deployed runtimes.

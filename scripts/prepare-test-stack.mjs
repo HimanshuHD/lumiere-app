@@ -14,7 +14,6 @@ writeFileSync(resolve(target, 'supabase/config.toml'), config);
 for (const directory of ['migrations', 'functions']) {
   cpSync(resolve(root, 'supabase', directory), resolve(target, 'supabase', directory), { recursive: true });
 }
-cpSync(resolve(root, 'src'), resolve(target, 'src'), { recursive: true });
 cpSync(resolve(root, 'supabase/tests'), resolve(target, 'supabase/tests'), { recursive: true });
 // pg_prove mounts the tests directory only. Embed the exact committed migration on preparation,
 // rather than maintaining a second migration implementation or relying on container host paths.

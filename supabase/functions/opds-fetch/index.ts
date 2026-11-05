@@ -1,5 +1,5 @@
-import { XMLParser, XMLValidator } from "npm:fast-xml-parser@4.5.3";
-import { createClient } from "npm:@supabase/supabase-js@2";
+import { XMLParser, XMLValidator } from "npm:fast-xml-parser@4.5.7";
+import { createClient } from "npm:@supabase/supabase-js@2.57.4";
 import { reconcileCatalogImportFailure } from "../_shared/catalog_import_recovery.ts";
 import { getCatalogDocumentWriteValues } from "../_shared/catalog_document_values.ts";
 import {
@@ -883,3 +883,4 @@ Deno.serve(async (req: Request) => {
     );
   }
 });
+

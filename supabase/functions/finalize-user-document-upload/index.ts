@@ -1,5 +1,5 @@
-import { createClient } from "npm:@supabase/supabase-js@2";
-import { textToChapters } from "../../../src/services/documentText.ts";
+import { createClient } from "npm:@supabase/supabase-js@2.57.4";
+import { textToChapters } from "../_shared/document_text.ts";
 import { validateUserUpload } from "../_shared/user_upload_validation.ts";
 
 const corsHeaders = {
@@ -248,3 +248,4 @@ Deno.serve(async (request) => {
 
   return respond({ id: String(document.id) }, 201);
 });
+
