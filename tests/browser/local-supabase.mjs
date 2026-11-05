@@ -49,13 +49,16 @@ try {
   await page.locator('button[type="submit"]').click();
   await page.getByRole('button', { name: 'Import Books', exact: true }).waitFor();
   await page.goto(origin + '/upload');
-  // Incorrect browser MIME must be normalized from validated bytes, for document and cover.
-  await page.locator('#upload-document').setInputFiles({ name: 'quality.txt', mimeType: 'application/octet-stream', buffer: Buffer.from('First synthetic section.\n\n\nSecond synthetic section.') });
+  // Use wrong but bucket-allowlisted MIME types so the finalizer, not bucket admission, is tested.
+  await page.locator('#upload-document').setInputFiles({ name: 'quality.txt', mimeType: 'application/pdf', buffer: Buffer.from('First synthetic section.\n\n\nSecond synthetic section.') });
   await page.locator('#upload-title').fill('Local quality fixture');
   await page.locator('#upload-author').fill('Synthetic author');
   const cover = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl6PjAAAAAASUVORK5CYII=', 'base64');
-  await page.locator('#upload-cover').setInputFiles({ name: 'cover.png', mimeType: 'application/octet-stream', buffer: cover });
-  const finalization = page.waitForResponse(response => response.url().endsWith('/functions/v1/finalize-user-document-upload') && response.request().method() === 'POST');
+  await page.locator('#upload-cover').setInputFiles({ name: 'cover.png', mimeType: 'image/jpeg', buffer: cover });
+  const finalization = Promise.race([
+    page.waitForResponse(response => response.url().endsWith('/functions/v1/finalize-user-document-upload') && response.request().method() === 'POST'),
+    page.locator('#upload-error').waitFor({ state: 'visible' }).then(async () => { throw new Error(await page.locator('#upload-error').textContent()); }),
+  ]);
   await page.getByRole('button', { name: 'Upload Document', exact: true }).click();
   const finalized = await finalization;
   assert.equal(finalized.status(), 201, `Finalizer ${finalized.status()}: ${await finalized.text()}`);
