@@ -1,4 +1,4 @@
-import { cpSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 // A separate project/config prevents test resets from targeting the developer's stack.
@@ -16,4 +16,13 @@ for (const directory of ['migrations', 'functions']) {
 }
 cpSync(resolve(root, 'src'), resolve(target, 'src'), { recursive: true });
 cpSync(resolve(root, 'supabase/tests'), resolve(target, 'supabase/tests'), { recursive: true });
+// pg_prove mounts the tests directory only. Embed the exact committed migration on preparation,
+// rather than maintaining a second migration implementation or relying on container host paths.
+for (const name of readdirSync(resolve(target, 'supabase/tests'))) {
+  if (!name.endsWith('.sql')) continue;
+  const path = resolve(target, 'supabase/tests', name);
+  const sql = readFileSync(path, 'utf8').replace(/^\\ir \.\.\/migrations\/([a-zA-Z0-9_.-]+\.sql)\s*$/gm,
+    (_, migration) => readFileSync(resolve(root, 'supabase/migrations', migration), 'utf8'));
+  writeFileSync(path, sql);
+}
 console.log('Prepared disposable lumiere-quality-test stack in .test-stack. No developer config changed.');

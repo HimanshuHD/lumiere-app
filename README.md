@@ -4,6 +4,9 @@
 
 ## Local setup
 
+CI, disposable Supabase tests, failure diagnostics, local function commands and hosting assumptions:
+[quality validation](docs/development/quality-validation.md).
+
 This project uses Supabase Auth, Storage, and the database. The Supabase CLI runs a complete local Supabase stack (including PostgreSQL) with Docker.
 
 1. Install Node.js (which includes npm) and Docker Desktop, then start Docker Desktop.
@@ -139,3 +142,4 @@ first npm error (not just the final summary):
 
 If it still fails, retain the exact command and first error block for diagnosis. An
 installation failure is separate from Supabase Edge Function/Docker DNS failures.
+
