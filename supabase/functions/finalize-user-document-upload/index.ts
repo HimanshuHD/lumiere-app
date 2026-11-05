@@ -194,7 +194,7 @@ Deno.serve(async (request) => {
     if (coverBlob.type !== coverContentType) {
       const { error: coverMetadataError } = await adminClient.storage
         .from("documents")
-        .update(coverPath, coverBlob, { contentType: coverContentType });
+        .update(coverPath, new Blob([coverBlob], { type: coverContentType }), { contentType: coverContentType });
       if (coverMetadataError) {
         console.error("[finalize-user-document-upload] Could not normalize cover metadata", coverMetadataError);
         return respond({ error: "The validated cover could not be finalized." }, 500);
@@ -205,7 +205,7 @@ Deno.serve(async (request) => {
   if (documentBlob.type !== validatedDocument.contentType) {
     const { error: documentMetadataError } = await adminClient.storage
       .from("documents")
-      .update(documentPath, documentBlob, { contentType: validatedDocument.contentType });
+      .update(documentPath, new Blob([documentBlob], { type: validatedDocument.contentType }), { contentType: validatedDocument.contentType });
     if (documentMetadataError) {
       console.error("[finalize-user-document-upload] Could not normalize document metadata", documentMetadataError);
       return respond({ error: "The validated document could not be finalized." }, 500);
