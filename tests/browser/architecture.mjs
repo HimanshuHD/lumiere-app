@@ -158,6 +158,7 @@ try {
   await page.getByRole('button',{name:'Library',exact:true}).click();
   await page.getByRole('button',{name:'Import Books',exact:true}).click();
   await page.getByRole('button',{name:/Online Library/}).click();
+  await page.getByRole('button',{name:'Back to catalogs',exact:true}).click();
   await page.getByRole('button',{name:'Browse Books',exact:true}).nth(0).click();
   await page.getByRole('button',{name:'Add to Shared Library',exact:true}).click();
   await page.getByRole('button',{name:'Bookmark document',exact:true}).waitFor();
