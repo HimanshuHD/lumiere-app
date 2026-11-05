@@ -58,6 +58,9 @@ jobs:
           trap 'kill "$FUNCTION_PID" 2>/dev/null || true' EXIT
           node scripts/wait-test-functions.mjs
           node tests/browser/local-supabase.mjs
+      - name: Function failure diagnostics
+        if: failure()
+        run: node scripts/report-test-function-errors.mjs
       - name: Stop disposable Supabase
         if: always()
         run: npx supabase stop --no-backup --workdir .test-stack

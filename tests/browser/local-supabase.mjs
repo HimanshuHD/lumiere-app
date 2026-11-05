@@ -52,7 +52,10 @@ try {
   await page.locator('#upload-document').setInputFiles({ name: 'quality.txt', mimeType: 'text/plain', buffer: Buffer.from('First synthetic section.\n\n\nSecond synthetic section.') });
   await page.locator('#upload-title').fill('Local quality fixture');
   await page.locator('#upload-author').fill('Synthetic author');
+  const finalization = page.waitForResponse(response => response.url().endsWith('/functions/v1/finalize-user-document-upload') && response.request().method() === 'POST');
   await page.getByRole('button', { name: 'Upload Document', exact: true }).click();
+  const finalized = await finalization;
+  assert.equal(finalized.status(), 201, `Finalizer ${finalized.status()}: ${await finalized.text()}`);
   let document;
   await until(async () => {
     const error = page.locator('#upload-error');
