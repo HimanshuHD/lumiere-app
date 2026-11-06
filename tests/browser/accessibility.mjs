@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {createRequire} from 'node:module';
-import {chromium} from 'playwright';
+import { launchBrowser } from './diagnostics.mjs';
 import {createServer} from 'vite';
 import {accessibilityPdf} from './accessibility-fixtures.mjs';
 const api='http://127.0.0.1:54321',userId='81000000-0000-4000-8000-000000000001';
@@ -19,7 +19,7 @@ const server=await createServer({server:{host:'127.0.0.1',port:0},plugins:[{name
  if(req.url.startsWith('/a11y.pdf')){res.setHeader('Content-Type','application/pdf');res.end(accessibilityPdf());return;}
  if(req.url!=='/__a11y')return next();res.setHeader('Content-Type','text/html');res.end(await s.transformIndexHtml(req.url,fixture));
 });}}]});await server.listen();
-const browser=await chromium.launch({...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE?{executablePath:process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE}:{}),args:['--no-sandbox','--disable-dev-shm-usage',...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE?['--single-process','--no-zygote']:[])]});
+const browser=await launchBrowser({...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE?{executablePath:process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE}:{}),args:['--no-sandbox','--disable-dev-shm-usage',...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE?['--single-process','--no-zygote']:[])]});
 const errors=[],audits=[];const origin=`http://127.0.0.1:${server.httpServer.address().port}`;
 let page;
 try{
@@ -84,3 +84,4 @@ try{
  assert.deepEqual(errors,[]);assert.deepEqual(audits.filter(a=>a.violations.length),[]);console.log('PASS: representative WCAG axe checks; no browser exceptions.');
 }catch(error){if(page)console.error('A11y fixture failure',page.url(),await page.locator('h1,h2,[role=alert]').allTextContents().catch(()=>[]));throw error;}
 finally{await browser.close();await server.close();}
+

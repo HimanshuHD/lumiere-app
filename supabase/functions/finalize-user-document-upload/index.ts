@@ -1,5 +1,5 @@
-import { createClient } from "npm:@supabase/supabase-js@2";
-import { textToChapters } from "../../../src/services/documentText.ts";
+import { createClient } from "npm:@supabase/supabase-js@2.57.4";
+import { textToChapters } from "../_shared/document_text.ts";
 import { validateUserUpload } from "../_shared/user_upload_validation.ts";
 
 const corsHeaders = {
@@ -194,7 +194,7 @@ Deno.serve(async (request) => {
     if (coverBlob.type !== coverContentType) {
       const { error: coverMetadataError } = await adminClient.storage
         .from("documents")
-        .updateMetadata(coverPath, { contentType: coverContentType });
+        .update(coverPath, new Blob([coverBlob], { type: coverContentType }), { contentType: coverContentType });
       if (coverMetadataError) {
         console.error("[finalize-user-document-upload] Could not normalize cover metadata", coverMetadataError);
         return respond({ error: "The validated cover could not be finalized." }, 500);
@@ -205,7 +205,7 @@ Deno.serve(async (request) => {
   if (documentBlob.type !== validatedDocument.contentType) {
     const { error: documentMetadataError } = await adminClient.storage
       .from("documents")
-      .updateMetadata(documentPath, { contentType: validatedDocument.contentType });
+      .update(documentPath, new Blob([documentBlob], { type: validatedDocument.contentType }), { contentType: validatedDocument.contentType });
     if (documentMetadataError) {
       console.error("[finalize-user-document-upload] Could not normalize document metadata", documentMetadataError);
       return respond({ error: "The validated document could not be finalized." }, 500);
@@ -248,3 +248,4 @@ Deno.serve(async (request) => {
 
   return respond({ id: String(document.id) }, 201);
 });
+

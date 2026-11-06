@@ -4,7 +4,7 @@
 
 `20261101170000_secure_document_ownership_visibility.sql` adds document origin, visibility, canonical source identity, and storage-path fields. Its legacy classification is explicit:
 
-- The nine curated seed IDs included in `supabase/export_data.sql` become shared catalog records with no owner.
+- The nine curated seed IDs from the historical project dataset become shared catalog records with no owner.
 - Rows with a non-null `uploaded_by` and no `source_url` become private user uploads owned by that user.
 - Existing source-URL imports and other unclassified rows become `legacy_unowned`, are private and unreadable to regular users, and require verification before they can be made shared. Eligible Project Gutenberg records can be restored by importing them again through the validated catalog flow; it preserves the document ID and personal references while auditing the previous storage paths. Other legacy records require privileged review.
 - Existing catalog duplicates with the same normalized source URL are merged. Bookmarks and reading-list entries are retained, and the newest reading-progress row is kept per user.
@@ -93,3 +93,4 @@ privileged lifecycle functions are not broadened. Manage demos through privilege
 operations; do not use catalog deletion or user-upload endpoints. Catalog membership remains required
 only for genuine catalog imports. The local/production seed is opt-in, not an automatic migration.
 See [demo content and recovery](../docs/development/demo-content.md) for deployment and testing.
+

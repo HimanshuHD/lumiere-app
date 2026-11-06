@@ -16,6 +16,8 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      - name: Check runtime dependency advisories
+        run: npm audit --omit=dev --audit-level=high
       - run: npm run check:db-types
       - run: npm run check:boundaries
       - run: npm run typecheck
@@ -24,3 +26,42 @@ jobs:
       - run: npm run build
       - run: npx playwright install --with-deps chromium
       - run: npm run test:browser
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: browser-failure
+          path: test-results/browser
+          if-no-files-found: ignore
+          retention-days: 3
+  database:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: node scripts/prepare-test-stack.mjs
+      - name: Start disposable Supabase
+        run: npx supabase start --workdir .test-stack
+      - name: Apply migrations from an empty test database
+        run: npx supabase db reset --local --workdir .test-stack
+      - name: Run SQL authorization and lifecycle regressions
+        run: npx supabase test db --workdir .test-stack
+      - run: npx playwright install --with-deps chromium
+      - name: Run real local-service browser acceptance
+        run: |
+          npx supabase functions serve --no-verify-jwt --workdir .test-stack > /tmp/lumiere-test-functions.log 2>&1 &
+          FUNCTION_PID=$!
+          trap 'kill "$FUNCTION_PID" 2>/dev/null || true' EXIT
+          node scripts/wait-test-functions.mjs
+          node tests/browser/local-supabase.mjs
+      - name: Function failure diagnostics
+        if: failure()
+        run: node scripts/report-test-function-errors.mjs
+      - name: Stop disposable Supabase
+        if: always()
+        run: npx supabase stop --no-backup --workdir .test-stack
+

@@ -1,6 +1,6 @@
 // Controller integration regressions. Uses synthetic identities and mocked transport only.
 import assert from 'node:assert/strict';
-import { chromium } from 'playwright';
+import { launchBrowser } from './diagnostics.mjs';
 import { createServer } from 'vite';
 process.env.VITE_SUPABASE_URL = 'http://127.0.0.1:54321';
 process.env.VITE_SUPABASE_ANON_KEY = 'async-regression-public-key';
@@ -36,7 +36,7 @@ const server=await createServer({server:{host:'127.0.0.1',port:0},plugins:[{
   });},
 }]});
 await server.listen();
-const browser=await chromium.launch({
+const browser=await launchBrowser({
   ...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE?{executablePath:process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE}:{}),
   args:['--no-sandbox','--disable-dev-shm-usage',...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE?['--single-process','--no-zygote']:[])],
 });
@@ -161,3 +161,4 @@ try{
   assert.deepEqual(errors,[]);
   console.log('PASS: all asynchronous lifecycle regressions; no browser exceptions.');
 }finally{await browser.close();await server.close();}
+

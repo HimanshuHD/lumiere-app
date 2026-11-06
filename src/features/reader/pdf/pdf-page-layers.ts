@@ -49,7 +49,7 @@ export class PdfPageLayers implements PageLayers {
     const supported = annotations.filter(annotation => annotation.subtype === 'Link' &&
       (annotation.url ? !!safePdfUrl(annotation.url) : !!annotation.dest || named.includes(annotation.action)));
     const annotationViewport = viewport.clone({dontFlip:true});
-    const layer = new pdfjs.AnnotationLayer({div:links, page, viewport:annotationViewport, accessibilityManager:null,annotationCanvasMap:null,annotationEditorUIManager:null});
+    const layer = new pdfjs.AnnotationLayer({div:links, page, viewport:annotationViewport, accessibilityManager:null,annotationCanvasMap:null,annotationEditorUIManager:null,structTreeLayer:null});
     await layer.render({viewport:annotationViewport,div:links,annotations:supported,page,linkService:service,renderForms:false,enableScripting:false});
     if (!current()) return;
     for (const link of links.querySelectorAll('a')) {
@@ -59,3 +59,4 @@ export class PdfPageLayers implements PageLayers {
     hosts.links.replaceChildren(links);
   }
 }
+

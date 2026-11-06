@@ -1,4 +1,4 @@
-import { createClient } from "npm:@supabase/supabase-js@2";
+import { createClient } from "npm:@supabase/supabase-js@2.57.4";
 import { shouldDeferCatalogImportCleanup } from "../_shared/catalog_import_recovery.ts";
 
 const corsHeaders = {
@@ -225,3 +225,4 @@ Deno.serve(async (request) => {
     }, 202);
   }
 });
+

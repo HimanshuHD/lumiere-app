@@ -22,3 +22,6 @@ dist-ssr
 *.sln
 *.sw?
 .env
+.test-stack/
+test-results/
+
