@@ -131,6 +131,32 @@ try{
   await failed.page.getByRole('button',{name:'Continue with Google'}).click();await failed.page.waitForURL('**/auth/v1/authorize**');
   assert.equal(new URL(failed.page.url()).searchParams.get('redirect_to'),failed.origin+'/shelf/auth/callback');
   await failed.context.close();
+  await freshBrowser();
+  const startup = await pageFor(server, '/shelf/', null);
+  const scripts = '**/shelf/assets/*.js';
+  let releaseBundle;
+  const bundleGate = new Promise(resolve => { releaseBundle = resolve; });
+  await startup.page.route(scripts, async route => {
+    await bundleGate;
+    await route.abort();
+  });
+  await startup.page.goto(startup.origin + '/shelf/', { waitUntil: 'commit' });
+  await startup.page.getByText('Starting Lumiere…', { exact: true }).waitFor();
+  assert.equal(await startup.page.locator('#root[inert]').count(), 1);
+  releaseBundle();
+  await startup.page.getByRole('button', { name: 'Reload page' }).waitFor();
+  await startup.page.unroute(scripts);
+  await startup.page.getByRole('button', { name: 'Reload page' }).click();
+  await startup.page.getByPlaceholder('you@example.com').waitFor();
+  assert.equal(await startup.page.locator('#startup-screen, #root[inert]').count(), 0);
+  await startup.context.close();
+  await freshBrowser();
+  const noScriptContext = await browser.newContext({ javaScriptEnabled: false });
+  const noScriptPage = await noScriptContext.newPage();
+  await noScriptPage.goto(startup.origin + '/shelf/');
+  await noScriptPage.getByText('Enable JavaScript in your browser', { exact: false }).waitFor();
+  await noScriptContext.close();
+  console.log('PASS: static loader paints before the bundle, recovers from a failed script, and explains disabled JavaScript.');
   assert.deepEqual(errors,[]);console.log('PASS: OAuth failure recovery and base-aware provider redirect; no browser exceptions.');
 }catch(error){
   for(const context of browser.contexts())for(const page of context.pages())console.error('Navigation fixture failure:',new URL(page.url()).pathname,await page.locator('h1,h2').allTextContents().catch(()=>[]));

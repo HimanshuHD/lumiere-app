@@ -8,9 +8,76 @@
     <meta property="og:image" content="https://bolt.new/static/og_default.png" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:image" content="https://bolt.new/static/og_default.png" />
+    <style>
+      #startup-screen {
+        position: fixed;
+        inset: 0;
+        z-index: 1000;
+        display: grid;
+        place-content: center;
+        overflow: auto;
+        padding: 1.5rem;
+        text-align: center;
+        background: #1c1917;
+        color: #fafaf9;
+        font: 1rem/1.5 system-ui, sans-serif;
+      }
+      #startup-screen strong { font-size: 1.5rem; }
+      #startup-screen button {
+        padding: .5rem 1rem;
+        color: #1c1917;
+        background: #fcd34d;
+        border: 0;
+        border-radius: .25rem;
+        cursor: pointer;
+      }
+      #startup-screen button:focus-visible { outline: 2px solid #fff; outline-offset: 4px; }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="startup-screen">
+      <strong>Lumiere</strong>
+      <p id="startup-status" role="status">Starting Lumiere…</p>
+      <button id="startup-retry" type="button" hidden>Reload page</button>
+      <noscript>
+        <style>#startup-status { display: none; }</style>
+        <p>Enable JavaScript in your browser, then reload this page to open Lumiere.</p>
+      </noscript>
+    </div>
+    <div id="root" inert></div>
+    <script>
+      (() => {
+        const screen = document.getElementById('startup-screen');
+        const status = document.getElementById('startup-status');
+        const retry = document.getElementById('startup-retry');
+        const showRecovery = () => {
+          status.textContent = 'Lumiere is taking longer than expected. Try reloading the page.';
+          retry.hidden = false;
+        };
+        const timeout = window.setTimeout(showRecovery, 30000);
+        const onResourceError = (event) => {
+          if (event.target instanceof HTMLScriptElement && event.target.type === 'module') {
+            showRecovery();
+          }
+        };
+        window.addEventListener('error', onResourceError, true);
+        retry.addEventListener('click', () => window.location.reload());
+        screen.addEventListener('lumiere:startup-ready', () => {
+          window.clearTimeout(timeout);
+          window.removeEventListener('error', onResourceError, true);
+          const restoreFocus = document.activeElement === retry;
+          document.getElementById('root').removeAttribute('inert');
+          screen.remove();
+          if (restoreFocus) {
+            const target = document.querySelector('#root main, #root h1');
+            if (target instanceof HTMLElement) {
+              target.tabIndex = -1;
+              target.focus();
+            }
+          }
+        }, { once: true });
+      })();
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

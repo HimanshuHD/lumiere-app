@@ -1,7 +1,7 @@
 import { IntegrationContext } from '@/shared/integrations';
 import { applySessionAccount } from '@/app/session-navigation';
 import { integrations } from '@/app/integrations';
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useLayoutEffect } from 'react';
 import { SessionNavigationBoundary } from '@/app/SessionNavigationBoundary';
 import { OAuthCallback } from '@/app/OAuthCallback';
 import { BookOpen, BookMarked, Library as LibraryIcon, Loader2, ListTodo } from 'lucide-react';
@@ -53,6 +53,12 @@ function AppContent() {
     refetch();
     navigateToView('library');
   }, [navigateToView, refetch]);
+
+  useLayoutEffect(() => {
+    if (!loading) {
+      document.getElementById('startup-screen')?.dispatchEvent(new Event('lumiere:startup-ready'));
+    }
+  }, [loading]);
 
   if (loading) {
     return (
