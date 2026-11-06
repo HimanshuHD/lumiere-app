@@ -41,6 +41,7 @@ function AppContent() {
   const view = route.kind === 'view' ? route.view : null;
   const activeDoc = route.kind === 'reader' ? route.documentId : null;
   const [showOnlineLibrary, setShowOnlineLibrary] = useState(false);
+  const [hasOpenedOnlineLibrary, setHasOpenedOnlineLibrary] = useState(false);
   const routeIdentity = route.kind === 'view' ? route.view : route.kind === 'reader' ? route.documentId : route.kind;
   useEffect(() => { setShowOnlineLibrary(false); }, [routeIdentity]);
   const openDocument = useCallback((doc: DocumentSummary | Document) => navigate({kind: 'reader', documentId: doc.id}), []);
@@ -121,7 +122,10 @@ function AppContent() {
           <div className="flex items-center gap-3">
             <ImportMenu
               onUpload={() => navigateToView('upload')}
-              onOnlineLibrary={() => { setShowOnlineLibrary(true); }}
+              onOnlineLibrary={() => {
+                setHasOpenedOnlineLibrary(true);
+                setShowOnlineLibrary(true);
+              }}
             />
             <UserMenu
               onProfile={() => navigateToView('profile')}
@@ -217,10 +221,10 @@ function AppContent() {
         </footer>
       )}
 
-      {showOnlineLibrary && (
+      {hasOpenedOnlineLibrary && (
         <DeferredContent>
           <OnlineLibraryModal
-            open
+            open={showOnlineLibrary}
             onClose={() => setShowOnlineLibrary(false)}
             onBookAdded={(doc) => {
               refetch();
