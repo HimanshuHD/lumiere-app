@@ -1,7 +1,7 @@
 import { IntegrationContext } from '@/shared/integrations';
 import { applySessionAccount } from '@/app/session-navigation';
 import { integrations } from '@/app/integrations';
-import { useState, useCallback, useEffect, useLayoutEffect } from 'react';
+import { lazy, useState, useCallback, useEffect, useLayoutEffect } from 'react';
 import { SessionNavigationBoundary } from '@/app/SessionNavigationBoundary';
 import { OAuthCallback } from '@/app/OAuthCallback';
 import { BookOpen, BookMarked, Library as LibraryIcon, Loader2, ListTodo } from 'lucide-react';
@@ -11,24 +11,26 @@ import { ToastProvider, useToast } from '@/shared/ui';
 import { AuthScreen } from '@/components/AuthScreen';
 import { Library } from '@/components/Library';
 import { BookmarksView } from '@/components/BookmarksView';
-import { ReaderLoader } from '@/components/ReaderLoader';
 import { QueryNotice } from '@/shared/ui';
 import type {  DocumentSummary  } from '@/domain/document-summary';
-import { UploadPanel } from '@/components/UploadPanel';
-import { Profile } from '@/components/Profile';
-import { MyUploads } from '@/components/MyUploads';
 import { UserMenu } from '@/components/UserMenu';
 import { AllDocuments } from '@/components/AllDocuments';
 import { ReadingListView } from '@/components/ReadingListView';
 import { ImportMenu } from '@/components/ImportMenu';
-import { OnlineLibraryModal } from '@/components/OnlineLibraryModal';
-import { CatalogAdmin } from '@/components/CatalogAdmin';
 import { isCatalogAdmin } from '@/lib/catalogAdminAccess';
 import { useDocuments } from '@/hooks/useData';
 import type { Document } from '@/domain/documents';
 
 import type { View } from '@/domain/navigation';
 import { navigate, useAppRoute } from '@/app/navigation';
+import { DeferredContent } from '@/app/DeferredContent';
+
+const ReaderLoader = lazy(() => import('@/components/ReaderLoader').then(module => ({ default: module.ReaderLoader })));
+const UploadPanel = lazy(() => import('@/components/UploadPanel').then(module => ({ default: module.UploadPanel })));
+const Profile = lazy(() => import('@/components/Profile').then(module => ({ default: module.Profile })));
+const MyUploads = lazy(() => import('@/components/MyUploads').then(module => ({ default: module.MyUploads })));
+const OnlineLibraryModal = lazy(() => import('@/components/OnlineLibraryModal').then(module => ({ default: module.OnlineLibraryModal })));
+const CatalogAdmin = lazy(() => import('@/components/CatalogAdmin').then(module => ({ default: module.CatalogAdmin })));
 
 function AppContent() {
   const { user, loading, signOut } = useAuth();
@@ -151,54 +153,56 @@ function AppContent() {
       {/* Main content */}
       {!activeDoc && (view === 'library' || view === 'all-documents') && <QueryNotice error={docsError} retry={refetch} label="library" />}
       <main id="main-content" tabIndex={-1}>
-        {route.kind === 'not-found' ? (
-          <div className="max-w-3xl mx-auto px-4 py-24 text-center">
-            <h1 className="text-2xl font-serif font-bold">Page unavailable</h1>
-            <button className="mt-6 underline" onClick={() => navigate({kind:'view',view:'library'},{replace:true})}>Return to library</button>
-          </div>
-        ) : view === 'admin-catalog' ? (
-          catalogAdmin ? (
-            <CatalogAdmin onBack={() => navigateToView('library')} />
-          ) : (
+        <DeferredContent key={routeIdentity}>
+          {route.kind === 'not-found' ? (
             <div className="max-w-3xl mx-auto px-4 py-24 text-center">
-              <h1 className="text-2xl font-serif font-bold text-stone-800">Administrator access required</h1>
-              <p className="mt-2 text-sm text-stone-600">This catalog maintenance page is restricted to authorized administrators.</p>
-              <button
-                onClick={() => navigateToView('library')}
-                className="mt-6 rounded-lg bg-stone-900 px-4 py-2 text-sm font-medium text-white hover:bg-stone-700"
-              >
-                Return to library
-              </button>
+              <h1 className="text-2xl font-serif font-bold">Page unavailable</h1>
+              <button className="mt-6 underline" onClick={() => navigate({kind:'view',view:'library'},{replace:true})}>Return to library</button>
             </div>
-          )
-        ) : activeDoc ? (
-          <ReaderLoader key={activeDoc} documentId={activeDoc} onBack={() => navigateToView('library')} />
-        ) : (
-          <>
-            {view === 'library' && !(docsError && documents.length === 0) && (
-              <Library
-                documents={documents}
-                loading={docsLoading && documents.length === 0}
-                onOpenDoc={openDocument}
-                onViewAll={() => navigateToView('all-documents')}
-              />
-            )}
-            {view === 'bookmarks' && <BookmarksView onOpenDoc={openDocument} />}
-            {view === 'reading-list' && <ReadingListView onOpenDoc={openDocument} />}
-            {view === 'upload' && <UploadPanel onUploaded={handleUploaded} />}
-            {view === 'profile' && <Profile />}
-            {view === 'my-uploads' && <MyUploads />}
-            {view === 'all-documents' && !(docsError && documents.length === 0) && (
-              <AllDocuments
-                documents={documents}
-                loading={docsLoading && documents.length === 0}
-                onOpenDoc={openDocument}
-                onBack={() => navigateToView('library')}
-                onCollectionChanged={async () => { await refetch(); }}
-              />
-            )}
-          </>
-        )}
+          ) : view === 'admin-catalog' ? (
+            catalogAdmin ? (
+              <CatalogAdmin onBack={() => navigateToView('library')} />
+            ) : (
+              <div className="max-w-3xl mx-auto px-4 py-24 text-center">
+                <h1 className="text-2xl font-serif font-bold text-stone-800">Administrator access required</h1>
+                <p className="mt-2 text-sm text-stone-600">This catalog maintenance page is restricted to authorized administrators.</p>
+                <button
+                  onClick={() => navigateToView('library')}
+                  className="mt-6 rounded-lg bg-stone-900 px-4 py-2 text-sm font-medium text-white hover:bg-stone-700"
+                >
+                  Return to library
+                </button>
+              </div>
+            )
+          ) : activeDoc ? (
+            <ReaderLoader key={activeDoc} documentId={activeDoc} onBack={() => navigateToView('library')} />
+          ) : (
+            <>
+              {view === 'library' && !(docsError && documents.length === 0) && (
+                <Library
+                  documents={documents}
+                  loading={docsLoading && documents.length === 0}
+                  onOpenDoc={openDocument}
+                  onViewAll={() => navigateToView('all-documents')}
+                />
+              )}
+              {view === 'bookmarks' && <BookmarksView onOpenDoc={openDocument} />}
+              {view === 'reading-list' && <ReadingListView onOpenDoc={openDocument} />}
+              {view === 'upload' && <UploadPanel onUploaded={handleUploaded} />}
+              {view === 'profile' && <Profile />}
+              {view === 'my-uploads' && <MyUploads />}
+              {view === 'all-documents' && !(docsError && documents.length === 0) && (
+                <AllDocuments
+                  documents={documents}
+                  loading={docsLoading && documents.length === 0}
+                  onOpenDoc={openDocument}
+                  onBack={() => navigateToView('library')}
+                  onCollectionChanged={async () => { await refetch(); }}
+                />
+              )}
+            </>
+          )}
+        </DeferredContent>
       </main>
 
       {/* Footer (hidden in reader view) */}
@@ -213,15 +217,19 @@ function AppContent() {
         </footer>
       )}
 
-      <OnlineLibraryModal
-        open={showOnlineLibrary}
-        onClose={() => setShowOnlineLibrary(false)}
-        onBookAdded={(doc) => {
-          refetch();
-          setShowOnlineLibrary(false);
-          openDocument(doc);
-        }}
-      />
+      {showOnlineLibrary && (
+        <DeferredContent>
+          <OnlineLibraryModal
+            open
+            onClose={() => setShowOnlineLibrary(false)}
+            onBookAdded={(doc) => {
+              refetch();
+              setShowOnlineLibrary(false);
+              openDocument(doc);
+            }}
+          />
+        </DeferredContent>
+      )}
     </div>
   );
 }
