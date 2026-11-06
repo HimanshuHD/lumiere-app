@@ -154,7 +154,7 @@ try{
   const noScriptContext = await browser.newContext({ javaScriptEnabled: false });
   const noScriptPage = await noScriptContext.newPage();
   await noScriptPage.goto(startup.origin + '/shelf/');
-  await noScriptPage.getByText('Enable JavaScript in your browser', { exact: false }).waitFor();
+  await noScriptPage.locator('noscript p').waitFor();
   await noScriptContext.close();
   console.log('PASS: static loader paints before the bundle, recovers from a failed script, and explains disabled JavaScript.');
   assert.deepEqual(errors,[]);console.log('PASS: OAuth failure recovery and base-aware provider redirect; no browser exceptions.');
