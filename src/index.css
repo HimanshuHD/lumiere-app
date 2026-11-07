@@ -69,6 +69,7 @@ body {
 /* The brand palette applies to app chrome. Reading themes keep their own colors. */
 .app-frame, .auth-screen { background: var(--app-bg); color: var(--app-ink); }
 .theme-scope { color: var(--app-ink); }
+.app-frame, .auth-screen, .theme-scope { transition: background-color 300ms, color 300ms, border-color 300ms; }
 .brand-logo { display: inline-block; flex-shrink: 0; }
 .brand-logo img { display: block; width: 100%; height: 100%; object-fit: contain; }
 .brand-logo .brand-dark { display: none; }
@@ -134,3 +135,9 @@ body {
 :where(.theme-scope, .theme-scope *)[class~="bg-amber-700"][class~="text-white"] { color: var(--app-on-accent); }
 :where(.theme-scope, .theme-scope *)[class~="bg-stone-900"][class~="text-white"] { color: var(--app-bg); }
 :where(.theme-scope, .theme-scope *)[class~="placeholder-stone-400"]::placeholder { color: var(--app-muted); }
+
+@media (max-width: 639px) {
+  .nav-tools { margin-left: auto; width: 100%; justify-content: flex-end; }
+  .nav-tools .theme-toggle { position: absolute; top: 12px; right: 16px; }
+}
+:where(.theme-scope, .theme-scope *)[class~="bg-stone-100"][class~="text-stone-600"] { color: var(--app-ink); }

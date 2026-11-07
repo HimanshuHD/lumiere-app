@@ -241,10 +241,18 @@ html, body { margin: 0; background: var(--app-bg); color: var(--app-ink); }
     drawings.forEach(animation => { animation.startTime = time; });
   }
   animateLogo();
-  reduced.addEventListener('change', animateLogo);
   const entry = !reduced.matches && screen.animate ? screen.animate([
     { transform: 'translateY(-100%)' }, { transform: 'translateY(0)' },
   ], { duration: 560, easing: 'cubic-bezier(.22,1,.36,1)' }) : null;
+  const onMotionChange = () => {
+    animateLogo();
+    if (reduced.matches) {
+      screen.getAnimations({ subtree: true }).forEach(animation => {
+        if (animation.effect.getTiming().iterations !== Infinity) animation.finish();
+      });
+    }
+  };
+  reduced.addEventListener('change', onMotionChange);
   let leaving = false;
   const showRecovery = () => {
     if (leaving) return;
@@ -258,11 +266,12 @@ html, body { margin: 0; background: var(--app-bg); color: var(--app-ink); }
   };
   window.addEventListener('error', onResourceError, true);
   retry.addEventListener('click', () => window.location.reload());
-  screen.addEventListener('lumiere:startup-ready', () => {
+  screen.addEventListener('lumiere:startup-ready', async () => {
     if (leaving) return;
     leaving = true;
     window.clearTimeout(timeout);
     window.removeEventListener('error', onResourceError, true);
+    if (entry && !reduced.matches) await entry.finished.catch(() => {});
     const restoreFocus = screen.contains(document.activeElement);
     let finished = false;
     let fallback;
@@ -272,7 +281,7 @@ html, body { margin: 0; background: var(--app-bg); color: var(--app-ink); }
       clearTimeout(fallback);
       entry?.cancel();
       drawings.forEach(animation => animation.cancel());
-      reduced.removeEventListener('change', animateLogo);
+      reduced.removeEventListener('change', onMotionChange);
       screen.remove();
       root.removeAttribute('inert');
       if (restoreFocus) {

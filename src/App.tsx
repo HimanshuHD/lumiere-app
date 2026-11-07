@@ -119,7 +119,7 @@ function AppContent() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div className="nav-tools flex items-center gap-2 sm:gap-3">
             <ThemeToggle />
             <ImportMenu
               onUpload={() => navigateToView('upload')}

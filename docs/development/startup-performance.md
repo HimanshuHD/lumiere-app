@@ -39,3 +39,18 @@ A separate signed-in run waited for the empty-library result from the mock API, 
 3. Record a fresh context and repeat navigation with caching enabled. Record Performance and Network for both, then repeat with the same throttle preset. Set the Resource Timing buffer above 2,000 entries before loading the development baseline.
 4. Record first contentful paint, the actual LCP element, and the first interactive sign-in or account control. In an environment with real data, separately record when library results or the empty/error state settle.
 5. Run `node tests/browser/navigation.mjs` after Chromium setup. It checks the static screen while the production entry script is held, then aborts the bundle, verifies the reload action, and confirms that the recovered app has no overlay or inert root. It also checks disabled JavaScript, OAuth return handling and document deep links.
+
+
+## Branded loader and app themes
+
+The supplied HTML's option 02, Reverse mirrored drawing, is the single loader animation. The exact source SVG paths are inline in the initial HTML so the animated logo adds no image request. The supplied static light/dark SVGs are used in app branding, and the SVG/ICO favicons are served relative to the Vite base.
+
+The page uses the reference's ivory (#f7f5ef), forest (#17231f), foregrounds and copper logo colors (#a46a45 / #d19a70). Small light-theme text uses #647268 and copper buttons use #a06843 to meet text contrast. Arial and Georgia match the supplied HTML and remove the previous external font requests.
+
+A sun/moon toggle is available before React loads and in the app header/sign-in screen. It stores the choice under lumiere:app-theme. With no saved choice it follows the operating system. Cross-tab storage changes and unavailable storage are handled. The React toggle subscribes to the same theme event used by the startup script, so handoff keeps the user's current selection. App surfaces and icon stroke weights share the brand palette.
+
+The initial screen enters from above for 560 ms. Once React is ready, entry completes, then the loader exits right over 440 ms while the app enters in the same direction. The app root stays inert until the transition finishes. A fallback timer completes cleanup if an animation fails. Reduced motion skips the drawings and slides. This requested animation sequence can add up to roughly one second before interaction on a fast cached startup. Earlier timing measurements above predate this visual treatment.
+
+The 30-second recovery state, failed-module detection, reload action and disabled-JavaScript explanation remain part of startup. No animation/style selectors or pause controls are shipped.
+
+For visual review, load once with the application module held in browser network controls. Compare both themes, then release the module and verify the slide and keyboard focus handoff. Toggle from sign-in and the library, reload, and confirm the choice persists. Check a 390px viewport and reduced motion. Navigation tests also cover a non-root base, blocked module recovery, theme persistence and reverse drawing keyframes.
