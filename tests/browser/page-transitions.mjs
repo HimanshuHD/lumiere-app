@@ -87,6 +87,10 @@ try {
   await idle();
   assert.equal(await page.getByLabel('Page exits', { exact: true }).inputValue(), 'fade');
   assert.equal(await page.getByLabel('Transition duration').inputValue(), '700');
+  await page.getByLabel('Choose avatar image', { exact: true }).setInputFiles({
+    name: 'avatar.png', mimeType: 'image/png',
+    buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Zl1sAAAAASUVORK5CYII=', 'base64'),
+  });
   await page.getByRole('button', { name: 'Library', exact: true }).first().click();
   await page.waitForFunction(() => document.documentElement.dataset.pageMotion === 'running');
   const effects = await page.locator('#root').evaluate(element => element.getAnimations().map(animation => ({ duration: animation.effect.getTiming().duration, easing: animation.effect.getTiming().easing, frames: animation.effect.getKeyframes() })));

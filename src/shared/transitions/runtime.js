@@ -90,10 +90,21 @@
       element.removeAttribute('id');
       element.removeAttribute('autofocus');
       if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
-        element.value = element.type === 'password' ? '' : originals[index].value || element.getAttribute('placeholder') || '';
+        const hideValue = element.type === 'password' || element.type === 'file';
+        element.value = hideValue ? '' : originals[index].value || element.getAttribute('placeholder') || '';
         element.removeAttribute('placeholder');
         element.removeAttribute('name');
-        if (element.type === 'password') element.removeAttribute('value');
+        if (hideValue) element.removeAttribute('value');
+      }
+      if (element instanceof HTMLSelectElement) element.selectedIndex = originals[index].selectedIndex;
+      if (element instanceof HTMLImageElement && element.src.startsWith('blob:') && originals[index].naturalWidth) {
+        try {
+          const bitmap = document.createElement('canvas');
+          bitmap.width = originals[index].naturalWidth;
+          bitmap.height = originals[index].naturalHeight;
+          bitmap.getContext('2d').drawImage(originals[index], 0, 0);
+          element.src = bitmap.toDataURL();
+        } catch { /* Keep the existing resource if a bitmap cannot be made. */ }
       }
       if (element instanceof HTMLCanvasElement) {
         try { element.getContext('2d')?.drawImage(originals[index], 0, 0); } catch { /* A restricted canvas can remain blank. */ }

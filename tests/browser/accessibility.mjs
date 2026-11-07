@@ -38,7 +38,7 @@ try{
  });
  page=await context.newPage();page.setDefaultTimeout(20000);page.setDefaultNavigationTimeout(60000);page.on('pageerror',e=>errors.push(e.message));
  const axePath=createRequire(import.meta.url).resolve('axe-core/axe.min.js');
- async function scan(name){await page.addScriptTag({path:axePath});const result=await page.evaluate(async()=>{const result=await window.axe.run(document,{runOnly:{type:'tag',values:['wcag2a','wcag2aa','wcag21aa','wcag22aa']}});return result.violations.map(v=>({id:v.id,nodes:v.nodes.map(n=>({html:n.html,summary:n.failureSummary}))}));});audits.push({name,violations:result});console.log('AXE',name,JSON.stringify(result));}
+ async function scan(name){await page.locator('#root[inert]').waitFor({state:'detached'});await page.addScriptTag({path:axePath});const result=await page.evaluate(async()=>{const result=await window.axe.run(document,{runOnly:{type:'tag',values:['wcag2a','wcag2aa','wcag21aa','wcag22aa']}});return result.violations.map(v=>({id:v.id,nodes:v.nodes.map(n=>({html:n.html,summary:n.failureSummary}))}));});audits.push({name,violations:result});console.log('AXE',name,JSON.stringify(result));}
  async function go(path){await page.goto(origin+path,{waitUntil:'domcontentloaded'});await page.locator('#root[inert]').waitFor({state:'detached'});}
  await go('/');await page.getByRole('button',{name:'Accessibility QA',exact:true}).waitFor();await scan('library');
  const open=page.getByRole('button',{name:`Open ${docs[0].title}`,exact:true}).last();await open.focus();await page.keyboard.press('Enter');
@@ -50,6 +50,7 @@ try{
  await page.getByRole('button',{name:'Open contents',exact:true}).click();await page.getByRole('dialog',{name:'Contents',exact:true}).waitFor();await scan('contents');await page.keyboard.press('Escape');
  assert.equal(await page.getByRole('button',{name:'Open contents',exact:true}).evaluate(e=>e===document.activeElement),true);
  await page.getByRole('button',{name:'Back to library',exact:true}).first().click();
+ await page.locator('#root[inert]').waitFor({state:'detached'});
  const importer=page.getByRole('button',{name:'Import Books',exact:true});await importer.focus();await page.keyboard.press('Enter');assert.equal(await importer.getAttribute('aria-expanded'),'true');
  await page.keyboard.press('Tab');await page.keyboard.press('Tab');await page.keyboard.press('Enter');
  await page.getByRole('dialog',{name:'Online library',exact:true}).waitFor();await scan('online-library');
