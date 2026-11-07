@@ -49,8 +49,8 @@ async function pageFor(server,base,account=a) {
   const page=await context.newPage();page.setDefaultTimeout(20000);page.setDefaultNavigationTimeout(60000);
   page.on('pageerror',e=>errors.push(e.message));
   const origin=`http://127.0.0.1:${server.httpServer.address().port}`;
-  const go=path=>page.goto(origin+base+path.replace(/^\//,''),{waitUntil:'domcontentloaded'});
-  const login=async email=>{await page.getByPlaceholder('you@example.com').fill(email);await page.getByPlaceholder('At least 6 characters').fill('qa-password');await page.locator('form button[type="submit"]').click();};
+  const go=async path=>{await page.goto(origin+base+path.replace(/^\//,''),{waitUntil:'domcontentloaded'});await page.locator('#root[inert]').waitFor({state:'detached'});};
+  const login=async email=>{await page.locator('#root[inert]').waitFor({state:'detached'});await page.getByPlaceholder('you@example.com').fill(email);await page.getByPlaceholder('At least 6 characters').fill('qa-password');await page.locator('form button[type="submit"]').click();};
   return {context,page,state,origin,go,login};
 }
 let server;
@@ -131,6 +131,43 @@ try{
   await failed.page.getByRole('button',{name:'Continue with Google'}).click();await failed.page.waitForURL('**/auth/v1/authorize**');
   assert.equal(new URL(failed.page.url()).searchParams.get('redirect_to'),failed.origin+'/shelf/auth/callback');
   await failed.context.close();
+  await freshBrowser();
+  const startup = await pageFor(server, '/shelf/', null);
+  const scripts = '**/shelf/assets/*.js';
+  let releaseBundle;
+  const bundleGate = new Promise(resolve => { releaseBundle = resolve; });
+  await startup.page.route(scripts, async route => {
+    await bundleGate;
+    await route.abort();
+  });
+  await startup.page.goto(startup.origin + '/shelf/', { waitUntil: 'commit' });
+  await startup.page.getByText('Opening your reading space', { exact: true }).waitFor();
+  assert.equal(await startup.page.locator('#root[inert]').count(), 1);
+  assert.equal(await startup.page.locator('select').count(), 0);
+  const themeToggle = startup.page.getByRole('button', { name: 'Dark theme', exact: true });
+  await themeToggle.click();
+  assert.equal(await themeToggle.getAttribute('aria-pressed'), 'true');
+  assert.equal(await startup.page.evaluate(() => localStorage.getItem('lumiere:app-theme')), 'dark');
+  assert.equal(await startup.page.locator('.startup-logo .ink').first().evaluate(path => path.getAnimations()[0].effect.getKeyframes()[0].strokeDashoffset), '-1');
+  releaseBundle();
+  await startup.page.getByRole('button', { name: 'Reload page' }).waitFor();
+  await startup.page.unroute(scripts);
+  await startup.page.getByRole('button', { name: 'Reload page' }).click();
+  await startup.page.getByPlaceholder('you@example.com').waitFor();
+  await startup.page.locator('#startup-screen').waitFor({ state: 'detached' });
+  assert.equal(await startup.page.locator('.theme-toggle').getAttribute('aria-pressed'), 'true');
+  assert.equal(await startup.page.evaluate(() => getComputedStyle(document.querySelector('.auth-screen')).backgroundColor), 'rgb(23, 35, 31)');
+  await startup.page.getByRole('button', { name: 'Dark theme', exact: true }).click();
+  assert.equal(await startup.page.evaluate(() => document.documentElement.dataset.appTheme), 'light');
+  assert.equal(await startup.page.locator('#startup-screen, #root[inert]').count(), 0);
+  await startup.context.close();
+  await freshBrowser();
+  const noScriptContext = await browser.newContext({ javaScriptEnabled: false });
+  const noScriptPage = await noScriptContext.newPage();
+  await noScriptPage.goto(startup.origin + '/shelf/');
+  await noScriptPage.locator('noscript p').waitFor();
+  await noScriptContext.close();
+  console.log('PASS: static loader paints before the bundle, recovers from a failed script, and explains disabled JavaScript.');
   assert.deepEqual(errors,[]);console.log('PASS: OAuth failure recovery and base-aware provider redirect; no browser exceptions.');
 }catch(error){
   for(const context of browser.contexts())for(const page of context.pages())console.error('Navigation fixture failure:',new URL(page.url()).pathname,await page.locator('h1,h2').allTextContents().catch(()=>[]));

@@ -257,7 +257,7 @@ export function Library({ documents, loading, onOpenDoc, onViewAll }: LibraryPro
 
       {/* Document Detail Modal */}
       {selectedDoc && (
-        <Modal label="Document details" className="fixed inset-0 z-50 flex items-center justify-center p-4" onClose={() => setSelectedDoc(null)}>
+        <Modal label="Document details" className="theme-scope fixed inset-0 z-50 flex items-center justify-center p-4" onClose={() => setSelectedDoc(null)}>
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
           <div
             className="relative bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[85vh] overflow-y-auto"

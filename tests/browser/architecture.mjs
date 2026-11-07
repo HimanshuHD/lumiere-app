@@ -126,6 +126,7 @@ try {
   await page.getByRole('button',{name:'Library',exact:true}).click();
   await page.getByRole('button',{name:'Architecture QA',exact:true}).click();
   await page.getByRole('button',{name:'Profile',exact:true}).click();
+  await page.locator('#root[inert]').waitFor({state:'detached'});
   await page.getByPlaceholder('Enter your full name').fill('Refactored Profile');
   await page.getByRole('button',{name:'Save Changes',exact:true}).click();
   await page.getByRole('button',{name:'Refactored Profile',exact:true}).waitFor();

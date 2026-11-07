@@ -183,7 +183,7 @@ export function MyUploads() {
 
       {/* Delete confirmation */}
       {deleteDoc && (
-        <Modal label="Delete document" className="fixed inset-0 z-50 flex items-center justify-center p-4" onClose={() => !deleting && setDeleteDoc(null)}>
+        <Modal label="Delete document" className="theme-scope fixed inset-0 z-50 flex items-center justify-center p-4" onClose={() => !deleting && setDeleteDoc(null)}>
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
           <div className="relative bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6" onClick={(e) => e.stopPropagation()}>
             <button aria-label="Close delete confirmation" disabled={deleting} onClick={() => !deleting && setDeleteDoc(null)} className="absolute top-4 right-4 w-8 h-8 rounded-full bg-stone-100 hover:bg-stone-200 flex items-center justify-center transition-colors">
@@ -300,7 +300,7 @@ function EditDocumentModal({ doc, onClose, onSaved }: { doc: Document; onClose: 
   };
 
   return (
-    <Modal label="Edit document" className="fixed inset-0 z-50 flex items-center justify-center p-4" onClose={() => { if (!saving) onClose(); }}>
+    <Modal label="Edit document" className="theme-scope fixed inset-0 z-50 flex items-center justify-center p-4" onClose={() => { if (!saving) onClose(); }}>
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
       <div className="relative bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between p-6 border-b border-stone-200">
