@@ -44,11 +44,13 @@ try {
   page.setDefaultTimeout(30_000);
   const origin = `http://127.0.0.1:${server.httpServer.address().port}`;
   await page.goto(origin);
+  await page.locator('#root[inert]').waitFor({ state: 'detached' });
   await page.locator('#auth-email').fill(emails[0]);
   await page.locator('#auth-password').fill(password);
   await page.locator('button[type="submit"]').click();
   await page.getByRole('button', { name: 'Import Books', exact: true }).waitFor();
   await page.goto(origin + '/upload');
+  await page.locator('#root[inert]').waitFor({ state: 'detached' });
   // Use wrong but bucket-allowlisted MIME types so the finalizer, not bucket admission, is tested.
   await page.locator('#upload-document').setInputFiles({ name: 'quality.txt', mimeType: 'application/pdf', buffer: Buffer.from('First synthetic section.\n\n\nSecond synthetic section.') });
   await page.locator('#upload-title').fill('Local quality fixture');
