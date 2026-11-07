@@ -229,7 +229,7 @@ export function CatalogAdmin({ onBack }: CatalogAdminProps) {
       )}
 
       {selectedDocument && (
-        <Modal onClose={() => { if (!deleting) { setSelectedDocument(null); setImpact(null); } }} label="Delete canonical document" className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4">
+        <Modal onClose={() => { if (!deleting) { setSelectedDocument(null); setImpact(null); } }} label="Delete canonical document" className="theme-scope fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4">
           <div
             onClick={(event) => event.stopPropagation()}
             className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl"
