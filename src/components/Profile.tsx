@@ -1,11 +1,14 @@
 import { useProfileController } from '@/features/profile';
-import { useState } from 'react';
+import { useState, useLayoutEffect } from 'react';
+import { pageReady } from '@/shared/transitions';
+import { TransitionSettingsPanel } from './TransitionSettingsPanel';
 import { User, Camera, Loader2, Save, Lock, Mail, CheckCircle2, Eye, EyeOff } from 'lucide-react';
 
 export function Profile() {
   const { user, fullName, setFullName, avatarUrl, loading, savingName, avatarFile, avatarPreview, uploadingAvatar, avatarInputRef, newPassword, setNewPassword, confirmPassword, setConfirmPassword, changingPassword, handleAvatarSelect, handleSaveName, handleSaveAvatar, handleChangePassword } = useProfileController();
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  useLayoutEffect(() => { if (!loading) pageReady(); }, [loading]);
   if (loading) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center">
@@ -25,6 +28,8 @@ export function Profile() {
           <p className="text-sm text-stone-600">Manage your account settings</p>
         </div>
       </div>
+
+      <TransitionSettingsPanel />
 
       {/* Avatar section */}
       <div className="bg-white rounded-2xl border border-stone-200 p-6 mb-6">

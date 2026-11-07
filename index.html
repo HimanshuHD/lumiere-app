@@ -176,6 +176,7 @@ html, body { margin: 0; background: var(--app-bg); color: var(--app-ink); }
       <div class="startup-footer">Good stories are worth a moment.</div>
     </section>
     <div id="root" inert></div>
+    <!-- lumiere-transition-runtime -->
     <script>
 (() => {
   const screen = document.getElementById('startup-screen');
@@ -280,11 +281,9 @@ html, body { margin: 0; background: var(--app-bg); color: var(--app-ink); }
     }
     const restoreFocus = screen.contains(document.activeElement);
     let finished = false;
-    let fallback;
     const finish = () => {
       if (finished) return;
       finished = true;
-      clearTimeout(fallback);
       entry?.cancel();
       drawings.forEach(animation => animation.cancel());
       reduced.removeEventListener('change', onMotionChange);
@@ -299,18 +298,11 @@ html, body { margin: 0; background: var(--app-bg); color: var(--app-ink); }
       }
     };
     if (reduced.matches || !screen.animate) { finish(); return; }
-    const from = getComputedStyle(screen).transform;
     entry?.cancel();
-    const exit = screen.animate([
-      { transform: from === 'none' ? 'translateX(0)' : from },
-      { transform: 'translateX(100%)' },
-    ], { duration: 440, easing: 'cubic-bezier(.65,0,.35,1)', fill: 'forwards' });
-    root.animate([
-      { opacity: .6, transform: 'translateX(-24px)' },
-      { opacity: 1, transform: 'translateX(0)' },
-    ], { duration: 440, easing: 'cubic-bezier(.22,1,.36,1)' });
-    exit.finished.then(finish, finish);
-    fallback = setTimeout(finish, 600);
+    const handoff = window.lumiereTransitions?.play(screen, root);
+    if (handoff) handoff.then(finish, finish);
+    else finish();
+
   }, { once: true });
 })();
     </script>

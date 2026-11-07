@@ -1,4 +1,5 @@
 import { Component, Suspense, type ReactNode } from 'react';
+import { PageArrival } from './transitions/PageArrival';
 
 class ContentErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
   state = { failed: false };
@@ -12,6 +13,7 @@ class ContentErrorBoundary extends Component<{ children: ReactNode }, { failed: 
 
     return (
       <section className="px-4 py-12 text-center" role="alert">
+        <PageArrival />
         <p>Could not load this screen.</p>
         <button type="button" className="mt-3 underline" onClick={() => window.location.reload()}>
           Reload page

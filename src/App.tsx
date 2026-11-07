@@ -24,6 +24,8 @@ import type { Document } from '@/domain/documents';
 import type { View } from '@/domain/navigation';
 import { navigate, useAppRoute } from '@/app/navigation';
 import { DeferredContent } from '@/app/DeferredContent';
+import { PageArrival } from '@/app/transitions/PageArrival';
+import { pageReady } from '@/shared/transitions';
 import { BrandLogo } from '@/shared/ui/brand-logo';
 import { ThemeToggle } from '@/shared/ui/theme-toggle';
 
@@ -59,11 +61,14 @@ function AppContent() {
     navigateToView('library');
   }, [navigateToView, refetch]);
 
+
+
   useLayoutEffect(() => {
-    if (!loading) {
-      document.getElementById('startup-screen')?.dispatchEvent(new Event('lumiere:startup-ready'));
-    }
-  }, [loading]);
+    if (loading) return;
+    // If code/data is slow, reveal the route's own loading or recovery UI.
+    const limit = setTimeout(pageReady, 2000);
+    return () => clearTimeout(limit);
+  }, [loading, routeIdentity]);
 
   if (loading) {
     return (
@@ -73,10 +78,10 @@ function AppContent() {
     );
   }
 
-  if (route.kind === 'callback') return <div className="theme-scope"><ThemeToggle className="auth-theme-toggle" /><OAuthCallback /></div>;
+  if (route.kind === 'callback') return <div className="theme-scope"><ThemeToggle className="auth-theme-toggle" /><OAuthCallback /><PageArrival /></div>;
 
   if (!user) {
-    return <AuthScreen />;
+    return <><AuthScreen /><PageArrival /></>;
   }
 
   const navItems: { key: View; label: string; icon: typeof LibraryIcon }[] = [
@@ -159,6 +164,7 @@ function AppContent() {
       {!activeDoc && (view === 'library' || view === 'all-documents') && <QueryNotice error={docsError} retry={refetch} label="library" />}
       <main id="main-content" tabIndex={-1} className={activeDoc ? undefined : "theme-scope"}>
         <DeferredContent key={routeIdentity}>
+          <PageArrival ready={!activeDoc && view !== 'profile' && (!(view === 'library' || view === 'all-documents') || !docsLoading)} />
           {route.kind === 'not-found' ? (
             <div className="max-w-3xl mx-auto px-4 py-24 text-center">
               <h1 className="text-2xl font-serif font-bold">Page unavailable</h1>
