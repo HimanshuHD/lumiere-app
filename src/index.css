@@ -71,10 +71,10 @@ body {
 .theme-scope { color: var(--app-ink); }
 .app-frame, .auth-screen, .theme-scope { transition: background-color 300ms, color 300ms, border-color 300ms; }
 .brand-logo { display: inline-block; flex-shrink: 0; }
-.brand-logo img { display: block; width: 100%; height: 100%; object-fit: contain; }
-.brand-logo .brand-dark { display: none; }
-[data-app-theme="dark"] .brand-logo .brand-light { display: none; }
-[data-app-theme="dark"] .brand-logo .brand-dark { display: block; }
+.brand-logo svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.brand-logo g { stroke: var(--app-accent); stroke-width: 7.2; }
+.brand-logo path[fill] { fill: var(--app-accent); }
+.app-header { background: var(--app-bg); }
 .auth-logo { width: 110px; height: 84px; margin-bottom: 10px; }
 .auth-theme-toggle { position: fixed; z-index: 50; top: 32px; right: 44px; }
 .theme-scope .lucide { stroke-width: 1.65px; }

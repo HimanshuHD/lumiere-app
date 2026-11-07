@@ -89,14 +89,14 @@ function AppContent() {
     <div className="app-frame min-h-screen">
       <a href="#main-content" className="skip-link">Skip to content</a>
       {/* Navigation */}
-      <nav className="theme-scope sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-stone-200">
+      <nav className="app-header theme-scope sticky top-0 z-40 border-b border-stone-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 min-h-16 py-3 flex flex-wrap gap-3 items-center justify-between">
           <div className="flex items-center gap-4 lg:gap-8">
             <button
               onClick={() => navigateToView('library')}
               className="flex items-center gap-2.5"
             >
-              <BrandLogo className="w-10 h-8" />
+              <BrandLogo className="header-brand-logo w-14 h-11" />
               <span className="font-serif font-bold text-stone-900 text-xl tracking-tight">Lumiere</span>
             </button>
 
