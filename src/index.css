@@ -134,7 +134,8 @@ body {
 :root[data-app-theme="dark"] { --app-accent-ink: #d19a70; }
 :where(.theme-scope, .theme-scope *)[class~="bg-amber-700"][class~="text-white"] { color: var(--app-on-accent); }
 :where(.theme-scope, .theme-scope *)[class~="bg-stone-900"][class~="text-white"] { color: var(--app-bg); }
-:where(.theme-scope, .theme-scope *)[class~="placeholder-stone-400"]::placeholder { color: var(--app-muted); }
+:where(.theme-scope, .theme-scope *)[class~="placeholder-stone-400"]::placeholder,
+:where(.theme-scope, .theme-scope *)[class~="placeholder-stone-600"]::placeholder { color: var(--app-muted); }
 
 @media (max-width: 639px) {
   .nav-tools { margin-left: auto; width: 100%; justify-content: flex-end; }

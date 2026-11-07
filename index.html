@@ -271,7 +271,13 @@ html, body { margin: 0; background: var(--app-bg); color: var(--app-ink); }
     leaving = true;
     window.clearTimeout(timeout);
     window.removeEventListener('error', onResourceError, true);
-    if (entry && !reduced.matches) await entry.finished.catch(() => {});
+    if (entry && !reduced.matches) {
+      await new Promise(resolve => {
+        const limit = setTimeout(resolve, 600);
+        const complete = () => { clearTimeout(limit); resolve(); };
+        entry.finished.then(complete, complete);
+      });
+    }
     const restoreFocus = screen.contains(document.activeElement);
     let finished = false;
     let fallback;
