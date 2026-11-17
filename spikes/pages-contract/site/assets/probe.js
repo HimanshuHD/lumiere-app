@@ -12,19 +12,22 @@ export function safeRoute(input) {
   const match = /^\/read\/([^/]+)$/.exec(input);
   return match && ID.test(match[1]) ? input : null;
 }
-export function rememberReturn(storage, path, now = Date.now()) {
+export function rememberReturn(storage, path, state, now = Date.now()) {
   const valid = safeRoute(path);
-  if (!valid) return false;
-  try { storage.setItem(KEY, JSON.stringify({path: valid, at: now})); return true; } catch { return false; }
+  if (!valid || !state) return false;
+  try { storage.setItem(KEY, JSON.stringify({path: valid, state, at: now})); return true; } catch { return false; }
 }
-export function consumeReturn(storage, now = Date.now()) {
+export function consumeReturn(storage, state, now = Date.now()) {
   try {
     const raw = storage.getItem(KEY);
     storage.removeItem(KEY);
     if (!raw) return null;
     const record = JSON.parse(raw);
-    return typeof record.at === 'number' && record.at <= now && now - record.at <= AGE ? safeRoute(record.path) : null;
+    return state && record.state === state && typeof record.at === 'number' && record.at <= now && now - record.at <= AGE ? safeRoute(record.path) : null;
   } catch { return null; }
+}
+export function tabStorage() {
+  try { return window.sessionStorage; } catch { return null; }
 }
 export function decodeHash(hash) {
   if (!hash || hash === '#') return '/';
@@ -49,8 +52,9 @@ if (typeof document !== 'undefined' && document.querySelector('[data-pages-proof
   document.getElementById('start-oauth').addEventListener('click', () => {
     const path = decodeHash(window.location.hash);
     const status = document.getElementById('oauth-state');
-    if (!path || !rememberReturn(window.sessionStorage, path)) { status.textContent = 'Return storage unavailable or route rejected'; return; }
-    window.location.href = './auth/callback/?result=success';
+    const state = crypto.randomUUID();
+    if (!path || !rememberReturn(tabStorage(), path, state)) { status.textContent = 'Return storage unavailable or route rejected'; return; }
+    window.location.href = './auth/callback/?result=success&state=' + encodeURIComponent(state);
   });
   document.getElementById('start-oauth-error').addEventListener('click', () => {
     try { window.sessionStorage.removeItem(KEY); } catch { /* unavailable */ }

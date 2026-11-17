@@ -30,19 +30,27 @@ test('reject external, malformed and unrecognized return destinations', () => {
 });
 test('one-use same-tab return and expiration', () => {
   const storage=store(),now=1770000000000;
-  assert.equal(rememberReturn(storage,'/read/'+fixtureId,now),true);
-  assert.equal(consumeReturn(storage,now+1000),'/read/'+fixtureId);
-  assert.equal(consumeReturn(storage,now+1001),null);
-  assert.equal(rememberReturn(storage,'/profile',now),true);
-  assert.equal(consumeReturn(storage,now+600001),null);
-  assert.equal(rememberReturn(storage,'/profile',now),true);
-  assert.equal(consumeReturn(storage,now-1),null);
+  assert.equal(rememberReturn(storage,'/read/'+fixtureId,'state',now),true);
+  assert.equal(consumeReturn(storage,'state',now+1000),'/read/'+fixtureId);
+  assert.equal(consumeReturn(storage,'state',now+1001),null);
+  assert.equal(rememberReturn(storage,'/profile','state',now),true);
+  assert.equal(consumeReturn(storage,'state',now+600001),null);
+  assert.equal(rememberReturn(storage,'/profile','state',now),true);
+  assert.equal(consumeReturn(storage,'state',now-1),null);
 });
 test('wrong tab and unavailable storage fail closed', () => {
   const a=store(), b=store();
-  assert.equal(rememberReturn(a,'/profile'),true);
-  assert.equal(consumeReturn(b),null);
-  assert.equal(rememberReturn({getItem:()=>null,setItem:()=>{throw new Error('blocked');},removeItem:()=>{}},'/profile'),false);
+  assert.equal(rememberReturn(a,'/profile','state'),true);
+  assert.equal(consumeReturn(b,'state'),null);
+  assert.equal(rememberReturn({getItem:()=>null,setItem:()=>{throw new Error('blocked');},removeItem:()=>{}},'/profile','state'),false);
+});
+test('unknown or missing callback state cannot restore a saved route', () => {
+  for (const state of ['wrong', null]) {
+    const storage = store();
+    assert.equal(rememberReturn(storage, '/profile', 'expected'), true);
+    assert.equal(consumeReturn(storage, state), null);
+    assert.equal(consumeReturn(storage, 'expected'), null);
+  }
 });
 test('literal callback entry exists without any provider or Supabase URL', () => {
   const here=dirname(fileURLToPath(import.meta.url));
