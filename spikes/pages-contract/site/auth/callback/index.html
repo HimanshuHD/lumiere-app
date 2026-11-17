@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Lumiere · synthetic OAuth callback</title><link rel="stylesheet" href="../../assets/probe.css"></head>
+<body><h1>Static OAuth callback proof</h1><p class="warning">Synthetic callback only. No real OAuth tokens, provider, or Supabase requests.</p><p id="result" role="status">Checking synthetic return…</p><a href="../../#/">Return to library</a>
+<script type="module">
+import {consumeReturn,routeHash,tabStorage} from '../../assets/probe.js';
+const params = new URLSearchParams(location.search);
+const result = document.getElementById('result');
+const success = !params.has('error') && params.get('result') === 'success';
+const states = params.getAll('state');
+const path = consumeReturn(tabStorage(), success && states.length === 1 ? states[0] : null);
+if (!success) {
+  result.textContent = 'Sign-in simulation cancelled or missing. Recover using Return to library.';
+} else {
+  result.textContent = path ? 'Returning to the validated saved route…' : 'No valid saved route. Returning to the library…';
+  location.replace('../../' + routeHash(path || '/'));
+}
+</script></body></html>
