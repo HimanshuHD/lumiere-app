@@ -1,0 +1,63 @@
+name: Synthetic Pages routing proof
+
+on:
+  pull_request:
+    paths:
+      - 'spikes/pages-contract/**'
+      - 'tests/pages-contract.test.ts'
+      - '.github/workflows/pages-contract.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --include=dev
+      - name: Synthetic routing and return state tests
+        run: node --test tests/pages-contract.test.ts
+      - name: Isolated Vite Pages build
+        run: npx vite build --config spikes/pages-contract/vite.config.ts
+      - name: Verify emitted root and literal callback pages
+        run: |
+          test -f dist/pages-contract/index.html
+          test -f dist/pages-contract/auth/callback/index.html
+          grep -q '/lumiere-app/assets/' dist/pages-contract/index.html
+          if grep -RIE 'service_role|SUPABASE_SERVICE_ROLE|VITE_SUPABASE_URL|\.supabase\.co' dist/pages-contract; then
+            echo 'Unexpected hosted backend reference in synthetic build'
+            exit 1
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pages-contract-synthetic
+          path: dist/pages-contract
+
+  publish:
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: pages-contract-synthetic
+          path: dist/pages-contract
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: dist/pages-contract
+      - id: deployment
+        uses: actions/deploy-pages@v4
