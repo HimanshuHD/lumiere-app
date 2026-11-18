@@ -2,15 +2,310 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Online Document Reader</title>
-    <meta property="og:image" content="https://bolt.new/static/og_default.png" />
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:image" content="https://bolt.new/static/og_default.png" />
+    <link rel="icon" type="image/svg+xml" href="%BASE_URL%favicon.svg" />
+    <link rel="alternate icon" href="%BASE_URL%favicon.ico" />
+    <meta name="theme-color" content="#f7f5ef" />
+    <title>Lumiere · Your reading space</title>
+    <script>
+      try {
+        const preference = localStorage.getItem('lumiere:app-theme');
+        document.documentElement.dataset.appTheme = preference === 'light' || preference === 'dark'
+          ? preference : matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      } catch { document.documentElement.dataset.appTheme = 'light'; }
+    </script>
+    <style>
+:root {
+  --app-bg: #f7f5ef;
+  --app-ink: #273b36;
+  --app-muted: #647268;
+  --app-accent: #a46a45;
+  --app-border: #e7e2d8;
+  --app-surface: #fffdf8;
+  --app-soft: #eeeae1;
+  --app-on-accent: #ffffff;
+  --app-button: #a06843;
+  color-scheme: light;
+}
+:root[data-app-theme="dark"] {
+  --app-bg: #17231f;
+  --app-ink: #f1eee5;
+  --app-muted: #b7c0b7;
+  --app-accent: #d19a70;
+  --app-border: #2d3b33;
+  --app-surface: #1e2c26;
+  --app-soft: #293a31;
+  --app-on-accent: #17231f;
+  --app-button: #d19a70;
+  color-scheme: dark;
+}
+html, body { margin: 0; background: var(--app-bg); color: var(--app-ink); }
+.theme-toggle {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+  width: 76px;
+  height: 40px;
+  padding: 4px;
+  border: 1px solid var(--app-border);
+  border-radius: 24px;
+  background: var(--app-surface);
+  color: var(--app-muted);
+  cursor: pointer;
+  isolation: isolate;
+  transition: background-color 300ms, border-color 300ms;
+}
+.theme-toggle::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  left: 4px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--app-accent);
+  box-shadow: 0 2px 6px #17231f18;
+  transition: transform 360ms cubic-bezier(.22, 1, .36, 1), background-color 300ms;
+}
+[data-app-theme="dark"] .theme-toggle::before { transform: translateX(36px); }
+.theme-toggle svg {
+  width: 18px;
+  height: 18px;
+  margin: 0 6px;
+  flex-shrink: 0;
+  transition: transform 360ms, color 300ms;
+}
+.theme-toggle .theme-sun { color: var(--app-on-accent); }
+[data-app-theme="dark"] .theme-toggle .theme-sun { color: var(--app-muted); transform: rotate(90deg); }
+[data-app-theme="dark"] .theme-toggle .theme-moon { color: var(--app-on-accent); transform: rotate(-12deg); }
+.theme-toggle:focus-visible, #startup-retry:focus-visible {
+  outline: 2px solid var(--app-accent);
+  outline-offset: 4px;
+}
+#startup-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  height: 100svh;
+  min-height: 360px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background: var(--app-bg);
+  color: var(--app-ink);
+  font-family: Arial, sans-serif;
+  transition: background-color 300ms, color 300ms;
+}
+#startup-screen *, #startup-screen *::before { box-sizing: border-box; }
+.startup-circle {
+  position: absolute;
+  width: 640px;
+  height: 640px;
+  border: 1px solid var(--app-border);
+  border-radius: 50%;
+  pointer-events: none;
+  transition: border-color 300ms;
+}
+.startup-circle.outer { width: 820px; height: 820px; opacity: .5; }
+.startup-theme { position: absolute; top: 32px; right: 44px; }
+.startup-center { position: relative; text-align: center; padding: 0 20px; }
+.startup-logo { width: 126px; height: 96px; margin: 0 auto; }
+.startup-logo svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.startup-logo .ink { stroke-dasharray: 1; stroke-dashoffset: 0; }
+.startup-word { font: 64px Georgia, serif; letter-spacing: -2px; margin: 21px 0 12px; }
+.startup-tag { font: 17px Georgia, serif; color: var(--app-muted); margin: 0 0 47px; }
+#startup-status { font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: var(--app-muted); }
+.startup-dots { display: flex; gap: 6px; justify-content: center; margin-top: 19px; height: 5px; }
+.startup-dots i { width: 4px; height: 4px; background: var(--app-accent); border-radius: 50%; animation: startup-dot 1.5s ease-in-out infinite; }
+.startup-dots i:nth-child(2) { animation-delay: .2s; }
+.startup-dots i:nth-child(3) { animation-delay: .4s; }
+@keyframes startup-dot { 50% { opacity: .22; } }
+.startup-footer { position: absolute; bottom: 34px; left: 40px; font: 12px Georgia, serif; color: var(--app-muted); }
+#startup-retry {
+  margin: 20px auto 0;
+  padding: 10px 20px;
+  font: 12px Arial, sans-serif;
+  color: var(--app-ink);
+  background: var(--app-surface);
+  border: 1px solid var(--app-border);
+  border-radius: 7px;
+  cursor: pointer;
+}
+#startup-screen[data-recovery] #startup-status { max-width: 340px; line-height: 1.8; letter-spacing: 1px; }
+#startup-screen noscript p { max-width: 340px; color: var(--app-muted); font-size: 14px; line-height: 1.6; }
+@media (max-width: 850px) {
+  .startup-circle { width: 500px; height: 500px; }
+  .startup-circle.outer { width: 650px; height: 650px; }
+  .startup-word { font-size: 52px; }
+  .startup-tag { font-size: 15px; }
+  .startup-theme { top: 24px; right: 24px; }
+  .startup-footer { left: 0; right: 0; bottom: 28px; text-align: center; }
+}
+@media (max-height: 500px) {
+  .startup-logo { width: 90px; height: 68px; }
+  .startup-word { font-size: 42px; margin-top: 10px; }
+  .startup-tag { margin-bottom: 20px; }
+  .startup-footer { bottom: 14px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .theme-toggle, .theme-toggle::before, .theme-toggle svg,
+  #startup-screen, .startup-circle { transition: none; }
+  .startup-dots i { animation: none; }
+}
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <section id="startup-screen" aria-label="Opening Lumiere">
+      <div class="startup-circle" aria-hidden="true"></div>
+      <div class="startup-circle outer" aria-hidden="true"></div>
+      <div class="startup-theme"><button class="theme-toggle" type="button" aria-label="Dark theme" aria-pressed="false"><svg class="theme-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42"/></svg><svg class="theme-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.44.402.783a6.25 6.25 0 0 0 8.268 8.268c.344-.215.825-.004.803.421"/></svg></button></div>
+      <div class="startup-center">
+        <div class="startup-logo"><svg xmlns="http://www.w3.org/2000/svg" viewBox="130 310 350 265" role="img" aria-label="Lumiere open book and light logo"><g fill="none" stroke="var(--app-accent)" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round"><g><path class="ink page" data-side="0" data-order="0" d="M304 433 C282 394 235 380 190 386 V511 C233 499 275 512 304 556" pathLength="1"/><path class="ink page" data-side="0" data-order="1" d="M190 397 Q184 397 178 399 V526 C221 512 272 521 304 556" pathLength="1"/><path class="ink text" data-side="0" data-order="2" d="M210 432 C235 431 260 439 283 456" pathLength="1"/><path class="ink text" data-side="0" data-order="3" d="M210 460 C235 459 260 467 283 484" pathLength="1"/></g><g transform="translate(608 0) scale(-1 1)"><path class="ink page" data-side="1" data-order="0" d="M304 433 C282 394 235 380 190 386 V511 C233 499 275 512 304 556" pathLength="1"/><path class="ink page" data-side="1" data-order="1" d="M190 397 Q184 397 178 399 V526 C221 512 272 521 304 556" pathLength="1"/><path class="ink text" data-side="1" data-order="2" d="M210 432 C235 431 260 439 283 456" pathLength="1"/><path class="ink text" data-side="1" data-order="3" d="M210 460 C235 459 260 467 283 484" pathLength="1"/></g><path class="ink spine" data-side="2" data-order="0" d="M304 433 V556" pathLength="1"/></g><path class="spark" fill="var(--app-accent)" d="M304 324 C308 345 313 352 335 356 C313 360 308 367 304 389 C300 367 295 360 273 356 C295 352 300 345 304 324Z"/></svg></div>
+        <h1 class="startup-word">Lumiere</h1>
+        <p class="startup-tag">A little light for your next chapter.</p>
+        <div id="startup-status" role="status">Opening your reading space</div>
+        <div class="startup-dots" aria-hidden="true"><i></i><i></i><i></i></div>
+        <button id="startup-retry" type="button" hidden>Reload page</button>
+        <noscript>
+          <style>#startup-status, .startup-theme, .startup-dots { display: none; }</style>
+          <p>Enable JavaScript in your browser, then reload this page to open Lumiere.</p>
+        </noscript>
+      </div>
+      <div class="startup-footer">Good stories are worth a moment.</div>
+    </section>
+    <div id="root" inert></div>
+    <!-- lumiere-transition-runtime -->
+    <script>
+(() => {
+  const screen = document.getElementById('startup-screen');
+  const root = document.getElementById('root');
+  const status = document.getElementById('startup-status');
+  const retry = document.getElementById('startup-retry');
+  const toggle = screen.querySelector('.theme-toggle');
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)');
+  const systemDark = matchMedia('(prefers-color-scheme: dark)');
+  const themeKey = 'lumiere:app-theme';
+  let preference = null;
+  try { preference = localStorage.getItem(themeKey); } catch { /* Storage is optional. */ }
+
+  function applyTheme(theme, save = false) {
+    const next = theme === 'dark' ? 'dark' : 'light';
+    document.documentElement.dataset.appTheme = next;
+    document.querySelector('meta[name="theme-color"]').content = next === 'dark' ? '#17231f' : '#f7f5ef';
+    toggle.setAttribute('aria-pressed', String(next === 'dark'));
+    if (save) {
+      preference = next;
+      try { localStorage.setItem(themeKey, next); } catch { /* Keep the in-memory choice. */ }
+    }
+    window.dispatchEvent(new Event('lumiere:theme-change'));
+  }
+  const preferredTheme = () => preference === 'dark' || preference === 'light'
+    ? preference : systemDark.matches ? 'dark' : 'light';
+  applyTheme(preferredTheme());
+  toggle.addEventListener('click', () => applyTheme(document.documentElement.dataset.appTheme === 'dark' ? 'light' : 'dark', true));
+  window.addEventListener('lumiere:set-theme', event => applyTheme(event.detail, true));
+  systemDark.addEventListener('change', () => {
+    if (preference !== 'dark' && preference !== 'light') applyTheme(preferredTheme());
+  });
+  window.addEventListener('storage', event => {
+    if (event.key === themeKey || event.key === null) {
+      preference = event.newValue;
+      applyTheme(preferredTheme());
+    }
+  });
+
+  let drawings = [];
+  function animateLogo() {
+    drawings.forEach(animation => animation.cancel());
+    drawings = [];
+    if (reduced.matches || !screen.isConnected || !screen.animate) return;
+    // Option 02 from the supplied HTML. Opposite dash direction, mirrored timing.
+    screen.querySelectorAll('.ink').forEach(path => {
+      const order = Number(path.dataset.order);
+      const text = path.classList.contains('text');
+      const start = text ? .25 + (order - 2) * .07 : order * .07;
+      const length = text ? .2 : .28;
+      drawings.push(path.animate([
+        { strokeDashoffset: '-1', offset: 0 },
+        { strokeDashoffset: '-1', offset: start },
+        { strokeDashoffset: '0', offset: start + length },
+        { strokeDashoffset: '0', offset: .86 },
+        { strokeDashoffset: '-1', offset: 1 },
+      ], { duration: 5200, iterations: Infinity, easing: 'linear' }));
+    });
+    drawings.push(screen.querySelector('.spark').animate([
+      { opacity: .3 }, { opacity: 1, offset: .65 }, { opacity: 1, offset: .86 }, { opacity: .3 },
+    ], { duration: 5200, iterations: Infinity }));
+    const time = document.timeline.currentTime;
+    drawings.forEach(animation => { animation.startTime = time; });
+  }
+  animateLogo();
+  const entry = !reduced.matches && screen.animate ? screen.animate([
+    { transform: 'translateY(-100%)' }, { transform: 'translateY(0)' },
+  ], { duration: 560, easing: 'cubic-bezier(.22,1,.36,1)' }) : null;
+  const onMotionChange = () => {
+    animateLogo();
+    if (reduced.matches) {
+      screen.getAnimations({ subtree: true }).forEach(animation => {
+        if (animation.effect.getTiming().iterations !== Infinity) animation.finish();
+      });
+    }
+  };
+  reduced.addEventListener('change', onMotionChange);
+  let leaving = false;
+  const showRecovery = () => {
+    if (leaving) return;
+    screen.dataset.recovery = '';
+    status.textContent = 'Lumiere is taking longer than expected. Try reloading the page.';
+    retry.hidden = false;
+  };
+  const timeout = window.setTimeout(showRecovery, 30000);
+  const onResourceError = event => {
+    if (event.target instanceof HTMLScriptElement && event.target.type === 'module') showRecovery();
+  };
+  window.addEventListener('error', onResourceError, true);
+  retry.addEventListener('click', () => window.location.reload());
+  screen.addEventListener('lumiere:startup-ready', async () => {
+    if (leaving) return;
+    leaving = true;
+    window.clearTimeout(timeout);
+    window.removeEventListener('error', onResourceError, true);
+    if (entry && !reduced.matches) {
+      await new Promise(resolve => {
+        const limit = setTimeout(resolve, 600);
+        const complete = () => { clearTimeout(limit); resolve(); };
+        entry.finished.then(complete, complete);
+      });
+    }
+    const restoreFocus = screen.contains(document.activeElement);
+    let finished = false;
+    const finish = () => {
+      if (finished) return;
+      finished = true;
+      entry?.cancel();
+      drawings.forEach(animation => animation.cancel());
+      reduced.removeEventListener('change', onMotionChange);
+      screen.remove();
+      root.removeAttribute('inert');
+      if (restoreFocus) {
+        const target = root.querySelector('.theme-toggle, main, h1');
+        if (target instanceof HTMLElement) {
+          if (target.tagName !== 'BUTTON') target.tabIndex = -1;
+          target.focus({ preventScroll: true });
+        }
+      }
+    };
+    if (reduced.matches || !screen.animate) { finish(); return; }
+    entry?.cancel();
+    const handoff = window.lumiereTransitions?.play(screen, root);
+    if (handoff) handoff.then(finish, finish);
+    else finish();
+
+  }, { once: true });
+})();
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
