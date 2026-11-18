@@ -22,8 +22,8 @@ jobs:
       - name: Build the app under the Pages base
         run: npm run build -- --mode pages
         env:
-          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL || 'https://preview.example.invalid' }}
+          VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY || 'sb_publishable_ci_preview' }}
       - name: Check emitted entry assets
         run: |
           node --input-type=module <<'NODE'
@@ -38,6 +38,45 @@ jobs:
           for (const url of assets) {
             assert(url.startsWith('/lumiere-app/assets/'), 'Unexpected asset URL: ' + url);
             assert(existsSync('dist/' + url.slice('/lumiere-app/'.length)), 'Missing asset: ' + url);
+          }
+          NODE
+      - run: npx playwright install --with-deps chromium
+      - name: Smoke test the Pages artifact in Chromium
+        run: |
+          mkdir -p "$RUNNER_TEMP/pages-smoke"
+          ln -s "$PWD/dist" "$RUNNER_TEMP/pages-smoke/lumiere-app"
+          python3 -m http.server 4173 --bind 127.0.0.1 --directory "$RUNNER_TEMP/pages-smoke" &
+          server_pid=$!
+          trap 'kill "$server_pid"' EXIT
+          curl --fail --silent --retry 10 --retry-connrefused http://127.0.0.1:4173/lumiere-app/ -o /dev/null
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import { chromium } from 'playwright';
+
+          const origin = 'http://127.0.0.1:4173';
+          const root = origin + '/lumiere-app/';
+          const browser = await chromium.launch();
+          try {
+            const page = await browser.newPage();
+            const errors = [];
+            page.on('pageerror', error => errors.push(error.message));
+            await page.route('**/*', route => {
+              return new URL(route.request().url()).origin === origin
+                ? route.continue()
+                : route.abort();
+            });
+
+            assert.equal((await page.goto(root)).status(), 200);
+            await page.getByPlaceholder('you@example.com').waitFor({ timeout: 10000 });
+
+            assert.equal((await page.goto(root + 'auth/callback/')).status(), 200);
+            assert.equal((await page.reload()).status(), 200);
+            await page.getByRole('button', { name: 'Return to sign in' }).click({ timeout: 10000 });
+            await page.getByPlaceholder('you@example.com').waitFor({ timeout: 10000 });
+            assert.equal(new URL(page.url()).pathname, '/lumiere-app/');
+            assert.deepEqual(errors, []);
+          } finally {
+            await browser.close();
           }
           NODE
       - uses: actions/upload-artifact@v4
