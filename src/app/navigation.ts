@@ -1,20 +1,22 @@
 import { useSyncExternalStore } from 'react';
-import { normalizeBase, parseRoute, routePath, type AppRoute } from '@/domain/navigation';
+import { normalizeBase, parseBrowserRoute, browserRoutePath, type AppRoute } from '@/domain/navigation';
 
 export const appBase = normalizeBase(import.meta.env.BASE_URL);
+const hashRoutes = import.meta.env.MODE === 'pages';
 const changed = 'lumiere:navigation';
 function subscribe(listener: () => void) {
+  window.addEventListener('hashchange', listener);
   window.addEventListener('popstate', listener); window.addEventListener(changed, listener);
-  return () => { window.removeEventListener('popstate', listener); window.removeEventListener(changed, listener); };
+  return () => { window.removeEventListener('hashchange', listener); window.removeEventListener('popstate', listener); window.removeEventListener(changed, listener); };
 }
-const snapshot = () => window.location.pathname;
+const snapshot = () => window.location.pathname + window.location.hash;
 export function useAppRoute() {
-  const pathname = useSyncExternalStore(subscribe, snapshot);
-  return parseRoute(pathname, appBase);
+  useSyncExternalStore(subscribe, snapshot);
+  return parseBrowserRoute(window.location.pathname, window.location.hash, appBase, hashRoutes);
 }
 export function navigate(route: Exclude<AppRoute, {kind: 'not-found'}>, options: {replace?: boolean} = {}) {
-  const path = routePath(route, appBase);
-  if (window.location.pathname !== path || window.location.search || window.location.hash) {
+  const path = browserRoutePath(route, appBase, hashRoutes);
+  if (snapshot() !== path || window.location.search) {
     window.history[options.replace ? 'replaceState' : 'pushState'](null, '', path);
     window.dispatchEvent(new Event(changed));
   }

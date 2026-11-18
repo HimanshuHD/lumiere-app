@@ -36,3 +36,19 @@ export function safeReturnPath(value: unknown, base = '/'): string | null {
   const route = parseRoute(value, base);
   return route.kind === 'view' || route.kind === 'reader' ? routePath(route, base) : null;
 }
+
+export function browserRoutePath(route: Exclude<AppRoute, {kind: 'not-found'}>, base: string, hashRoutes: boolean): string {
+  if (!hashRoutes) return routePath(route, base);
+  if (route.kind === 'callback') return routePath(route, base) + '/';
+  return normalizeBase(base) + '#' + routePath(route);
+}
+
+export function parseBrowserRoute(pathname: string, hash: string, base: string, hashRoutes: boolean): AppRoute {
+  const route = parseRoute(pathname, base);
+  if (!hashRoutes || route.kind === 'callback') return route;
+  const root = normalizeBase(base);
+  if (pathname !== root && pathname !== root.slice(0, -1)) return {kind: 'not-found'};
+  if (!hash || hash === '#') return route;
+  const path = safeReturnPath(hash.slice(1));
+  return path ? parseRoute(path) : {kind: 'not-found'};
+}
