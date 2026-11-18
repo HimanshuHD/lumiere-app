@@ -4,6 +4,11 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish the verified app to the Lumiere Pages URL
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -20,8 +25,31 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Build the app under the Pages base
-        run: npm run build -- --mode pages
+        run: |
+          node --input-type=module <<'NODE'
+          const { VITE_SUPABASE_URL: url, VITE_SUPABASE_ANON_KEY: key, PUBLISH } = process.env;
+          const endpoint = new URL(url);
+          if (endpoint.protocol !== 'https:' || endpoint.username || endpoint.password ||
+              endpoint.pathname !== '/' || endpoint.search || endpoint.hash) {
+            throw new Error('Set VITE_SUPABASE_URL to the HTTPS project origin.');
+          }
+
+          let isPublicKey = /^sb_publishable_[A-Za-z0-9_-]+$/.test(key);
+          if (!isPublicKey && key.split('.').length === 3) {
+            try {
+              isPublicKey = JSON.parse(Buffer.from(key.split('.')[1], 'base64url')).role === 'anon';
+            } catch { /* Invalid JWT. */ }
+          }
+          if (!isPublicKey) throw new Error('Set VITE_SUPABASE_ANON_KEY to a browser-safe key.');
+
+          if (PUBLISH === 'true' &&
+              (endpoint.origin === 'https://preview.example.invalid' || key === 'sb_publishable_ci_preview')) {
+            throw new Error('Set both hosted Supabase Actions variables before publishing.');
+          }
+          NODE
+          npm run build -- --mode pages
         env:
+          PUBLISH: ${{ github.event_name == 'workflow_dispatch' && inputs.publish }}
           VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL || 'https://preview.example.invalid' }}
           VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY || 'sb_publishable_ci_preview' }}
       - name: Check emitted entry assets
@@ -84,3 +112,25 @@ jobs:
           name: lumiere-pages-preview
           path: dist
           if-no-files-found: error
+
+      - uses: actions/upload-pages-artifact@v4
+        if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.publish
+        with:
+          path: dist
+
+  publish:
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.publish
+    needs: build
+    runs-on: ubuntu-latest
+    concurrency:
+      group: github-pages
+      cancel-in-progress: false
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
