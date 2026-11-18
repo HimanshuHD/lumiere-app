@@ -1,0 +1,46 @@
+name: Build Lumiere for Pages
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Build the app under the Pages base
+        run: npm run build -- --base=/lumiere-app/
+        env:
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
+      - name: Check emitted entry assets
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import { existsSync, readFileSync } from 'node:fs';
+
+          const html = readFileSync('dist/index.html', 'utf8');
+          const assets = [...html.matchAll(/(?:src|href)="([^"]*\/assets\/[^"]+)"/g)]
+            .map(([, url]) => url);
+          assert(assets.some(url => url.endsWith('.js')), 'Expected an emitted JavaScript entry');
+          for (const url of assets) {
+            assert(url.startsWith('/lumiere-app/assets/'), 'Unexpected asset URL: ' + url);
+            assert(existsSync('dist/' + url.slice('/lumiere-app/'.length)), 'Missing asset: ' + url);
+          }
+          NODE
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lumiere-pages-preview
+          path: dist
+          if-no-files-found: error
