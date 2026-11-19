@@ -94,3 +94,38 @@ operations; do not use catalog deletion or user-upload endpoints. Catalog member
 only for genuine catalog imports. The local/production seed is opt-in, not an automatic migration.
 See [demo content and recovery](../docs/development/demo-content.md) for deployment and testing.
 
+
+## Hosted pilot admission
+
+The migration installs the admission controls with enforcement disabled. This
+keeps existing sessions working during deployment. Enable it in the hosted
+SQL editor after the three updated Edge Functions are deployed and you have at
+least one approved administrator and a second approved test account. Use the
+existing Supabase Auth user IDs. Approval is independent of Google sign-in,
+and approval alone does not grant application administrator privileges.
+
+```sql
+BEGIN;
+INSERT INTO pilot_admission.approved_accounts (user_id)
+VALUES ('<existing-admin-user-uuid>'), ('<existing-pilot-test-user-uuid>')
+ON CONFLICT DO NOTHING;
+UPDATE pilot_admission.settings SET enabled = true WHERE singleton;
+COMMIT;
+```
+
+The Data API checks approval on each request, including RPC calls. Database and
+private Storage policies also check approval. The Edge Functions check
+admission before running protected operations. Enabling admission blocks
+anonymous OPDS browsing. Public avatar URLs and previously issued signed file
+URLs retain their normal Supabase behavior. Use a fresh authenticated Storage
+request to verify revocation.
+
+Test with separate approved, unapproved, and signed-out sessions. Start with a
+private synthetic reader URL, sign in as the owner, and verify the callback
+returns to that same document. Verify the unapproved session cannot read
+protected rows, call document RPCs, mint a signed file URL, finalize an upload,
+or use catalog operations. To revoke approval, delete the relevant row in
+`pilot_admission.approved_accounts` and repeat with the existing session.
+Recover a mistakenly omitted administrator by inserting their Auth user ID
+through the trusted SQL editor. An administrator can temporarily set `enabled`
+to false during rollback, which restores the pre-pilot access behavior.

@@ -1,3 +1,4 @@
+import { pilotAdmissionMessage, pilotAdmissionStatus } from "../_shared/pilot-admission.ts";
 import { XMLParser, XMLValidator } from "npm:fast-xml-parser@4.5.7";
 import { createClient } from "npm:@supabase/supabase-js@2.57.4";
 import { reconcileCatalogImportFailure } from "../_shared/catalog_import_recovery.ts";
@@ -92,20 +93,23 @@ async function authorizeCatalogBrowse(
   }
 
   const authorization = req.headers.get("Authorization");
-  let isAuthenticated = false;
-  if (authorization) {
-    const accessToken = authorization.match(/^Bearer\s+(.+)$/i)?.[1];
-    if (!accessToken) return jsonError("A valid sign-in session is required.", 401, corsHeaders);
-
-    const userClient = createClient(supabaseUrl, anonKey, {
-      auth: { autoRefreshToken: false, persistSession: false },
-    });
-    const { data, error } = await userClient.auth.getUser(accessToken);
-    if (error || !data.user) return jsonError("Your sign-in session is invalid or expired.", 401, corsHeaders);
-    isAuthenticated = true;
+  const accessToken = authorization?.match(/^Bearer\s+(.+)$/i)?.[1];
+  if (authorization && !accessToken) {
+    return jsonError("A valid sign-in session is required.", 401, corsHeaders);
   }
 
-  if (isAuthenticated) return null;
+  const userClient = createClient(supabaseUrl, anonKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+    global: accessToken ? { headers: { Authorization: `Bearer ${accessToken}` } } : undefined,
+  });
+  if (accessToken) {
+    const { data, error } = await userClient.auth.getUser(accessToken);
+    if (error || !data.user) return jsonError("Your sign-in session is invalid or expired.", 401, corsHeaders);
+  }
+
+  const admission = await pilotAdmissionStatus(userClient);
+  if (admission) return jsonError(pilotAdmissionMessage(admission), admission, corsHeaders);
+  if (accessToken) return null;
 
   const turnstileSecret = Deno.env.get("TURNSTILE_SECRET_KEY");
   const expectedHostname = Deno.env.get("TURNSTILE_EXPECTED_HOSTNAME");
@@ -208,9 +212,12 @@ async function importCatalogBook(req: Request): Promise<Response> {
 
   const userClient = createClient(supabaseUrl, anonKey, {
     auth: { autoRefreshToken: false, persistSession: false },
+    global: { headers: { Authorization: `Bearer ${accessToken}` } },
   });
   const { data: authData, error: authError } = await userClient.auth.getUser(accessToken);
   if (authError || !authData.user) return fail("Your sign-in session is invalid or expired.", 401);
+  const admission = await pilotAdmissionStatus(userClient);
+  if (admission) return fail(pilotAdmissionMessage(admission), admission);
 
   let catalogUrl: URL;
   let requestedDownloadUrl: URL;
