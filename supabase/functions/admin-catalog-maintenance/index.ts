@@ -1,3 +1,4 @@
+import { pilotAdmissionMessage, pilotAdmissionStatus } from "../_shared/pilot-admission.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.57.4";
 import { shouldDeferCatalogImportCleanup } from "../_shared/catalog_import_recovery.ts";
 
@@ -158,6 +159,8 @@ Deno.serve(async (request) => {
   if (authError || !authData.user) {
     return respond({ error: "Your sign-in session is invalid or expired." }, 401);
   }
+  const admission = await pilotAdmissionStatus(userClient);
+  if (admission) return respond({ error: pilotAdmissionMessage(admission) }, admission);
   if (authData.user.app_metadata?.role !== "admin") {
     return respond({ error: "Catalog administrator access is required." }, 403);
   }

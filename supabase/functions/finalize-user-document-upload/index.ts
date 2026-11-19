@@ -1,3 +1,4 @@
+import { pilotAdmissionMessage, pilotAdmissionStatus } from "../_shared/pilot-admission.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.57.4";
 import { textToChapters } from "../_shared/document_text.ts";
 import { validateUserUpload } from "../_shared/user_upload_validation.ts";
@@ -102,6 +103,8 @@ Deno.serve(async (request) => {
   if (authError || !authData.user) {
     return respond({ error: "Your sign-in session is invalid or expired." }, 401);
   }
+  const admission = await pilotAdmissionStatus(userClient);
+  if (admission) return respond({ error: pilotAdmissionMessage(admission) }, admission);
 
   const contentLength = Number(request.headers.get("Content-Length"));
   if (Number.isFinite(contentLength) && contentLength > 256 * 1024) {

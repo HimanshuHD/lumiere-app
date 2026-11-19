@@ -1,6 +1,6 @@
 -- Development-only platform shims for migration introspection. Not a deployment migration.
 
-    CREATE ROLE authenticated; CREATE ROLE anon; CREATE ROLE service_role BYPASSRLS;
+    CREATE ROLE authenticator; CREATE ROLE authenticated; CREATE ROLE anon; CREATE ROLE service_role BYPASSRLS;
     CREATE SCHEMA auth; CREATE SCHEMA storage;
     CREATE TABLE auth.users(id uuid PRIMARY KEY, raw_app_meta_data jsonb DEFAULT '{}');
     CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS
