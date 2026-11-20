@@ -27,7 +27,16 @@ export const authIntegration = {
     );
     try { rememberOAuthReturn(window.sessionStorage, destination, base); }
     catch { throw new Error('Sign-in return storage is unavailable. Allow session storage or use email sign-in.'); }
-    const {error} = await supabase.auth.signInWithOAuth({provider:'google',options:{redirectTo:new URL(browserRoutePath({kind:'callback'},base,hashRoutes),window.location.origin).href}});
+    const {error} = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: new URL(
+          browserRoutePath({kind:'callback'}, base, hashRoutes),
+          window.location.origin,
+        ).href,
+        queryParams: { prompt: 'select_account' },
+      },
+    });
     if (error) { clearOAuthReturn(window.sessionStorage, base); throw error; }
   }); },
   signOut() { return attempt(async () => { const {error} = await supabase.auth.signOut(); if (error) throw error; }); },
