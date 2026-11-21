@@ -98,6 +98,7 @@ Deno.serve(async (request) => {
 
   const userClient = createClient(supabaseUrl, anonKey, {
     auth: { autoRefreshToken: false, persistSession: false },
+    global: { headers: { Authorization: `Bearer ${accessToken}` } },
   });
   const { data: authData, error: authError } = await userClient.auth.getUser(accessToken);
   if (authError || !authData.user) {
