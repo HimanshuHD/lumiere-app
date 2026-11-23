@@ -1,16 +1,55 @@
 name: Validate application
 on:
+  workflow_call:
+    inputs:
+      candidate:
+        required: true
+        type: string
   pull_request:
-  push:
-    branches: [main]
+    branches: [staging, main]
+    types: [opened, reopened, synchronize, ready_for_review, edited, converted_to_draft]
 permissions:
   contents: read
 jobs:
+  source:
+    name: Check PR source
+    if: inputs.candidate != '' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require a release or hotfix branch for main
+        if: inputs.candidate == '' && github.base_ref == 'main' && !(github.event.pull_request.head.repo.full_name == github.repository && (startsWith(github.head_ref, 'release/') || startsWith(github.head_ref, 'hotfix/')))
+        run: |
+          echo "::error::Target staging for feature work. Use a repository release/* or hotfix/* branch for main."
+          exit 1
+      - name: Check release contents against deployed staging
+        if: inputs.candidate == '' && github.base_ref == 'main' && startsWith(github.head_ref, 'release/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          records="repos/$GITHUB_REPOSITORY"
+          # The first workflow-only release installs the dispatcher on main.
+          if ! gh api "$records/contents/.github/workflows/promote-pages.yml?ref=main" >/dev/null 2>lookup-error; then
+            grep -Fq 'HTTP 404' lookup-error && exit 0
+            cat lookup-error >&2
+            exit 1
+          fi
+          staged=$(gh api -H 'Accept: application/vnd.github.raw+json' "$records/contents/manifest.json?ref=pages-state" --jq '.staging.sha')
+          [[ "$staged" =~ ^[0-9a-f]{40}$ ]]
+          accepted_tree=$(gh api "$records/git/commits/$staged" --jq .tree.sha)
+          release_tree=$(gh api "$records/git/commits/$RELEASE_SHA" --jq .tree.sha)
+          test "$accepted_tree" = "$release_tree"
+      - name: Accept source
+        run: echo "PR source accepted."
   validate:
+    needs: source
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.candidate || github.sha }}
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -34,10 +73,14 @@ jobs:
           if-no-files-found: ignore
           retention-days: 3
   database:
+    needs: source
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.candidate || github.sha }}
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: 24

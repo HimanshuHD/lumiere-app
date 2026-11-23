@@ -2,32 +2,31 @@ name: Build Lumiere for Pages
 
 on:
   pull_request:
-    branches: [main]
-  workflow_dispatch:
+    branches: [staging, main]
+    types: [opened, reopened, synchronize, ready_for_review, edited, converted_to_draft]
+  workflow_call:
     inputs:
-      publish:
-        description: Publish the verified app to the Lumiere Pages URL
-        type: boolean
-        default: false
-      preview_sha:
-        description: Optional reviewed preview commit SHA from this repository
+      candidate:
         type: string
-      live_ref:
-        description: Published release tag to preserve when adding a preview
+        required: true
+      base:
         type: string
-        default: v0.1.0-pilot.1
+        required: true
 
 permissions:
   contents: read
 
 jobs:
   build:
+    if: inputs.candidate != '' || (github.event.pull_request.draft == false && (github.base_ref == 'staging' || (github.event.pull_request.head.repo.full_name == github.repository && (startsWith(github.head_ref, 'release/') || startsWith(github.head_ref, 'hotfix/')))))
     runs-on: ubuntu-latest
+    env:
+      PAGES_BASE: ${{ inputs.base || '/lumiere-app/' }}
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.publish && inputs.preview_sha != '' && inputs.live_ref || github.ref }}
+          ref: ${{ inputs.candidate || github.sha }}
           persist-credentials: false
       - uses: actions/setup-node@v4
         with:
@@ -57,9 +56,9 @@ jobs:
             throw new Error('Set both hosted Supabase Actions variables before publishing.');
           }
           NODE
-          npm run build -- --mode pages
+          npm run build -- --mode pages --base "$PAGES_BASE"
         env:
-          PUBLISH: ${{ github.event_name == 'workflow_dispatch' && inputs.publish }}
+          PUBLISH: ${{ inputs.candidate != '' }}
           VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL || 'https://preview.example.invalid' }}
           VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY || 'sb_publishable_ci_preview' }}
       - name: Check emitted entry assets
@@ -74,47 +73,26 @@ jobs:
             .map(([, url]) => url);
           assert(assets.some(url => url.endsWith('.js')), 'Expected an emitted JavaScript entry');
           for (const url of assets) {
-            assert(url.startsWith('/lumiere-app/assets/'), 'Unexpected asset URL: ' + url);
-            assert(existsSync('dist/' + url.slice('/lumiere-app/'.length)), 'Missing asset: ' + url);
+            assert(url.startsWith(process.env.PAGES_BASE + 'assets/'), 'Unexpected asset URL: ' + url);
+            assert(existsSync('dist/' + url.slice(process.env.PAGES_BASE.length)), 'Missing asset: ' + url);
           }
           NODE
-      - name: Add reviewed preview to the Pages artifact
-        if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.publish && inputs.preview_sha != ''
-        env:
-          PREVIEW_SHA: ${{ inputs.preview_sha }}
-          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
-        run: |
-          [[ "$PREVIEW_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo 'Provide a full preview commit SHA.'; exit 1; }
-          git fetch --no-tags origin "$PREVIEW_SHA"
-          git worktree add --detach "$RUNNER_TEMP/preview-source" "$PREVIEW_SHA"
-          (
-            cd "$RUNNER_TEMP/preview-source"
-            npm ci
-            LUMIERE_PAGES_PREVIEW=true npm run build -- --mode pages
-            cmp dist/index.html dist/auth/callback/index.html
-            grep -q '/lumiere-app/preview/assets/' dist/index.html
-          )
-          test ! -e dist/preview
-          mv "$RUNNER_TEMP/preview-source/dist" dist/preview
-
       - run: npx playwright install --with-deps chromium
       - name: Smoke test the Pages artifact in Chromium
         run: |
-          mkdir -p "$RUNNER_TEMP/pages-smoke"
-          ln -s "$PWD/dist" "$RUNNER_TEMP/pages-smoke/lumiere-app"
+          webroot="$RUNNER_TEMP/pages-smoke"
+          mkdir -p "$(dirname "$webroot${PAGES_BASE%/}")"
+          ln -s "$PWD/dist" "$webroot${PAGES_BASE%/}"
           python3 -m http.server 4173 --bind 127.0.0.1 --directory "$RUNNER_TEMP/pages-smoke" &
           server_pid=$!
           trap 'kill "$server_pid"' EXIT
-          curl --fail --silent --retry 10 --retry-connrefused http://127.0.0.1:4173/lumiere-app/ -o /dev/null
+          curl --fail --silent --retry 10 --retry-connrefused http://127.0.0.1:4173"$PAGES_BASE" -o /dev/null
           node --input-type=module <<'NODE'
           import assert from 'node:assert/strict';
           import { chromium } from 'playwright';
 
           const origin = 'http://127.0.0.1:4173';
-          const { existsSync } = await import('node:fs');
-          const bases = ['/lumiere-app/'];
-          if (existsSync('dist/preview/index.html')) bases.push('/lumiere-app/preview/');
+          const bases = [process.env.PAGES_BASE];
           const browser = await chromium.launch();
           try {
             for (const base of bases) {
@@ -148,25 +126,3 @@ jobs:
           name: lumiere-pages-preview
           path: dist
           if-no-files-found: error
-
-      - uses: actions/upload-pages-artifact@v4
-        if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.publish
-        with:
-          path: dist
-
-  publish:
-    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.publish
-    needs: build
-    runs-on: ubuntu-latest
-    concurrency:
-      group: github-pages
-      cancel-in-progress: false
-    permissions:
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - id: deployment
-        uses: actions/deploy-pages@v4
