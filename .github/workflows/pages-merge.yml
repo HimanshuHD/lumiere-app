@@ -1,0 +1,12 @@
+name: Queue merged Pages change
+on:
+  pull_request:
+    branches: [staging, main]
+    types: [closed]
+permissions: {}
+jobs:
+  merged:
+    if: github.event.pull_request.merged && github.event.pull_request.head.repo.full_name == github.repository && (github.base_ref == 'staging' || startsWith(github.head_ref, 'release/') || startsWith(github.head_ref, 'hotfix/'))
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Merged revision is eligible for promotion."
