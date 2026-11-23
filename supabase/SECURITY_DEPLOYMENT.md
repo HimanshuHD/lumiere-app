@@ -129,3 +129,12 @@ or use catalog operations. To revoke approval, delete the relevant row in
 Recover a mistakenly omitted administrator by inserting their Auth user ID
 through the trusted SQL editor. An administrator can temporarily set `enabled`
 to false during rollback, which restores the pre-pilot access behavior.
+
+## Preview and staging before a planned release
+
+All three Pages paths use the same Supabase project. A migration, RLS or Storage policy edit, or redeployed Edge Function affects the live pilot immediately. A write through a preview UI also changes shared data. Use synthetic books and test accounts for hosted smoke checks.
+
+1. Commit pending migrations and Edge Functions to the feature branch. Ready-PR CI resets a disposable local database, runs pgTAP and exercises the local functions. Preview and staging publication deploy frontend assets only.
+2. While the shared backend still runs the released contract, keep dependent UI disabled or use the existing API. For example, continue saving reading progress with the existing RPC until its replacement is deployed. Verify the new RPC and UI together on the disposable stack. To exercise them together at a persistent hosted URL before release, point that build at an isolated test backend with synthetic data. A Pages path or client-side flag cannot isolate a database policy change.
+3. At release, apply backward-compatible schema additions first, then compatible Edge Functions, then enable the frontend change after a hosted smoke check. Keep old callable signatures, columns and permissions required by the released client during rollout and frontend rollback. Recheck both approved and denied requests after policy changes. Schedule destructive cleanup in a later release after older clients have aged out.
+4. If a release migration fails or functions only partially deploy, hold the new UI, inspect the migration ledger and deployed function versions, and repair forward from the recorded commit. Redeploying old Pages assets restores only the frontend. Full database and Storage recovery rehearsal is tracked in #81.
