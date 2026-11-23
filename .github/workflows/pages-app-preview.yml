@@ -9,6 +9,13 @@ on:
         description: Publish the verified app to the Lumiere Pages URL
         type: boolean
         default: false
+      preview_sha:
+        description: Optional reviewed preview commit SHA from this repository
+        type: string
+      live_ref:
+        description: Published release tag to preserve when adding a preview
+        type: string
+        default: v0.1.0-pilot.1
 
 permissions:
   contents: read
@@ -19,6 +26,9 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.publish && inputs.preview_sha != '' && inputs.live_ref || github.ref }}
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -68,6 +78,26 @@ jobs:
             assert(existsSync('dist/' + url.slice('/lumiere-app/'.length)), 'Missing asset: ' + url);
           }
           NODE
+      - name: Add reviewed preview to the Pages artifact
+        if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.publish && inputs.preview_sha != ''
+        env:
+          PREVIEW_SHA: ${{ inputs.preview_sha }}
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
+        run: |
+          [[ "$PREVIEW_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo 'Provide a full preview commit SHA.'; exit 1; }
+          git fetch --no-tags origin "$PREVIEW_SHA"
+          git worktree add --detach "$RUNNER_TEMP/preview-source" "$PREVIEW_SHA"
+          (
+            cd "$RUNNER_TEMP/preview-source"
+            npm ci
+            LUMIERE_PAGES_PREVIEW=true npm run build -- --mode pages
+            cmp dist/index.html dist/auth/callback/index.html
+            grep -q '/lumiere-app/preview/assets/' dist/index.html
+          )
+          test ! -e dist/preview
+          mv "$RUNNER_TEMP/preview-source/dist" dist/preview
+
       - run: npx playwright install --with-deps chromium
       - name: Smoke test the Pages artifact in Chromium
         run: |
@@ -82,27 +112,33 @@ jobs:
           import { chromium } from 'playwright';
 
           const origin = 'http://127.0.0.1:4173';
-          const root = origin + '/lumiere-app/';
+          const { existsSync } = await import('node:fs');
+          const bases = ['/lumiere-app/'];
+          if (existsSync('dist/preview/index.html')) bases.push('/lumiere-app/preview/');
           const browser = await chromium.launch();
           try {
-            const page = await browser.newPage();
-            const errors = [];
-            page.on('pageerror', error => errors.push(error.message));
-            await page.route('**/*', route => {
-              return new URL(route.request().url()).origin === origin
-                ? route.continue()
-                : route.abort();
-            });
+            for (const base of bases) {
+              const root = origin + base;
+              const page = await browser.newPage();
+              const errors = [];
+              page.on('pageerror', error => errors.push(error.message));
+              await page.route('**/*', route => {
+                return new URL(route.request().url()).origin === origin
+                  ? route.continue()
+                  : route.abort();
+              });
 
-            assert.equal((await page.goto(root)).status(), 200);
-            await page.getByPlaceholder('you@example.com').waitFor({ timeout: 10000 });
+              assert.equal((await page.goto(root)).status(), 200);
+              await page.getByPlaceholder('you@example.com').waitFor({ timeout: 10000 });
 
-            assert.equal((await page.goto(root + 'auth/callback/')).status(), 200);
-            assert.equal((await page.reload()).status(), 200);
-            await page.getByRole('button', { name: 'Return to sign in' }).click({ timeout: 10000 });
-            await page.getByPlaceholder('you@example.com').waitFor({ timeout: 10000 });
-            assert.equal(new URL(page.url()).pathname, '/lumiere-app/');
-            assert.deepEqual(errors, []);
+              assert.equal((await page.goto(root + 'auth/callback/')).status(), 200);
+              assert.equal((await page.reload()).status(), 200);
+              await page.getByRole('button', { name: 'Return to sign in' }).click({ timeout: 10000 });
+              await page.getByPlaceholder('you@example.com').waitFor({ timeout: 10000 });
+              assert.equal(new URL(page.url()).pathname, base);
+              assert.deepEqual(errors, []);
+              await page.close();
+            }
           } finally {
             await browser.close();
           }
