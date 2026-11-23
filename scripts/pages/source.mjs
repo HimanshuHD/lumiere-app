@@ -1,4 +1,4 @@
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { appendFileSync, readFileSync } from 'node:fs';
 const env = process.env;
 const repo = env.GITHUB_REPOSITORY;
@@ -47,9 +47,16 @@ if (event.workflow_run) {
     });
     if (!state.ok && state.status !== 404) throw Error('Cannot read last deployed revision');
     const previous = state.ok ? (await state.json()).production.backendBaseline : 'be349afeb10b96aca982344bbcbf55a32eba4a95';
-    const comparison = await api(`compare/${previous}...${sha}`);
-    backend = !comparison.files || comparison.files.length >= 300 ||
-      comparison.files.some(f => [f.filename, f.previous_filename].some(path => path?.startsWith('supabase/')));
+    requireValue(/^[0-9a-f]{40}$/.test(previous), 'Invalid deployed backend baseline');
+    // The resolver checks out full history, so even large releases can be compared in full.
+    const diff = spawnSync('git', [
+      'diff', '--quiet', '--no-ext-diff', previous, sha, '--',
+      'supabase/config.toml', 'supabase/migrations/*.sql', 'supabase/functions/',
+      ':(exclude,icase)supabase/functions/*.md', ':(exclude,icase)supabase/functions/*.mdx'
+    ], { stdio: 'inherit' });
+    if (diff.error) throw diff.error;
+    requireValue(diff.status === 0 || diff.status === 1, 'Cannot compare hosted Supabase inputs');
+    backend = diff.status === 1;
   }
 } else {
   requireValue(env.GITHUB_REF === 'refs/heads/main', 'Run the publisher from main');
