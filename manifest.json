@@ -1,0 +1,18 @@
+{
+  "preview": {
+    "digest": "17eb10f4e08d59ef40b4f2b24793c9eb22182f14c45207e7702221566fed6fd5",
+    "run": "45232260842",
+    "sha": "71e483f8ed3dd5ea2acbe37fba647e337e1aed04"
+  },
+  "production": {
+    "backendBaseline": "be349afeb10b96aca982344bbcbf55a32eba4a95",
+    "digest": "dfab12cea72c81740f028e4fbd4746efcbf6046a7f1ffcfff549f5df440063f5",
+    "run": "45232260842",
+    "sha": "be349afeb10b96aca982344bbcbf55a32eba4a95"
+  },
+  "staging": {
+    "digest": "36d2f885889e2456c73118b824eb6ef1746bd92e246112592ba22f8a80ee2ac5",
+    "run": "45251045222",
+    "sha": "0a802b779452cb169aa044e336e05534c579715d"
+  }
+}
