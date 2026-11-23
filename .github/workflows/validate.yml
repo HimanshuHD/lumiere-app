@@ -1,12 +1,25 @@
 name: Validate application
 on:
   pull_request:
-  push:
-    branches: [main]
+    branches: [staging, main]
+    types: [opened, reopened, synchronize, ready_for_review, edited, converted_to_draft]
 permissions:
   contents: read
 jobs:
+  source:
+    name: Check PR source
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require a release or hotfix branch for main
+        if: github.base_ref == 'main' && !(github.event.pull_request.head.repo.full_name == github.repository && (startsWith(github.head_ref, 'release/') || startsWith(github.head_ref, 'hotfix/')))
+        run: |
+          echo "::error::Target staging for feature work. Use a repository release/* or hotfix/* branch for main."
+          exit 1
+      - name: Accept source
+        run: echo "PR source accepted."
   validate:
+    needs: source
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -34,6 +47,7 @@ jobs:
           if-no-files-found: ignore
           retention-days: 3
   database:
+    needs: source
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
