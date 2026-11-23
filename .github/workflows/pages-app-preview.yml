@@ -2,7 +2,8 @@ name: Build Lumiere for Pages
 
 on:
   pull_request:
-    branches: [main]
+    branches: [staging, main]
+    types: [opened, reopened, synchronize, ready_for_review, edited, converted_to_draft]
   workflow_dispatch:
     inputs:
       publish:
@@ -22,6 +23,7 @@ permissions:
 
 jobs:
   build:
+    if: github.event_name == 'workflow_dispatch' || (github.event.pull_request.draft == false && (github.base_ref == 'staging' || (github.event.pull_request.head.repo.full_name == github.repository && (startsWith(github.head_ref, 'release/') || startsWith(github.head_ref, 'hotfix/')))))
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
