@@ -61,6 +61,7 @@ try {
 
   await page.goto(origin, { waitUntil: 'domcontentloaded' });
   await freezePair('#startup-screen');
+  assert(await page.evaluate(() => performance.now() >= 2500), 'Startup handoff began before the minimum hold');
   const loaderBackground = await page.locator('#startup-screen').evaluate(element => getComputedStyle(element).backgroundColor);
   if (process.env.TRANSITION_SCREENSHOTS) {
     mkdirSync(process.env.TRANSITION_SCREENSHOTS, { recursive: true });
