@@ -36,6 +36,11 @@ jobs:
       sha: ${{ steps.source.outputs.sha }}
       backend: ${{ steps.source.outputs.backend }}
       snapshot: ${{ steps.source.outputs.snapshot }}
+      head: ${{ steps.source.outputs.head }}
+      base: ${{ steps.source.outputs.base }}
+      pr: ${{ steps.source.outputs.prNumber }}
+      artifact_run: ${{ steps.source.outputs.artifactRun }}
+      artifact_id: ${{ steps.source.outputs.artifact }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -44,11 +49,13 @@ jobs:
       - id: source
         env:
           GH_TOKEN: ${{ github.token }}
+          SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          SUPABASE_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
         run: node scripts/pages/source.mjs
 
   validate:
     needs: resolve
-    if: needs.resolve.outputs.sha != '' && inputs.operation != 'Verify preview' && needs.resolve.outputs.snapshot == ''
+    if: needs.resolve.outputs.sha != '' && inputs.operation != 'Verify preview' && needs.resolve.outputs.snapshot == '' && needs.resolve.outputs.artifact_id == ''
     uses: ./.github/workflows/validate.yml
     with:
       candidate: ${{ needs.resolve.outputs.sha }}
@@ -75,6 +82,7 @@ jobs:
     permissions:
       contents: read
       statuses: write
+      pull-requests: read
     steps:
       - name: Record developer sign-off for the deployed revision
         env:
@@ -84,21 +92,39 @@ jobs:
           live=$(curl -fsSL "https://himanshuhd.github.io/lumiere-app/lumiere-deployment.json?run=$GITHUB_RUN_ID" | jq -er '.snapshot')
           active=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/pages-state" --jq .object.sha)
           test "$active" = "$live"
-          actual=$(gh api -H 'Accept: application/vnd.github.raw+json' "repos/$GITHUB_REPOSITORY/contents/manifest.json?ref=pages-state" --jq '.preview.sha')
-          test "$actual" = "$SOURCE_SHA"
-          gh api "repos/$GITHUB_REPOSITORY/statuses/$SOURCE_SHA" -f state=success -f context='Preview verified' -f description="Verified by $GITHUB_ACTOR" -f target_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          preview=$(gh api -H 'Accept: application/vnd.github.raw+json' "repos/$GITHUB_REPOSITORY/contents/manifest.json?ref=pages-state" --jq '.preview')
+          actual=$(jq -er 'select(.status != "expired") | .sha' <<< "$preview") || { echo "::error::No active preview to verify."; exit 1; }
+          head=$(jq -er '.head // .sha' <<< "$preview")
+          if [[ "$SOURCE_SHA" != "$actual" && "$SOURCE_SHA" != "$head" ]]; then
+            echo "::error::The supplied SHA does not match the current preview."; exit 1
+          fi
+          pr=$(jq -r '.pr // empty' <<< "$preview")
+          base=$(jq -r '.base // empty' <<< "$preview")
+          if [[ -n "$pr" ]]; then
+            gh api "repos/$GITHUB_REPOSITORY/pulls/$pr" | jq -e --arg head "$head" '.state == "open" and (.draft | not) and .head.sha == $head' >/dev/null
+          fi
+          if [[ -n "$base" ]]; then
+            test "$(gh api "repos/$GITHUB_REPOSITORY/branches/staging" --jq .commit.sha)" = "$base" || { echo "::error::Staging changed. Deploy and review the current PR preview."; exit 1; }
+          fi
+          preview_run=$(jq -er '.run' <<< "$preview")
+          gh api --silent "repos/$GITHUB_REPOSITORY/statuses/$head" -f state=success -f context='Preview verified' -f description="Verified preview run $preview_run" -f target_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          printf '### Preview verified\n\n- [Open the verified preview](https://himanshuhd.github.io/lumiere-app/preview/)\n- Verified by: @%s\n- Built revision: `%s`\n- Commit marked **Preview verified**: `%s`\n' "$GITHUB_ACTOR" "$actual" "$head" >> "$GITHUB_STEP_SUMMARY"
+      - name: Summarize verification failure
+        if: failure()
+        run: |
+          printf '### Preview verification failed\n\nNo sign-off was recorded. Check the preceding step for the live snapshot or revision mismatch.\n' >> "$GITHUB_STEP_SUMMARY"
 
   publish:
     needs: [resolve, build, backend]
     if: >-
       always() && !cancelled() && needs.resolve.result == 'success' &&
       needs.resolve.outputs.sha != '' && inputs.operation != 'Verify preview' &&
-      (needs.build.result == 'success' || needs.resolve.outputs.snapshot != '') &&
+      (needs.build.result == 'success' || needs.resolve.outputs.snapshot != '' || needs.resolve.outputs.artifact_id != '') &&
       (needs.backend.result == 'success' || needs.resolve.outputs.backend == 'false')
     runs-on: ubuntu-latest
     environment:
       name: github-pages
-      url: ${{ steps.pages.outputs.page_url }}
+      url: ${{ steps.pages.outcome == 'success' && format('https://himanshuhd.github.io/lumiere-app/{0}', needs.resolve.outputs.target != 'production' && format('{0}/', needs.resolve.outputs.target) || '') || '' }}
     permissions:
       contents: write
       actions: read
@@ -109,6 +135,10 @@ jobs:
       TARGET: ${{ needs.resolve.outputs.target }}
       SOURCE_SHA: ${{ needs.resolve.outputs.sha }}
       SNAPSHOT: ${{ needs.resolve.outputs.snapshot }}
+      PR_HEAD: ${{ needs.resolve.outputs.head }}
+      PR_NUMBER: ${{ needs.resolve.outputs.pr }}
+      TESTED_BASE: ${{ needs.resolve.outputs.base }}
+      ARTIFACT_RUN: ${{ needs.resolve.outputs.artifact_run }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -117,10 +147,14 @@ jobs:
         if: env.TARGET == 'preview' && env.SNAPSHOT == ''
         env:
           GH_TOKEN: ${{ github.token }}
+          RECHECK_PREVIEW: 'true'
         run: |
           check=$(mktemp)
           GITHUB_OUTPUT="$check" node scripts/pages/source.mjs
-          grep -Fxq "sha=$SOURCE_SHA" "$check"
+          grep -Fxq "sha=$SOURCE_SHA" "$check" &&
+          grep -Fxq "head=$PR_HEAD" "$check" &&
+          grep -Fxq "base=$TESTED_BASE" "$check" &&
+          grep -Fxq "prNumber=$PR_NUMBER" "$check"
       - name: Open last successful state
         id: state
         run: |
@@ -160,10 +194,19 @@ jobs:
             curl -fsSL "https://himanshuhd.github.io/lumiere-app/${prefix}" | cmp - "seed/${prefix}index.html"
           done
       - uses: actions/download-artifact@v4
-        if: env.SNAPSHOT == ''
+        if: env.SNAPSHOT == '' && env.ARTIFACT_RUN == ''
         with:
           name: lumiere-pages-preview
           path: candidate
+      - name: Download the validated preview build
+        if: env.ARTIFACT_RUN != ''
+        uses: actions/download-artifact@v4
+        with:
+          artifact-ids: ${{ needs.resolve.outputs.artifact_id }}
+          run-id: ${{ needs.resolve.outputs.artifact_run }}
+          github-token: ${{ github.token }}
+          path: candidate
+          merge-multiple: true
       - name: Restore one path from deployment history
         if: env.SNAPSHOT != ''
         run: |
@@ -172,6 +215,12 @@ jobs:
           mv "$TARGET" candidate
           restored=$(git show "$SNAPSHOT:manifest.json" | jq -er --arg t "$TARGET" '.[$t].sha')
           echo "SOURCE_SHA=$restored" >> "$GITHUB_ENV"
+          git show "$SNAPSHOT:manifest.json" > "$RUNNER_TEMP/restore-manifest.json"
+      - name: Check whether staging includes the verified preview
+        if: env.TARGET == 'staging' && env.SNAPSHOT == ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/pages/expire-preview.mjs
       - name: Assemble and verify retained builds
         env:
           PAGES_SEED: seed
@@ -198,4 +247,40 @@ jobs:
       - name: Record successful deployment
         run: |
           git -C state push origin HEAD:refs/heads/pages-state
-          cat state/manifest.json >> "$GITHUB_STEP_SUMMARY"
+          python3 scripts/pages/state.py --summary state "$TARGET"
+      - name: Summarize publication failure
+        if: failure()
+        run: |
+          printf '### Pages publication did not complete\n\n- Target: **%s**\n- Revision: `%s`\n- Review the failed step. If Pages deployed before the state update failed, the next promotion can reconcile the live snapshot.\n' "$TARGET" "$SOURCE_SHA" >> "$GITHUB_STEP_SUMMARY"
+  summary:
+    name: Summarize promotion
+    needs: [resolve, validate, build, backend, verify, publish]
+    if: always()
+    runs-on: ubuntu-latest
+    env:
+      OPERATION: ${{ inputs.operation || 'Merge promotion' }}
+      TARGET: ${{ needs.resolve.outputs.target }}
+      ARTIFACT_RUN: ${{ needs.resolve.outputs.artifact_run }}
+      RESOLVE: ${{ needs.resolve.result }}
+      VALIDATE: ${{ needs.validate.result }}
+      BUILD: ${{ needs.build.result }}
+      BACKEND: ${{ needs.backend.result }}
+      VERIFY: ${{ needs.verify.result }}
+      PUBLISH: ${{ needs.publish.result }}
+    steps:
+      - name: Report workflow results
+        run: |
+          if [[ -n "$ARTIFACT_RUN" ]]; then
+            VALIDATE="Reused from [run $ARTIFACT_RUN]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$ARTIFACT_RUN)"
+            BUILD="$VALIDATE"
+          fi
+          {
+            printf '### %s\n\n' "$OPERATION"
+            printf '| Job | Result |\n| --- | --- |\n'
+            printf '| Select revision | %s |\n| Validate application and database | %s |\n| Build and smoke-test Pages | %s |\n| Deploy hosted Supabase | %s |\n| Record preview sign-off | %s |\n| Publish Pages | %s |\n' "$RESOLVE" "$VALIDATE" "$BUILD" "$BACKEND" "$VERIFY" "$PUBLISH"
+            if [[ "$PUBLISH" == success || "$VERIFY" == success ]]; then
+              root=https://himanshuhd.github.io/lumiere-app/
+              [[ "$TARGET" == production ]] || root="$root$TARGET/"
+              printf '\n[Open %s](%s)\n' "$TARGET" "$root"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

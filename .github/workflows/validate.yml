@@ -41,6 +41,10 @@ jobs:
           test "$accepted_tree" = "$release_tree"
       - name: Accept source
         run: echo "PR source accepted."
+      - name: Summarize source check
+        if: always()
+        run: |
+          printf '### Source check\n\n- Result: **%s**\n- Checked eligibility for the target branch or accepted a pinned promotion revision.\n' '${{ job.status }}' >> "$GITHUB_STEP_SUMMARY"
   validate:
     needs: source
     runs-on: ubuntu-latest
@@ -72,6 +76,12 @@ jobs:
           path: test-results/browser
           if-no-files-found: ignore
           retention-days: 3
+      - name: Summarize application validation
+        if: always()
+        env:
+          REVISION: ${{ inputs.candidate || github.sha }}
+        run: |
+          printf '### Application validation\n\n- Result: **%s**\n- Revision: `%s`\n- Coverage: dependency audit, database types, architecture, lint, TypeScript, unit tests, build and Chromium browser tests.\n' '${{ job.status }}' "$REVISION" >> "$GITHUB_STEP_SUMMARY"
   database:
     needs: source
     runs-on: ubuntu-latest
@@ -107,4 +117,17 @@ jobs:
       - name: Stop disposable Supabase
         if: always()
         run: npx supabase stop --no-backup --workdir .test-stack
-
+      - name: Summarize database validation
+        if: always()
+        env:
+          REVISION: ${{ inputs.candidate || github.sha }}
+        run: |
+          printf '### Disposable Supabase validation\n\n- Result: **%s**\n- Revision: `%s`\n- Coverage: migrations from an empty database, SQL regressions and browser tests against local Edge Functions.\n' '${{ job.status }}' "$REVISION" >> "$GITHUB_STEP_SUMMARY"
+  preview:
+    needs: [validate, database]
+    if: inputs.candidate == '' && github.base_ref == 'staging' && github.event.pull_request.head.repo.full_name == github.repository
+    uses: ./.github/workflows/pages-app-preview.yml
+    with:
+      candidate: ${{ github.sha }}
+      base: /lumiere-app/preview/
+      reusable_preview: true
