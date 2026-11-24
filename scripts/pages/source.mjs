@@ -28,11 +28,17 @@ if (event.workflow_run) {
     appendFileSync(env.GITHUB_STEP_SUMMARY, 'Closed PR did not qualify for deployment.\n');
     process.exit(0);
   }
-  const candidates = run.pull_requests?.length ? run.pull_requests : await api(`commits/${run.head_sha}/pulls`);
+  requireValue(run.head_branch, 'Missing source branch for merge event');
+  // A release branch can start at an earlier PR's merge SHA. Search by the
+  // triggering branch so that shared SHA cannot redirect a release to staging.
+  const owner = repo.split('/')[0];
+  const source = encodeURIComponent(`${owner}:${run.head_branch}`);
+  const candidates = run.pull_requests?.length ? run.pull_requests : await api(`pulls?state=closed&head=${source}&per_page=100`);
   let pr;
   for (const item of candidates) {
     const detail = await api('pulls/' + item.number);
-    if (detail.merged && eligiblePR(detail) && (detail.head.sha === run.head_sha || detail.merge_commit_sha === run.head_sha)) {
+    if (detail.merged && eligiblePR(detail) && detail.head.ref === run.head_branch &&
+      (detail.head.sha === run.head_sha || detail.merge_commit_sha === run.head_sha)) {
       if (pr) throw Error('Ambiguous merge event');
       pr = detail;
     }
