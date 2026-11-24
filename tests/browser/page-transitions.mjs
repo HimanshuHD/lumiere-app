@@ -27,12 +27,15 @@ try {
       sessionStorage.setItem('transition-initialized', 'yes');
     }
   }, session);
-  let heldDocument;
+  const documentResponse = Promise.withResolvers();
   await context.route(`${api}/**`, async route => {
     const url = new URL(route.request().url());
     if (url.pathname.endsWith('/logout')) return route.fulfill({ status: 204 });
     if (url.pathname.endsWith('/profiles')) return route.fulfill({ json: { full_name: 'Transition QA', avatar_url: null } });
-    if (url.pathname.endsWith('/documents') && url.searchParams.get('select') === '*') { heldDocument = route; return; }
+    if (url.pathname.endsWith('/documents') && url.searchParams.get('id') === `eq.${docId}` && url.searchParams.get('select') === '*') {
+      await documentResponse.promise;
+      return route.fulfill({ status: 403, json: { code: '42501', message: 'Fixture denial' } });
+    }
     return route.fulfill({ json: [] });
   });
   const page = await context.newPage();
@@ -103,8 +106,7 @@ try {
   await page.waitForFunction(() => !!document.querySelector('[data-page-outgoing]'));
   assert.equal(await page.evaluate(() => document.documentElement.dataset.pageMotion), undefined);
   await page.waitForFunction(() => document.querySelector('#root main h1')?.textContent === 'Opening document…');
-  assert(heldDocument);
-  await heldDocument.fulfill({ status: 403, json: { code: '42501', message: 'Fixture denial' } });
+  documentResponse.resolve();
   await idle();
   await page.getByRole('heading', { name: 'Document access denied' }).waitFor();
 
