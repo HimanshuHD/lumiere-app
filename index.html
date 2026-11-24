@@ -179,7 +179,8 @@ html, body { margin: 0; background: var(--app-bg); color: var(--app-ink); }
     <!-- lumiere-transition-runtime -->
     <script>
 (() => {
-  const minimumHoldUntil = performance.now() + 2500;
+  const minimumHoldMs = 2500;
+  const minimumHoldUntil = performance.now() + minimumHoldMs;
   const screen = document.getElementById('startup-screen');
   const root = document.getElementById('root');
   const status = document.getElementById('startup-status');
