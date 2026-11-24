@@ -56,3 +56,9 @@ jobs:
         run: supabase db push --linked --skip-vault --yes
       - name: Deploy Edge Functions
         run: supabase functions deploy --project-ref "$SUPABASE_PROJECT_REF" --use-api --yes
+      - name: Summarize hosted backend deployment
+        if: always()
+        env:
+          REVISION: ${{ inputs.candidate }}
+        run: |
+          printf '### Hosted Supabase deployment\n\n- Result: **%s**\n- Release revision: `%s`\n- Steps: link the hosted project, apply pending migrations, and deploy Edge Functions.\n' '${{ job.status }}' "$REVISION" >> "$GITHUB_STEP_SUMMARY"
