@@ -125,7 +125,7 @@ jobs:
           printf '### Disposable Supabase validation\n\n- Result: **%s**\n- Revision: `%s`\n- Coverage: migrations from an empty database, SQL regressions and browser tests against local Edge Functions.\n' '${{ job.status }}' "$REVISION" >> "$GITHUB_STEP_SUMMARY"
   preview:
     needs: [validate, database]
-    if: inputs.candidate == '' && github.base_ref == 'staging' && github.event.pull_request.head.repo.full_name == github.repository
+    if: inputs.candidate == '' && github.event.pull_request.head.repo.full_name == github.repository
     uses: ./.github/workflows/pages-app-preview.yml
     with:
       candidate: ${{ github.sha }}

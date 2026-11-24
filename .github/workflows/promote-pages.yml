@@ -55,7 +55,7 @@ jobs:
 
   validate:
     needs: resolve
-    if: needs.resolve.outputs.sha != '' && inputs.operation != 'Verify preview' && needs.resolve.outputs.snapshot == '' && needs.resolve.outputs.artifact_id == ''
+    if: needs.resolve.outputs.sha != '' && inputs.operation != 'Verify preview' && needs.resolve.outputs.snapshot == '' && needs.resolve.outputs.target != 'preview'
     uses: ./.github/workflows/validate.yml
     with:
       candidate: ${{ needs.resolve.outputs.sha }}
@@ -101,10 +101,10 @@ jobs:
           pr=$(jq -r '.pr // empty' <<< "$preview")
           base=$(jq -r '.base // empty' <<< "$preview")
           if [[ -n "$pr" ]]; then
-            gh api "repos/$GITHUB_REPOSITORY/pulls/$pr" | jq -e --arg head "$head" '.state == "open" and (.draft | not) and .head.sha == $head' >/dev/null
-          fi
-          if [[ -n "$base" ]]; then
-            test "$(gh api "repos/$GITHUB_REPOSITORY/branches/staging" --jq .commit.sha)" = "$base" || { echo "::error::Staging changed. Deploy and review the current PR preview."; exit 1; }
+            base_ref=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$pr" | jq -er --arg head "$head" 'select(.state == "open" and (.draft | not) and .head.sha == $head) | .base.ref')
+            if [[ -n "$base" ]]; then
+              test "$(gh api "repos/$GITHUB_REPOSITORY/branches/$base_ref" --jq .commit.sha)" = "$base" || { echo "::error::The PR base changed. Deploy and review the current PR preview."; exit 1; }
+            fi
           fi
           preview_run=$(jq -er '.run' <<< "$preview")
           gh api --silent "repos/$GITHUB_REPOSITORY/statuses/$head" -f state=success -f context='Preview verified' -f description="Verified preview run $preview_run" -f target_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
