@@ -54,6 +54,7 @@ jobs:
         run: node scripts/pages/source.mjs
 
   validate:
+    name: Validate deployment revision
     needs: resolve
     if: needs.resolve.outputs.sha != '' && inputs.operation != 'Verify preview' && needs.resolve.outputs.snapshot == '' && needs.resolve.outputs.target != 'preview'
     uses: ./.github/workflows/validate.yml
@@ -61,6 +62,7 @@ jobs:
       candidate: ${{ needs.resolve.outputs.sha }}
 
   build:
+    name: Prepare deployment
     needs: [resolve, validate]
     uses: ./.github/workflows/pages-app-preview.yml
     with:
