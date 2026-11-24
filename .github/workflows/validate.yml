@@ -12,7 +12,7 @@ permissions:
   contents: read
 jobs:
   source:
-    name: Check PR source
+    name: Release branch eligibility
     if: inputs.candidate != '' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     steps:
@@ -46,6 +46,7 @@ jobs:
         run: |
           printf '### Source check\n\n- Result: **%s**\n- Checked eligibility for the target branch or accepted a pinned promotion revision.\n' '${{ job.status }}' >> "$GITHUB_STEP_SUMMARY"
   validate:
+    name: Application tests
     needs: source
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -83,6 +84,7 @@ jobs:
         run: |
           printf '### Application validation\n\n- Result: **%s**\n- Revision: `%s`\n- Coverage: dependency audit, database types, architecture, lint, TypeScript, unit tests, build and Chromium browser tests.\n' '${{ job.status }}' "$REVISION" >> "$GITHUB_STEP_SUMMARY"
   database:
+    name: Supabase migration and function tests
     needs: source
     runs-on: ubuntu-latest
     timeout-minutes: 25
@@ -124,6 +126,7 @@ jobs:
         run: |
           printf '### Disposable Supabase validation\n\n- Result: **%s**\n- Revision: `%s`\n- Coverage: migrations from an empty database, SQL regressions and browser tests against local Edge Functions.\n' '${{ job.status }}' "$REVISION" >> "$GITHUB_STEP_SUMMARY"
   preview:
+    name: Prepare preview
     needs: [validate, database]
     if: inputs.candidate == '' && github.event.pull_request.head.repo.full_name == github.repository
     uses: ./.github/workflows/pages-app-preview.yml

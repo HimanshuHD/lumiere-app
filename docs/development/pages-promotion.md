@@ -11,8 +11,23 @@
 1. Set **Settings → Pages → Build and deployment → Source** to **GitHub Actions**. In **Settings → Environments → github-pages**, permit deployments from `main`. Configure GitHub rules so the Actions publisher can update `pages-prepared` and `pages-state`.
 2. Set repository Actions variables `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` to the shared hosted project's HTTPS origin and browser-safe publishable or anon key. The hosted deployment job also needs `SUPABASE_PROJECT_REF`, `SUPABASE_ACCESS_TOKEN`, and `SUPABASE_DB_PASSWORD` through the `supabase-hosted` environment or the corresponding repository Actions configuration.
 3. In Supabase **Authentication → URL Configuration → Redirect URLs**, allow the exact paths `/lumiere-app/auth/callback/`, `/lumiere-app/preview/auth/callback/`, and `/lumiere-app/staging/auth/callback/` on `https://himanshuhd.github.io`. Keep the pilot site URL and admission settings.
-4. Protect `staging` and `main` with PR requirements and up-to-date branches. Require application and database validation on both. On `staging`, select the successful reusable **preview / build** check shown by the updated application workflow for same-repository PRs and require **Preview verified**. On `main`, require **Check PR source** and the standalone **Build Lumiere for Pages** check. Use the actual GitHub check names after a ready PR runs. During rollout, update staging's required Pages check when the new preview check becomes available.
+4. Protect `staging` and `main` with PR requirements and up-to-date branches. Configure the exact required checks listed below.
 5. A change to the trusted publisher takes effect when it reaches `main` through a release PR. Until then, the manual dispatcher on `main` runs the previous implementation. The initial publisher can seed state from Pages run [45232260842](https://github.com/HimanshuHD/lumiere-app/actions/runs/45232260842) after comparing the root and preview HTML to the live site. Subsequent updates use the retained deployment state.
+
+## Required PR checks
+
+| Required check | Staging | Main |
+| --- | --- | --- |
+| Application tests | Yes | Yes |
+| Supabase migration and function tests | Yes | Yes |
+| Prepare preview / Pages build and smoke test | Yes | |
+| Pages build and smoke test | | Yes |
+| Release branch eligibility | | Yes |
+| Preview verified | Yes | |
+
+The staging preview job builds for `/lumiere-app/preview/` and saves the tested artifact for manual deployment. The standalone Pages check on main tests the production root at `/lumiere-app/`. **Prepare deployment / Pages build and smoke test** appears in a promotion when the workflow builds a deployment candidate for its target URL. **Validate deployment revision / …** reports promotion-time tests. Use the unprefixed PR checks and the staging preview check in the rulesets.
+
+The previous names were `validate`, `database`, `preview / build`, `build`, and `Check PR source`. Replace those contexts with the new names once GitHub has a successful ready-PR run for each replacement. **Preview verified** stays the same. It appears in the PR merge status area once the manual **Verify preview** operation posts it to the PR head.
 
 ## Open, preview, and verify a PR
 
