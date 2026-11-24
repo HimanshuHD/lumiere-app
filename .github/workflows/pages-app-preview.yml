@@ -2,11 +2,17 @@ name: Build Lumiere for Pages
 
 on:
   pull_request:
-    branches: [main]
-  workflow_dispatch:
+    branches: [staging, main]
+    types: [opened, reopened, synchronize, ready_for_review, edited, converted_to_draft]
+  workflow_call:
     inputs:
-      publish:
-        description: Publish the verified app to the Lumiere Pages URL
+      candidate:
+        type: string
+        required: true
+      base:
+        type: string
+        required: true
+      reusable_preview:
         type: boolean
         default: false
 
@@ -15,10 +21,17 @@ permissions:
 
 jobs:
   build:
+    name: Pages build and smoke test
+    if: inputs.candidate != '' || (!github.event.pull_request.draft && ((github.base_ref == 'staging' && github.event.pull_request.head.repo.full_name != github.repository) || (github.base_ref == 'main' && github.event.pull_request.head.repo.full_name == github.repository && (startsWith(github.head_ref, 'release/') || startsWith(github.head_ref, 'hotfix/')))))
     runs-on: ubuntu-latest
+    env:
+      PAGES_BASE: ${{ inputs.base || '/lumiere-app/' }}
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.candidate || github.sha }}
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -47,9 +60,9 @@ jobs:
             throw new Error('Set both hosted Supabase Actions variables before publishing.');
           }
           NODE
-          npm run build -- --mode pages
+          npm run build -- --mode pages --base "$PAGES_BASE"
         env:
-          PUBLISH: ${{ github.event_name == 'workflow_dispatch' && inputs.publish }}
+          PUBLISH: ${{ inputs.candidate != '' }}
           VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL || 'https://preview.example.invalid' }}
           VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY || 'sb_publishable_ci_preview' }}
       - name: Check emitted entry assets
@@ -64,73 +77,71 @@ jobs:
             .map(([, url]) => url);
           assert(assets.some(url => url.endsWith('.js')), 'Expected an emitted JavaScript entry');
           for (const url of assets) {
-            assert(url.startsWith('/lumiere-app/assets/'), 'Unexpected asset URL: ' + url);
-            assert(existsSync('dist/' + url.slice('/lumiere-app/'.length)), 'Missing asset: ' + url);
+            assert(url.startsWith(process.env.PAGES_BASE + 'assets/'), 'Unexpected asset URL: ' + url);
+            assert(existsSync('dist/' + url.slice(process.env.PAGES_BASE.length)), 'Missing asset: ' + url);
           }
           NODE
       - run: npx playwright install --with-deps chromium
       - name: Smoke test the Pages artifact in Chromium
         run: |
-          mkdir -p "$RUNNER_TEMP/pages-smoke"
-          ln -s "$PWD/dist" "$RUNNER_TEMP/pages-smoke/lumiere-app"
+          webroot="$RUNNER_TEMP/pages-smoke"
+          mkdir -p "$(dirname "$webroot${PAGES_BASE%/}")"
+          ln -s "$PWD/dist" "$webroot${PAGES_BASE%/}"
           python3 -m http.server 4173 --bind 127.0.0.1 --directory "$RUNNER_TEMP/pages-smoke" &
           server_pid=$!
           trap 'kill "$server_pid"' EXIT
-          curl --fail --silent --retry 10 --retry-connrefused http://127.0.0.1:4173/lumiere-app/ -o /dev/null
+          curl --fail --silent --retry 10 --retry-connrefused http://127.0.0.1:4173"$PAGES_BASE" -o /dev/null
           node --input-type=module <<'NODE'
           import assert from 'node:assert/strict';
           import { chromium } from 'playwright';
 
           const origin = 'http://127.0.0.1:4173';
-          const root = origin + '/lumiere-app/';
+          const bases = [process.env.PAGES_BASE];
           const browser = await chromium.launch();
           try {
-            const page = await browser.newPage();
-            const errors = [];
-            page.on('pageerror', error => errors.push(error.message));
-            await page.route('**/*', route => {
-              return new URL(route.request().url()).origin === origin
-                ? route.continue()
-                : route.abort();
-            });
+            for (const base of bases) {
+              const root = origin + base;
+              const page = await browser.newPage();
+              const errors = [];
+              page.on('pageerror', error => errors.push(error.message));
+              await page.route('**/*', route => {
+                return new URL(route.request().url()).origin === origin
+                  ? route.continue()
+                  : route.abort();
+              });
 
-            assert.equal((await page.goto(root)).status(), 200);
-            await page.getByPlaceholder('you@example.com').waitFor({ timeout: 10000 });
+              assert.equal((await page.goto(root)).status(), 200);
+              await page.getByPlaceholder('you@example.com').waitFor({ timeout: 10000 });
 
-            assert.equal((await page.goto(root + 'auth/callback/')).status(), 200);
-            assert.equal((await page.reload()).status(), 200);
-            await page.getByRole('button', { name: 'Return to sign in' }).click({ timeout: 10000 });
-            await page.getByPlaceholder('you@example.com').waitFor({ timeout: 10000 });
-            assert.equal(new URL(page.url()).pathname, '/lumiere-app/');
-            assert.deepEqual(errors, []);
+              assert.equal((await page.goto(root + 'auth/callback/')).status(), 200);
+              assert.equal((await page.reload()).status(), 200);
+              await page.getByRole('button', { name: 'Return to sign in' }).click({ timeout: 10000 });
+              await page.getByPlaceholder('you@example.com').waitFor({ timeout: 10000 });
+              assert.equal(new URL(page.url()).pathname, base);
+              assert.deepEqual(errors, []);
+              await page.close();
+            }
           } finally {
             await browser.close();
           }
           NODE
+      - name: Identify reusable preview artifact
+        if: inputs.reusable_preview
+        id: preview
+        env:
+          SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          SUPABASE_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
+        run: |
+          config=$(printf '%s\0%s' "$SUPABASE_URL" "$SUPABASE_KEY" | sha256sum | cut -d ' ' -f 1)
+          echo "name=lumiere-preview-$GITHUB_SHA-$config" >> "$GITHUB_OUTPUT"
       - uses: actions/upload-artifact@v4
         with:
-          name: lumiere-pages-preview
+          name: ${{ steps.preview.outputs.name || 'lumiere-pages-preview' }}
           path: dist
           if-no-files-found: error
-
-      - uses: actions/upload-pages-artifact@v4
-        if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.publish
-        with:
-          path: dist
-
-  publish:
-    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.publish
-    needs: build
-    runs-on: ubuntu-latest
-    concurrency:
-      group: github-pages
-      cancel-in-progress: false
-    permissions:
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - id: deployment
-        uses: actions/deploy-pages@v4
+      - name: Summarize Pages build
+        if: always()
+        env:
+          REVISION: ${{ inputs.candidate || github.sha }}
+        run: |
+          printf '### Pages build and browser smoke test\n\n- Result: **%s**\n- Revision: `%s`\n- Base path: `%s`\n- Coverage: emitted assets, sign-in screen and OAuth callback navigation.\n' '${{ job.status }}' "$REVISION" "$PAGES_BASE" >> "$GITHUB_STEP_SUMMARY"

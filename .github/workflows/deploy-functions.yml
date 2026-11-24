@@ -1,12 +1,11 @@
 name: Deploy hosted Supabase
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'supabase/**'
-      - '.github/workflows/deploy-functions.yml'
-  workflow_dispatch:
+  workflow_call:
+    inputs:
+      candidate:
+        type: string
+        required: true
 
 permissions:
   contents: read
@@ -28,8 +27,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          # A newer main commit includes changes from any superseded pending run.
-          ref: main
+          ref: ${{ inputs.candidate }}
           persist-credentials: false
       - uses: supabase/setup-cli@v1
         with:
@@ -45,9 +43,22 @@ jobs:
             exit 1
           fi
           echo "Deploying commit $(git rev-parse HEAD)"
+      - name: Check the release is still current
+        run: |
+          main_sha=$(git ls-remote --exit-code origin refs/heads/main | cut -f1)
+          if [[ "$(git rev-parse HEAD)" != "$main_sha" ]]; then
+            echo "::error::Main has advanced. Reconcile pending backend changes with the current release before deploying."
+            exit 1
+          fi
       - name: Link the hosted project
         run: supabase link --project-ref "$SUPABASE_PROJECT_REF"
       - name: Apply pending migrations
         run: supabase db push --linked --skip-vault --yes
       - name: Deploy Edge Functions
         run: supabase functions deploy --project-ref "$SUPABASE_PROJECT_REF" --use-api --yes
+      - name: Summarize hosted backend deployment
+        if: always()
+        env:
+          REVISION: ${{ inputs.candidate }}
+        run: |
+          printf '### Hosted Supabase deployment\n\n- Result: **%s**\n- Release revision: `%s`\n- Steps: link the hosted project, apply pending migrations, and deploy Edge Functions.\n' '${{ job.status }}' "$REVISION" >> "$GITHUB_STEP_SUMMARY"

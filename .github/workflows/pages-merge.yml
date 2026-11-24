@@ -1,0 +1,18 @@
+name: Queue merged Pages change
+on:
+  pull_request:
+    branches: [staging, main]
+    types: [closed]
+permissions: {}
+jobs:
+  merged:
+    if: github.event.pull_request.merged && github.event.pull_request.head.repo.full_name == github.repository && (github.base_ref == 'staging' || startsWith(github.head_ref, 'release/') || startsWith(github.head_ref, 'hotfix/'))
+    runs-on: ubuntu-latest
+    steps:
+      - name: Summarize queued promotion
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          BASE_BRANCH: ${{ github.base_ref }}
+          REVISION: ${{ github.event.pull_request.merge_commit_sha }}
+        run: |
+          printf '### Pages promotion queued\n\n- Pull request: [#%s](%s/%s/pull/%s)\n- Target branch: `%s`\n- Merge revision: `%s`\n- **Promote Lumiere Pages** will validate the merged revision and publish it.\n' "$PR_NUMBER" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$PR_NUMBER" "$BASE_BRANCH" "$REVISION" >> "$GITHUB_STEP_SUMMARY"
