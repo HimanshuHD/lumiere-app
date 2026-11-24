@@ -21,12 +21,12 @@
 
    | Source type | Enter | What it deploys |
    | --- | --- | --- |
-   | PR | A number such as `83` | For a ready staging PR, GitHub's current proposed merge with staging. Ready release and hotfix PRs use their branch head. |
-   | Branch | A branch name | The selected branch's current commit. |
-   | SHA | A full 40-character SHA | The exact commit, reachable from a branch in this repository. |
+   | PR | A number such as `83` | GitHub's current proposed merge for the ready PR. |
+   | Branch | A branch name | The ready PR for the branch tip. |
+   | SHA | A full 40-character SHA | The ready PR matching the current head or proposed merge SHA. |
 
-3. For a staging PR the publisher checks the commit's parents against the current PR head and current staging tip. It reuses the preview artifact when the successful run used that exact merge revision, the current public Supabase config, and the same validation and build workflow definitions as the publisher on `main`. The run summary links to the reused run. A missing, mismatched, or expired artifact causes fresh validation and a preview build. Branch and SHA deployments also validate and build their selected commits. The trusted publisher rechecks the selected source before replacing preview.
-4. Open the **Preview published** link in the summary and review the app. Run the workflow again with **Verify preview → SHA** and the full source commit or built revision from the summary. Verification checks that this is the active preview and, for PR previews, that the PR head and tested staging base are current. The verification run records **Preview verified** on the PR head and ties the sign-off to the active preview deployment. Deploy and recheck whenever the head or staging base changes.
+3. The publisher requires a successful ready-PR run that tested the current head and base, using the current public Supabase config and trusted validation workflows. Preview publishes the resulting artifact. If the artifact is missing, stale or expired, rerun the ready PR's validation in Actions and then retry the deployment. The publisher rechecks the selected source before replacing the preview.
+4. Open the **Preview published** link in the summary and review the app. Run the workflow again with **Verify preview → SHA** and the full source commit or built revision from the summary. Verification checks that this is the active preview and, for PR previews, that the PR head and tested PR base are current. The verification run records **Preview verified** on the PR head and ties the sign-off to the active preview deployment. Deploy and recheck whenever the head or base changes.
 
 ## Promote to staging and production
 

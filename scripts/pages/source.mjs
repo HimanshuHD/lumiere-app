@@ -74,35 +74,38 @@ if (event.workflow_run) {
   } else if (operation === 'Verify preview') {
     requireValue(kind === 'SHA' && /^[0-9a-f]{40}$/i.test(value), 'Enter the full SHA listed in the preview summary');
     sha = value.toLowerCase();
-  } else if (kind === 'PR') {
-    requireValue(/^[1-9]\d*$/.test(value), 'Expected a PR number');
-    const pr = await api('pulls/' + value);
-    requireValue(pr.state === 'open' && !pr.draft && eligiblePR(pr), 'Select a ready repository PR for staging, release or hotfix');
-    head = sha = pr.head.sha;
-    prNumber = pr.number;
-    if (pr.base.ref === 'staging') {
-      base = (await branch('staging')).commit.sha;
-      requireValue(pr.mergeable && /^[0-9a-f]{40}$/.test(pr.merge_commit_sha ?? ''), 'GitHub has no merge candidate yet. Check PR conflicts and try again.');
-      const candidate = await api('git/commits/' + pr.merge_commit_sha);
-      requireValue(candidate.parents.length === 2 && candidate.parents[0].sha === base && candidate.parents[1].sha === head,
-        'GitHub has not prepared a merge candidate for the current PR head and staging tip. Try again after PR checks start.');
-      sha = candidate.sha;
-    }
-  } else if (kind === 'Branch') {
-    sha = (await branch(value)).commit.sha;
   } else {
-    requireValue(kind === 'SHA' && /^[0-9a-f]{40}$/i.test(value), 'Expected a full commit SHA');
-    sha = (await api('commits/' + value)).sha;
-    const branches = execFileSync('git', ['for-each-ref', '--contains', sha, '--format=%(refname)', 'refs/remotes/origin/'], {encoding: 'utf8'});
-    requireValue(branches.trim(), 'Select a commit reachable from a repository branch');
+    let pr;
+    if (kind === 'PR') {
+      requireValue(/^[1-9]\d*$/.test(value), 'Expected a PR number');
+      pr = await api('pulls/' + value);
+    } else {
+      if (kind === 'Branch') {
+        sha = (await branch(value)).commit.sha;
+      } else {
+        requireValue(kind === 'SHA' && /^[0-9a-f]{40}$/i.test(value), 'Expected a full commit SHA');
+        sha = value.toLowerCase();
+      }
+      const prs = await api(`commits/${sha}/pulls`);
+      const matches = prs.filter(candidate => candidate.state === 'open' && eligiblePR(candidate) &&
+        (candidate.head.sha === sha || candidate.merge_commit_sha === sha) &&
+        (kind !== 'Branch' || candidate.head.ref === value));
+      requireValue(matches.length === 1, 'Select a commit or branch for exactly one open repository PR, or use its PR number');
+      pr = await api('pulls/' + matches[0].number);
+      requireValue(pr.head.sha === sha || pr.merge_commit_sha === sha, 'The selected revision has changed');
+    }
+    requireValue(pr.state === 'open' && !pr.draft && eligiblePR(pr), 'Select a ready repository PR for staging, release or hotfix');
+    head = pr.head.sha;
+    prNumber = pr.number;
+    base = (await branch(pr.base.ref)).commit.sha;
+    requireValue(pr.mergeable && /^[0-9a-f]{40}$/.test(pr.merge_commit_sha ?? ''), 'GitHub has no merge candidate yet. Check PR conflicts and try again.');
+    const candidate = await api('git/commits/' + pr.merge_commit_sha);
+    requireValue(candidate.parents.length === 2 && candidate.parents[0].sha === base && candidate.parents[1].sha === head,
+      'GitHub has not prepared a merge candidate for the current PR head and base. Try again after PR checks start.');
+    sha = candidate.sha;
   }
-  if (!prNumber && !snapshot && operation !== 'Verify preview') {
-    const prs = await api(`commits/${sha}/pulls`);
-    requireValue(!prs.some(p => p.state === 'open' && p.head.sha === sha && p.draft), 'Preview source belongs to a draft PR');
-    const ready = prs.filter(p => p.state === 'open' && p.head.sha === sha && eligiblePR(p));
-    if (ready.length === 1) prNumber = ready[0].number;
-  }
-  if (base && !env.RECHECK_PREVIEW && env.SUPABASE_URL && env.SUPABASE_KEY) {
+  if (base && !env.RECHECK_PREVIEW) {
+    requireValue(env.SUPABASE_URL && env.SUPABASE_KEY, 'Missing hosted Pages configuration');
     const workflows = ['validate.yml', 'pages-app-preview.yml'];
     const versionsMatch = await Promise.all(workflows.map(async name => {
       const path = '.github/workflows/' + name;
@@ -123,6 +126,7 @@ if (event.workflow_run) {
         break;
       }
     }
+    requireValue(artifact, 'No matching validated preview artifact. Check the ready PR validation run, then retry preview deployment.');
   }
 }
 requireValue(/^[0-9a-f]{40}$/.test(sha), 'Invalid resolved commit');
