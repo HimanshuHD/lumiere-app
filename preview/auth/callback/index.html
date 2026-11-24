@@ -368,6 +368,8 @@ html, body { margin: 0; background: var(--app-bg); color: var(--app-ink); }
 </script>
     <script>
 (() => {
+  const minimumHoldMs = 2500;
+  const minimumHoldUntil = performance.now() + minimumHoldMs;
   const screen = document.getElementById('startup-screen');
   const root = document.getElementById('root');
   const status = document.getElementById('startup-status');
@@ -468,6 +470,9 @@ html, body { margin: 0; background: var(--app-bg); color: var(--app-ink); }
         entry.finished.then(complete, complete);
       });
     }
+    // Loading and the minimum hold run concurrently. Slow startups add no extra delay.
+    const remainingHold = minimumHoldUntil - performance.now();
+    if (remainingHold > 0) await new Promise(resolve => setTimeout(resolve, remainingHold));
     const restoreFocus = screen.contains(document.activeElement);
     let finished = false;
     const finish = () => {
