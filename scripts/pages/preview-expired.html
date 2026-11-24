@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Preview expired | Lumiere</title>
+<style>
+  :root { color-scheme: dark; font: 1rem/1.6 system-ui, sans-serif; background: #211914; color: #f9ebdc; }
+  body { min-height: 100vh; min-height: 100svh; margin: 0; display: grid; place-items: center; }
+  main { box-sizing: border-box; width: min(100%, 42rem); padding: 2rem 1.25rem; text-align: center; }
+  svg { display: block; width: min(66vw, 17rem); margin: 0 auto; }
+  .brand, h1 { font-family: Georgia, serif; font-weight: 400; }
+  .brand { margin: 0; font-size: clamp(2.5rem, 9vw, 4rem); letter-spacing: .03em; line-height: 1.15; }
+  h1 { font-size: clamp(1.65rem, 5vw, 2.25rem); margin: 1.2rem 0 .5rem; }
+  p { margin: .5rem 0 1.1rem; color: #e4d0bd; }
+  nav { display: flex; flex-wrap: wrap; justify-content: center; gap: .75rem 1.25rem; }
+  nav + nav { margin-top: 1.15rem; }
+  a { color: #f6c7a3; text-underline-offset: .2em; }
+  a:focus-visible { outline: 2px solid #f6c7a3; outline-offset: .25rem; }
+</style>
+<main>
+  <svg aria-hidden="true" viewBox="130 310 350 265" fill="none">
+    <g stroke="#d19a70" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M190 397 Q184 397 178 399 V526 C221 512 272 521 304 556 C336 521 387 512 430 526 V399 Q424 397 418 397"/>
+      <path d="M304 433 C282 394 235 380 190 386 V511 C233 499 275 512 304 556 C333 512 375 499 418 511 V386 C373 380 326 394 304 433Z M304 433 V556"/>
+      <path d="M210 432 C235 431 260 439 283 456 M210 460 C235 459 260 467 283 484 M325 456 C348 439 373 431 398 432 M325 484 C348 467 373 459 398 460"/>
+    </g>
+    <path fill="#d19a70" d="M304 324 C308 345 313 352 335 356 C313 360 308 367 304 389 C300 367 295 360 273 356 C295 352 300 345 304 324Z"/>
+  </svg>
+  <div class="brand">Lumiere</div>
+  <h1>This preview has expired</h1>
+  <p>The change was verified and deployed to staging. You can try it there or open the live release.</p>
+  <nav aria-label="Lumiere environments">
+    <a href="/lumiere-app/staging/">Open staging</a>
+    <a href="/lumiere-app/">Open live Lumiere</a>
+  </nav>
+  <nav aria-label="GitHub references"><!-- PREVIEW_REFERENCES --></nav>
+</main>
+</html>

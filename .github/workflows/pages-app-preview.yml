@@ -12,13 +12,16 @@ on:
       base:
         type: string
         required: true
+      reusable_preview:
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
 jobs:
   build:
-    if: inputs.candidate != '' || (github.event.pull_request.draft == false && (github.base_ref == 'staging' || (github.event.pull_request.head.repo.full_name == github.repository && (startsWith(github.head_ref, 'release/') || startsWith(github.head_ref, 'hotfix/')))))
+    if: inputs.candidate != '' || (!github.event.pull_request.draft && ((github.base_ref == 'staging' && github.event.pull_request.head.repo.full_name != github.repository) || (github.base_ref == 'main' && github.event.pull_request.head.repo.full_name == github.repository && (startsWith(github.head_ref, 'release/') || startsWith(github.head_ref, 'hotfix/')))))
     runs-on: ubuntu-latest
     env:
       PAGES_BASE: ${{ inputs.base || '/lumiere-app/' }}
@@ -121,8 +124,23 @@ jobs:
             await browser.close();
           }
           NODE
+      - name: Identify reusable preview artifact
+        if: inputs.reusable_preview
+        id: preview
+        env:
+          SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          SUPABASE_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
+        run: |
+          config=$(printf '%s\0%s' "$SUPABASE_URL" "$SUPABASE_KEY" | sha256sum | cut -d ' ' -f 1)
+          echo "name=lumiere-preview-$GITHUB_SHA-$config" >> "$GITHUB_OUTPUT"
       - uses: actions/upload-artifact@v4
         with:
-          name: lumiere-pages-preview
+          name: ${{ steps.preview.outputs.name || 'lumiere-pages-preview' }}
           path: dist
           if-no-files-found: error
+      - name: Summarize Pages build
+        if: always()
+        env:
+          REVISION: ${{ inputs.candidate || github.sha }}
+        run: |
+          printf '### Pages build and browser smoke test\n\n- Result: **%s**\n- Revision: `%s`\n- Base path: `%s`\n- Coverage: emitted assets, sign-in screen and OAuth callback navigation.\n' '${{ job.status }}' "$REVISION" "$PAGES_BASE" >> "$GITHUB_STEP_SUMMARY"
