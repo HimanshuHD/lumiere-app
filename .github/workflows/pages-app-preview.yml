@@ -21,6 +21,7 @@ permissions:
 
 jobs:
   build:
+    name: Pages build and smoke test
     if: inputs.candidate != '' || (!github.event.pull_request.draft && ((github.base_ref == 'staging' && github.event.pull_request.head.repo.full_name != github.repository) || (github.base_ref == 'main' && github.event.pull_request.head.repo.full_name == github.repository && (startsWith(github.head_ref, 'release/') || startsWith(github.head_ref, 'hotfix/')))))
     runs-on: ubuntu-latest
     env:
