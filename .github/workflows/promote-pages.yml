@@ -131,11 +131,13 @@ jobs:
             const { data: branch } = await github.rest.repos.getBranch({ ...repo, branch: pr.base.ref })
             if (pr.head.repo?.full_name !== process.env.GITHUB_REPOSITORY || pr.state !== 'open' ||
                 pr.draft || pr.head.sha !== preview_head || branch.commit.sha !== preview_base ||
-                pr.merge_commit_sha !== preview_merge) {
+                (staging && pr.merge_commit_sha !== preview_merge)) {
               throw new Error('The PR or its base changed. Deploy and verify the current merge revision.')
             }
+            const target = staging ? preview_merge : preview_head
+            core.info(`Sign-off target=${target} head=${preview_head} base=${preview_base} reviewed merge=${preview_merge}`)
             await github.rest.repos.createCommitStatus({
-              ...repo, sha: preview_merge, context: staging ? 'Staging sign-off' : 'Production sign-off', state: 'success',
+              ...repo, sha: target, context: staging ? 'Staging sign-off' : 'Production sign-off', state: 'success',
               description: `Verified hosted ${staging ? 'staging PR' : 'hotfix'} preview for PR #${pr.number}`,
               target_url: `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${context.runId}`
             })
