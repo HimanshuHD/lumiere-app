@@ -170,7 +170,9 @@ jobs:
   preview:
     name: Prepare preview
     needs: [validate, database]
-    if: inputs.candidate == '' && github.event.pull_request.head.repo.full_name == github.repository
+    if: >-
+      inputs.candidate == '' && github.event.pull_request.head.repo.full_name == github.repository &&
+      (github.base_ref == 'staging' || (github.base_ref == 'main' && startsWith(github.head_ref, 'hotfix/')))
     uses: ./.github/workflows/pages-app-preview.yml
     with:
       candidate: ${{ github.sha }}
