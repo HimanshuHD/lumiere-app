@@ -345,6 +345,13 @@ jobs:
               try {
                 const response = await github.request('GET ' + statusRoute, deployment)
                 status = response.data.status
+                if (typeof status === 'string' && status.startsWith('deployment_') && status !== 'deployment_attempt_error') {
+                  core.info(`Pages status response fields: ${Object.keys(response.data).join(', ')}`)
+                  for (const field of ['message', 'error_message']) {
+                    const detail = response.data[field]
+                    if (typeof detail === 'string') core.warning(`Pages ${field}: ${JSON.stringify(detail.slice(0, 500))}`)
+                  }
+                }
                 core.info(`Pages ${deployment_id} status ${status}, request ${requestId(response)}`)
               } catch (error) {
                 if ([401, 403].includes(error.status)) throw new Error(`Pages status lookup denied (HTTP ${error.status}, request ${requestId(error.response)})`)
