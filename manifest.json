@@ -1,11 +1,13 @@
 {
   "preview": {
     "base": "c15fc28cea8ca4f3fb34807def03e86a0e0e4a49",
-    "digest": "9939d87f0d2020ed1b1107e366a81787797fc0f4c7a442bf9bb755be1585b50b",
+    "digest": "93c554d4fd7861a54863cd0add3a0870675f3f595510c5bcecef7f5f116b40af",
+    "expiredBy": "275e6ea1df76adb9271977d7af8105ec70013725",
     "head": "2a03e1a41e5d26b3400bc17bd80ff9b69a48d76e",
     "pr": 83,
-    "run": "45683922208",
-    "sha": "8525d4349ec4c18171d9b358a0b4be1e063571ca"
+    "run": "45684610329",
+    "sha": "8525d4349ec4c18171d9b358a0b4be1e063571ca",
+    "status": "expired"
   },
   "production": {
     "backendBaseline": "30428e35262efce53488f82f88ab8f1a1a3b20b3",
@@ -14,8 +16,8 @@
     "sha": "30428e35262efce53488f82f88ab8f1a1a3b20b3"
   },
   "staging": {
-    "digest": "36d2f885889e2456c73118b824eb6ef1746bd92e246112592ba22f8a80ee2ac5",
-    "run": "45678309445",
-    "sha": "c15fc28cea8ca4f3fb34807def03e86a0e0e4a49"
+    "digest": "a45f2d99aa172f016197a72653236357f3471998343c622c7a8f5afeb319cfd8",
+    "run": "45684610329",
+    "sha": "275e6ea1df76adb9271977d7af8105ec70013725"
   }
 }
