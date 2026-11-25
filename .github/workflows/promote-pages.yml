@@ -89,6 +89,8 @@ jobs:
   verify:
     needs: resolve
     if: inputs.operation == 'Verify preview'
+    outputs:
+      hotfix: ${{ steps.reviewed.outputs.hotfix }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -100,6 +102,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           SOURCE_SHA: ${{ needs.resolve.outputs.sha }}
+          SELECTED_PR: ${{ needs.resolve.outputs.pr }}
         run: |
           live=$(curl -fsSL "https://himanshuhd.github.io/lumiere-app/lumiere-deployment.json?run=$GITHUB_RUN_ID" | jq -er '.snapshot')
           active=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/pages-state" --jq .object.sha)
@@ -112,6 +115,9 @@ jobs:
           fi
           pr=$(jq -r '.pr // empty' <<< "$preview")
           base=$(jq -r '.base // empty' <<< "$preview")
+          if [[ -n "$SELECTED_PR" && "$pr" != "$SELECTED_PR" ]]; then
+            echo "::error::The active preview PR changed."; exit 1
+          fi
           if [[ -n "$pr" ]]; then
             base_ref=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$pr" | jq -er --arg head "$head" 'select(.state == "open" and (.draft | not) and .head.sha == $head) | .base.ref')
             if [[ -n "$base" ]]; then
@@ -121,7 +127,15 @@ jobs:
           preview_run=$(jq -er '.run' <<< "$preview")
           gh api --silent "repos/$GITHUB_REPOSITORY/statuses/$head" -f state=success -f context='Preview verified' -f description="Verified preview run $preview_run" -f target_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
           printf 'pr=%s\nhead=%s\nbase=%s\nmerge=%s\n' "$pr" "$head" "$base" "$actual" >> "$GITHUB_OUTPUT"
-          printf '### Preview verified\n\n- [Open the verified preview](https://himanshuhd.github.io/lumiere-app/preview/)\n- Verified by: @%s\n- Built revision: `%s`\n- Commit marked **Preview verified**: `%s`\n' "$GITHUB_ACTOR" "$actual" "$head" >> "$GITHUB_STEP_SUMMARY"
+          link='[Open the verified preview](https://himanshuhd.github.io/lumiere-app/preview/)'
+          if [[ "${base_ref:-}" == main ]]; then
+            head_ref=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$pr" --jq .head.ref)
+            if [[ "$head_ref" == hotfix/* ]]; then
+              echo 'hotfix=true' >> "$GITHUB_OUTPUT"
+              link='[Open live app](https://himanshuhd.github.io/lumiere-app/)'
+            fi
+          fi
+          printf '### Preview verified\n\n- %s\n- Verified by: @%s\n- Built revision: `%s`\n- Commit marked **Preview verified**: `%s`\n' "$link" "$GITHUB_ACTOR" "$actual" "$head" >> "$GITHUB_STEP_SUMMARY"
       - name: Record branch sign-off for the reviewed preview
         if: steps.reviewed.outputs.pr != ''
         uses: actions/github-script@v8
@@ -304,14 +318,23 @@ jobs:
             }
             const route = '/repos/{owner}/{repo}/pages/deployments'
             const repo = context.repo
-            core.info(`Deploying uploaded Pages artifact ${artifactId}`)
-            const { data } = await github.request('POST ' + route, {
-              ...repo,
-              artifact_id: artifactId,
-              pages_build_version: context.sha,
-              oidc_token: await core.getIDToken()
-            })
-            const deployment_id = data.id || data.status_url?.split('/').pop() || context.sha
+            const { snapshot } = JSON.parse(require('node:fs').readFileSync('site/lumiere-deployment.json', 'utf8'))
+            if (!/^[0-9a-f]{40}$/.test(snapshot)) throw new Error('Invalid prepared Pages snapshot')
+            const requestId = response => response?.headers?.['x-github-request-id'] || 'unknown'
+            core.info(`Deploying artifact ${artifactId} from prepared snapshot ${snapshot}`)
+            const token = await core.getIDToken()
+            let created
+            try {
+              created = await github.request('POST ' + route, {
+                ...repo, artifact_id: artifactId, pages_build_version: snapshot, oidc_token: token
+              })
+            } catch (error) {
+              throw new Error(`Pages creation failed (HTTP ${error.status || 'unknown'}, request ${requestId(error.response)})`)
+            }
+            core.info(`Pages creation HTTP ${created.status}, request ${requestId(created)}`)
+            const { id, status_url } = created.data
+            const deployment_id = id || (status_url && new URL(status_url).pathname.match(/\/deployments\/([^/]+)\/?$/)?.[1])
+            if (!deployment_id) throw new Error('Pages returned no deployment identifier')
             const deployment = { ...repo, deployment_id }
             core.info(`Created Pages deployment ${deployment_id}`)
             const statusRoute = route + '/{deployment_id}'
@@ -322,9 +345,10 @@ jobs:
               try {
                 const response = await github.request('GET ' + statusRoute, deployment)
                 status = response.data.status
+                core.info(`Pages ${deployment_id} status ${status}, request ${requestId(response)}`)
               } catch (error) {
-                if ([401, 403].includes(error.status)) throw error
-                core.warning(`Status lookup for ${deployment_id} failed (HTTP ${error.status || 'unknown'}), retrying`)
+                if ([401, 403].includes(error.status)) throw new Error(`Pages status lookup denied (HTTP ${error.status}, request ${requestId(error.response)})`)
+                core.warning(`Status lookup for ${deployment_id} failed (HTTP ${error.status || 'unknown'}, request ${requestId(error.response)}), retrying`)
                 continue
               }
               if (status === 'succeed') return
@@ -356,6 +380,7 @@ jobs:
       VALIDATE: ${{ needs.validate.result }}
       BUILD: ${{ needs.build.result }}
       BACKEND: ${{ needs.backend.result }}
+      HOTFIX_VERIFIED: ${{ needs.verify.outputs.hotfix }}
       VERIFY: ${{ needs.verify.result }}
       PUBLISH: ${{ needs.publish.result }}
     steps:
