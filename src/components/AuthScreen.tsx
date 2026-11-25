@@ -1,6 +1,8 @@
 import { useState, FormEvent } from 'react';
-import { BookOpen, Eye, EyeOff, Loader2, Mail, Lock, User as UserIcon } from 'lucide-react';
+import { Eye, EyeOff, Loader2, Mail, Lock, User as UserIcon } from 'lucide-react';
 import { useAuth } from '@/features/auth';
+import { BrandLogo } from '@/shared/ui/brand-logo';
+import { ThemeToggle } from '@/shared/ui/theme-toggle';
 
 function GoogleIcon({ className }: { className?: string }) {
   return (
@@ -49,29 +51,24 @@ export function AuthScreen() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-stone-900 via-stone-800 to-amber-950 px-4">
-      <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute -top-40 -right-40 w-96 h-96 bg-amber-700/10 rounded-full blur-3xl" />
-        <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-amber-700/10 rounded-full blur-3xl" />
-      </div>
+    <div className="theme-scope auth-screen min-h-screen flex items-center justify-center px-4 py-24">
+      <ThemeToggle className="auth-theme-toggle" />
 
       <div className="relative w-full max-w-md">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-amber-700/20 border border-amber-500/30 mb-4">
-            <BookOpen aria-hidden="true" className="w-8 h-8 text-amber-400" />
-          </div>
-          <h1 className="text-3xl font-serif font-bold text-stone-100 tracking-tight">Lumiere</h1>
-          <p className="text-stone-400 mt-2 text-sm">Your personal reading sanctuary</p>
+          <BrandLogo className="auth-logo" />
+          <h1 className="text-3xl font-serif font-bold text-stone-900 tracking-tight">Lumiere</h1>
+          <p className="text-stone-600 mt-2 text-sm">Your personal reading sanctuary</p>
         </div>
 
-        <div className="bg-stone-900/60 backdrop-blur-xl rounded-2xl border border-stone-700/50 p-8 shadow-2xl">
-          <div className="flex gap-1 p-1 bg-stone-800/60 rounded-lg mb-6">
+        <div className="bg-white backdrop-blur-xl rounded-2xl border border-stone-200 p-8 shadow-sm">
+          <div className="flex gap-1 p-1 bg-stone-50 rounded-lg mb-6">
             <button
               onClick={() => { setMode('signin'); setError(null); }}
               className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${
                 mode === 'signin'
                   ? 'bg-amber-700 text-white shadow-lg shadow-amber-600/20'
-                  : 'text-stone-400 hover:text-stone-200'
+                  : 'text-stone-600 hover:text-stone-900'
               }`}
             >
               Sign In
@@ -81,7 +78,7 @@ export function AuthScreen() {
               className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${
                 mode === 'signup'
                   ? 'bg-amber-700 text-white shadow-lg shadow-amber-600/20'
-                  : 'text-stone-400 hover:text-stone-200'
+                  : 'text-stone-600 hover:text-stone-900'
               }`}
             >
               Create Account
@@ -96,7 +93,7 @@ export function AuthScreen() {
               className="w-full py-3 bg-white hover:bg-stone-50 text-stone-700 font-medium rounded-lg transition-all border border-stone-300 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-3"
             >
               {googleLoading ? (
-                <Loader2 aria-hidden="true" className="w-5 h-5 animate-spin text-stone-400" />
+                <Loader2 aria-hidden="true" className="w-5 h-5 animate-spin text-stone-600" />
               ) : (
                 <GoogleIcon className="w-5 h-5" />
               )}
@@ -105,19 +102,19 @@ export function AuthScreen() {
 
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-stone-700/50" />
+                <div className="w-full border-t border-stone-200" />
               </div>
               <div className="relative flex justify-center text-xs">
-                <span className="bg-stone-900/60 px-3 text-stone-400 uppercase tracking-wide">or</span>
+                <span className="bg-white px-3 text-stone-600 uppercase tracking-wide">or</span>
               </div>
             </div>
 
             <div>
-              <label htmlFor="auth-email" className="block text-xs font-medium text-stone-400 mb-1.5 uppercase tracking-wide">
+              <label htmlFor="auth-email" className="block text-xs font-medium text-stone-600 mb-1.5 uppercase tracking-wide">
                 Email
               </label>
               <div className="relative">
-                <Mail aria-hidden="true" className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
+                <Mail aria-hidden="true" className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-600" />
                 <input
                   id="auth-email" type="email" autoComplete="email"
                   aria-invalid={!!error} aria-describedby={error ? "auth-error" : undefined}
@@ -128,17 +125,17 @@ export function AuthScreen() {
                     [mode]: { ...values[mode], email: e.target.value },
                   }))}
                   placeholder="you@example.com"
-                  className="w-full pl-10 pr-4 py-3 bg-stone-800/60 border border-stone-700 rounded-lg text-stone-100 placeholder-stone-400 text-sm focus:outline-none focus:ring-2 focus:ring-amber-600/50 focus:border-amber-600/50 transition-all"
+                  className="w-full pl-10 pr-4 py-3 bg-stone-50 border border-stone-200 rounded-lg text-stone-900 placeholder-stone-400 text-sm focus:outline-none focus:ring-2 focus:ring-amber-600/50 focus:border-amber-600/50 transition-all"
                 />
               </div>
             </div>
 
             <div>
-              <label htmlFor="auth-password" className="block text-xs font-medium text-stone-400 mb-1.5 uppercase tracking-wide">
+              <label htmlFor="auth-password" className="block text-xs font-medium text-stone-600 mb-1.5 uppercase tracking-wide">
                 Password
               </label>
               <div className="relative">
-                <Lock aria-hidden="true" className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
+                <Lock aria-hidden="true" className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-600" />
                 <input
                   id="auth-password" autoComplete={mode === "signin" ? "current-password" : "new-password"}
                   aria-invalid={!!error} aria-describedby={error ? "auth-error" : undefined}
@@ -151,14 +148,14 @@ export function AuthScreen() {
                     [mode]: { ...values[mode], password: e.target.value },
                   }))}
                   placeholder="At least 6 characters"
-                  className="w-full pl-10 pr-12 py-3 bg-stone-800/60 border border-stone-700 rounded-lg text-stone-100 placeholder-stone-400 text-sm focus:outline-none focus:ring-2 focus:ring-amber-600/50 focus:border-amber-600/50 transition-all"
+                  className="w-full pl-10 pr-12 py-3 bg-stone-50 border border-stone-200 rounded-lg text-stone-900 placeholder-stone-400 text-sm focus:outline-none focus:ring-2 focus:ring-amber-600/50 focus:border-amber-600/50 transition-all"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword((shown) => !shown)}
                   aria-label={showPassword ? 'Hide password' : 'Show password'}
                   aria-pressed={showPassword}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded text-stone-400 hover:text-stone-300 transition-colors"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded text-stone-600 hover:text-stone-900 transition-colors"
                 >
                   {showPassword
                     ? <EyeOff className="w-4 h-4" aria-hidden="true" />
@@ -174,7 +171,7 @@ export function AuthScreen() {
             )}
 
             {mode === 'signup' && (
-              <div className="flex items-center gap-2 text-xs text-stone-400">
+              <div className="flex items-center gap-2 text-xs text-stone-600">
                 <UserIcon aria-hidden="true" className="w-3.5 h-3.5" />
                 <span>Your account is created instantly — no email confirmation needed.</span>
               </div>
@@ -191,7 +188,7 @@ export function AuthScreen() {
           </form>
         </div>
 
-        <p className="text-center text-stone-400 text-xs mt-6">
+        <p className="text-center text-stone-600 text-xs mt-6">
           A quiet space for great stories and ideas.
         </p>
       </div>
