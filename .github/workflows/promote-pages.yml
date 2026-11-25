@@ -304,14 +304,23 @@ jobs:
             }
             const route = '/repos/{owner}/{repo}/pages/deployments'
             const repo = context.repo
-            core.info(`Deploying uploaded Pages artifact ${artifactId}`)
-            const { data } = await github.request('POST ' + route, {
-              ...repo,
-              artifact_id: artifactId,
-              pages_build_version: context.sha,
-              oidc_token: await core.getIDToken()
-            })
-            const deployment_id = data.id || data.status_url?.split('/').pop() || context.sha
+            const { snapshot } = JSON.parse(require('node:fs').readFileSync('site/lumiere-deployment.json', 'utf8'))
+            if (!/^[0-9a-f]{40}$/.test(snapshot)) throw new Error('Invalid prepared Pages snapshot')
+            const requestId = response => response?.headers?.['x-github-request-id'] || 'unknown'
+            core.info(`Deploying artifact ${artifactId} from prepared snapshot ${snapshot}`)
+            const token = await core.getIDToken()
+            let created
+            try {
+              created = await github.request('POST ' + route, {
+                ...repo, artifact_id: artifactId, pages_build_version: snapshot, oidc_token: token
+              })
+            } catch (error) {
+              throw new Error(`Pages creation failed (HTTP ${error.status || 'unknown'}, request ${requestId(error.response)})`)
+            }
+            core.info(`Pages creation HTTP ${created.status}, request ${requestId(created)}`)
+            const { id, status_url } = created.data
+            const deployment_id = id || (status_url && new URL(status_url).pathname.match(/\/deployments\/([^/]+)\/?$/)?.[1])
+            if (!deployment_id) throw new Error('Pages returned no deployment identifier')
             const deployment = { ...repo, deployment_id }
             core.info(`Created Pages deployment ${deployment_id}`)
             const statusRoute = route + '/{deployment_id}'
@@ -322,9 +331,10 @@ jobs:
               try {
                 const response = await github.request('GET ' + statusRoute, deployment)
                 status = response.data.status
+                core.info(`Pages ${deployment_id} status ${status}, request ${requestId(response)}`)
               } catch (error) {
-                if ([401, 403].includes(error.status)) throw error
-                core.warning(`Status lookup for ${deployment_id} failed (HTTP ${error.status || 'unknown'}), retrying`)
+                if ([401, 403].includes(error.status)) throw new Error(`Pages status lookup denied (HTTP ${error.status}, request ${requestId(error.response)})`)
+                core.warning(`Status lookup for ${deployment_id} failed (HTTP ${error.status || 'unknown'}, request ${requestId(error.response)}), retrying`)
                 continue
               }
               if (status === 'succeed') return
