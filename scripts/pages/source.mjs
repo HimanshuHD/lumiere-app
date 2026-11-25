@@ -78,8 +78,21 @@ if (event.workflow_run) {
     snapshot = value;
     sha = value;
   } else if (operation === 'Verify preview') {
-    requireValue(kind === 'SHA' && /^[0-9a-f]{40}$/i.test(value), 'Enter the full SHA listed in the preview summary');
-    sha = value.toLowerCase();
+    if (kind === 'SHA') {
+      requireValue(/^[0-9a-f]{40}$/i.test(value), 'Enter the full preview revision or PR head SHA');
+      sha = value.toLowerCase();
+    } else {
+      const file = await api('contents/manifest.json?ref=pages-state');
+      const { preview } = JSON.parse(Buffer.from(file.content, 'base64').toString());
+      requireValue(preview?.pr && preview.status !== 'expired', 'No active PR preview to verify');
+      const pr = await api('pulls/' + preview.pr);
+      const matches = kind === 'PR' && value === String(pr.number) ||
+        kind === 'Branch' && value === pr.head.ref;
+      requireValue(matches && pr.head.repo?.full_name === repo && pr.head.sha === preview.head,
+        'Selection must match the PR or source branch of the currently deployed preview');
+      sha = preview.sha;
+      prNumber = pr.number;
+    }
   } else {
     let pr;
     if (kind === 'PR') {
