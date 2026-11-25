@@ -14,6 +14,12 @@ async function api(path) {
   return response.json();
 }
 
+// A main-to-staging sync must preserve whichever preview is currently live.
+if (env.PR_NUMBER) {
+  const merged = await api('pulls/' + env.PR_NUMBER);
+  if (merged.head.ref.startsWith('sync/')) process.exit(0);
+}
+
 function included(commit) {
   if (!/^[0-9a-f]{40}$/.test(commit ?? '')) return false;
   const result = spawnSync('git', ['merge-base', '--is-ancestor', commit, env.SOURCE_SHA]);
