@@ -24,6 +24,11 @@
 | Pages build and smoke test | | Yes |
 | Release branch eligibility | | Yes |
 | Preview verified | Yes | |
+| Production sign-off | | Yes (after rollout) |
+
+For a release, review staging before opening the release PR. Opening it is the developer's handoff of the deployed staging revision. CI compares the proposed merge tree with that revision and reports **Production sign-off** on the test merge commit. For a ready hotfix, run **Deploy → PR**, review the hosted preview, then run **Verify preview → SHA** from main. Verification reports the same status on the reviewed test merge commit. With this check required, an unreviewed hotfix waits for sign-off. Keep the existing PR checks and require branches to be up to date so a changed main base needs a fresh review.
+
+Roll out the workflow to main first. After a successful status appears, edit the existing **Live sign-off** ruleset targeting main. Under **Require status checks to pass**, add **Production sign-off** from GitHub Actions and enable **Require branches to be up to date before merging**. Test with a ready hotfix before and after verification and again after a new commit.
 
 The staging preview job builds for `/lumiere-app/preview/` and saves the tested artifact for manual deployment. The standalone Pages check on main tests the production root at `/lumiere-app/`. **Prepare deployment / Pages build and smoke test** appears in a promotion when the workflow builds a deployment candidate for its target URL. **Validate deployment revision / …** reports promotion-time tests. Use the unprefixed PR checks and the staging preview check in the rulesets.
 
