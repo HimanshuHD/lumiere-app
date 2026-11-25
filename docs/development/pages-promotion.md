@@ -6,13 +6,33 @@
 | Staging | [Lumiere staging](https://himanshuhd.github.io/lumiere-app/staging/) | The last published staging merge |
 | Preview | [Lumiere preview](https://himanshuhd.github.io/lumiere-app/preview/) | One developer-selected build, or an expiry notice after that verified change reaches staging |
 
+## Promotion paths
+
+```mermaid
+flowchart TD
+  A["Ready staging PR"] --> B["Validate and build preview"]
+  B --> C["Deploy and review preview"]
+  C --> D["Verify preview and merge"]
+  D --> E["Publish staging"]
+  S["Verified main sync merge"] --> E
+```
+
+```mermaid
+flowchart TD
+  A["Accepted staging"] --> B["Release PR"]
+  C["Hotfix PR"] --> D["Deploy and verify preview"]
+  B --> E["Production sign-off"]
+  D --> E
+  E --> F["Merge to main and publish"]
+```
+
 ## Set up GitHub and Supabase
 
 1. Set **Settings → Pages → Build and deployment → Source** to **GitHub Actions**. In **Settings → Environments → github-pages**, permit deployments from `main`. Configure GitHub rules so the Actions publisher can update `pages-prepared` and `pages-state`.
 2. Set repository Actions variables `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` to the shared hosted project's HTTPS origin and browser-safe publishable or anon key. The hosted deployment job also needs `SUPABASE_PROJECT_REF`, `SUPABASE_ACCESS_TOKEN`, and `SUPABASE_DB_PASSWORD` through the `supabase-hosted` environment or the corresponding repository Actions configuration.
 3. In Supabase **Authentication → URL Configuration → Redirect URLs**, allow the exact paths `/lumiere-app/auth/callback/`, `/lumiere-app/preview/auth/callback/`, and `/lumiere-app/staging/auth/callback/` on `https://himanshuhd.github.io`. Keep the pilot site URL and admission settings.
 4. Protect `staging` and `main` with PR requirements and up-to-date branches. Configure the exact required checks listed below.
-5. A change to the trusted publisher takes effect when it reaches `main` through a release PR. Until then, the manual dispatcher on `main` runs the previous implementation. The initial publisher can seed state from Pages run [45232260842](https://github.com/HimanshuHD/lumiere-app/actions/runs/45232260842) after comparing the root and preview HTML to the live site. Subsequent updates use the retained deployment state.
+5. The trusted publisher runs from `main`. Workflow changes take effect there after a release or hotfix merge.
 
 ## Required PR checks
 
@@ -23,16 +43,16 @@
 | Prepare preview / Pages build and smoke test | Yes | |
 | Pages build and smoke test | | Yes |
 | Release branch eligibility | | Yes |
-| Staging sign-off | Yes (after rollout) | |
-| Production sign-off | | Yes (after rollout) |
+| Staging sign-off | Yes | |
+| Production sign-off | | Yes |
 
-For a release, review staging before opening the release PR. Opening it is the developer's handoff of the deployed staging revision. CI compares the proposed merge tree with that revision and reports **Production sign-off** on the release PR head after rechecking the tested head and main base. For a ready hotfix, run **Deploy → PR**, review the hosted preview, then run **Verify preview → SHA** from main. Verification reports the same status on the hotfix PR head after rechecking the reviewed head and main base. With this check required, an unreviewed hotfix waits for sign-off. Keep the existing PR checks and require branches to be up to date so a changed main base needs a fresh review.
+For a release, review staging before opening the release PR. Opening it is the developer's handoff of the deployed staging revision. CI compares the proposed merge tree with that revision and reports **Production sign-off** on the release PR head after rechecking the tested head and main base. For a ready hotfix, run **Deploy → PR**, review the hosted preview, then run **Verify preview** from main. Verification reports the same status on the hotfix PR head after rechecking the reviewed head and main base. With this check required, an unreviewed hotfix waits for sign-off. Keep the existing PR checks and require branches to be up to date so a changed main base needs a fresh review.
 
-Roll out the workflow to main first. After a successful status appears, edit the existing **Live sign-off** ruleset targeting main. Under **Require status checks to pass**, add **Production sign-off** from GitHub Actions and enable **Require branches to be up to date before merging**. Test with a ready hotfix before and after verification and again after a new commit.
+Require **Production sign-off** from GitHub Actions in the main ruleset and keep the up-to-date branch requirement.
 
 The staging preview job builds for `/lumiere-app/preview/` and saves the tested artifact for manual deployment. The standalone Pages check on main tests the production root at `/lumiere-app/`. **Prepare deployment / Pages build and smoke test** appears in a promotion when the workflow builds a deployment candidate for its target URL. **Validate deployment revision / …** reports promotion-time tests. Use the unprefixed PR checks and the staging preview check in the rulesets.
 
-The previous names were `validate`, `database`, `preview / build`, `build`, and `Check PR source`. Replace those contexts with the new names once GitHub has a successful ready-PR run for each replacement. **Staging sign-off** appears in the PR merge area. During rollout, keep `Preview verified` required until `Staging sign-off` has appeared successfully in GitHub.
+Require **Staging sign-off** from GitHub Actions in the staging ruleset. That status covers the reviewed merge revision or an eligible main sync.
 
 ## Open, preview, and verify a PR
 
@@ -46,23 +66,23 @@ The previous names were `validate`, `database`, `preview / build`, `build`, and 
    | SHA | A full 40-character SHA | The ready PR matching the current head or proposed merge SHA. |
 
 3. The publisher requires a successful ready-PR run that tested the current head and base, using the current public Supabase config and trusted validation workflows. Preview publishes the resulting artifact. If the artifact is missing, stale or expired, rerun the ready PR's validation in Actions and then retry the deployment. The publisher rechecks the selected source before replacing the preview.
-4. Open the **Preview published** link in the summary and review the app. Run the workflow again with **Verify preview → SHA** and the full source commit or built revision from the summary. Verification checks that this is the active preview and, for PR previews, that the PR head and tested PR base are current. The verification run records **Preview verified** on the PR head and ties the sign-off to the active preview deployment. For an eligible staging PR, verification also posts **Staging sign-off** on the reviewed test merge commit. Deploy and recheck whenever the head or base changes.
+4. Open the **Preview published** link in the summary and review the app. Run the workflow again with **Verify preview** using the active preview’s PR number, PR source branch, or full head or build SHA. Verification checks that this is the active preview and, for PR previews, that the PR head and tested PR base are current. The verification run records **Preview verified** on the PR head and ties the sign-off to the active preview deployment. For an eligible staging PR, verification also posts **Staging sign-off** on the reviewed test merge commit. Deploy and recheck whenever the head or base changes.
 
 ### Sync main into staging
 
 Use a same-repository `sync/*` branch with a ready PR to `staging`. The trusted sync workflow reads PR metadata and compares GitHub’s proposed merge tree with current `main`. It posts **Staging sign-off** as **Main sync verified** when the files match. If they differ, use the normal preview review. The regular staging CI checks and up-to-date requirement apply to both paths.
 
-Once the workflows are available, confirm a successful `Staging sign-off` from the sync workflow and a successful manual sign-off from the publisher on `main`. Then edit the staging ruleset and replace `Preview verified` with `Staging sign-off`, using GitHub Actions as the source. Keep the remaining required checks and strict up-to-date validation.
+A `sync/*` merge preserves the active preview during staging publication.
 
 ## Promote to staging and production
 
-- **Staging.** Merge a verified PR to `staging`. **Queue merged Pages change** signals the trusted publisher, which validates and builds the resulting staging commit for `/lumiere-app/staging/`. The publisher records staging and expires the matching verified preview in the same Pages publication. The preview address then shows a static Lumiere notice with links to staging, production, and the PR and referenced issues when available. Issue #84 is the fallback reference for a change without an issue link in the PR body. An unrelated preview stays available. The next preview deploy replaces the notice.
+- **Staging.** Merge a verified PR to `staging`. **Queue merged Pages change** signals the trusted publisher, which reuses matching application and database validation when eligible, otherwise runs fresh validation, and builds the resulting staging commit for `/lumiere-app/staging/`. The publisher records staging and expires the matching verified preview on ordinary staging merges in the same Pages publication. The preview address then shows a static Lumiere notice with links to staging, production, and the PR and referenced issues when available. Issue #84 is the fallback reference for a change without an issue link in the PR body. An unrelated preview stays available. The next preview deploy replaces the notice.
 - **Production.** After accepting staging, branch `release/*` from the deployed staging revision and open a ready PR to `main`. The release contents must match deployed staging. For an urgent change, branch `hotfix/*` from `main`, validate and preview it, then bring the merged fix back into staging. An eligible merge to `main` builds for `/lumiere-app/`. If migration SQL, Edge Function inputs, or `supabase/config.toml` changed since the deployed backend baseline, the hosted job applies migrations and deploys functions before Pages publishes.
 - **Shared backend.** Preview and staging run frontend deployments, with SQL and functions tested against disposable Supabase in CI. The hosted site builds share the live project and its data. Features that need a pending migration can be exercised in CI or against a separately configured test project. Use backward-compatible backend changes so the current live frontend continues to work during a production promotion.
 
 ## Read the Actions results
 
-PR jobs report the checked source, application checks, database checks, and Pages smoke test. Promotion runs report the published environment and link, built revision, source commit for sign-off, retained environments, and any preview expiry. **Summarize promotion** lists which jobs succeeded, failed, skipped, or reused an earlier run. A failed job's logs and any browser failure artifact have the step-level diagnostics.
+PR jobs report the checked source, application checks, database checks, and Pages smoke test. Promotion runs report the published environment and link, built revision, source commit for sign-off, retained environments, and any preview expiry. **Summarize promotion** lists which jobs succeeded, failed, skipped, or reused an earlier run. Successful hotfix verification links to the live app. Review the candidate at the preview URL before sign-off. A failed job's logs and any browser failure artifact have the step-level diagnostics.
 
 ## Recover or roll back
 
