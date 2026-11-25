@@ -188,19 +188,25 @@ jobs:
       - name: Open last successful state
         id: state
         run: |
-          # Recover if Pages succeeded but recording the active ref was interrupted.
-          if git show-ref --verify --quiet refs/remotes/origin/pages-prepared; then
+          # Matching refs mean deployment and recording both completed.
+          active=$(git rev-parse --verify --quiet refs/remotes/origin/pages-state || true)
+          prepared=$(git rev-parse --verify --quiet refs/remotes/origin/pages-prepared || true)
+          if [[ -n "$prepared" && "$prepared" != "$active" ]]; then
             status=$(curl -sSL -o "$RUNNER_TEMP/live-state" -w '%{http_code}' "https://himanshuhd.github.io/lumiere-app/lumiere-deployment.json?run=$GITHUB_RUN_ID")
+            echo "Recovery check: HTTP $status, active=${active:-none}, prepared=$prepared"
             if [[ "$status" == 200 ]]; then
-              live=$(jq -er '.snapshot' "$RUNNER_TEMP/live-state")
-              [[ "$live" =~ ^[0-9a-f]{40}$ ]]
-              if ! git rev-parse --verify origin/pages-state | grep -Fxq "$live"; then
-                test "$(git rev-parse origin/pages-prepared)" = "$live"
+              if ! live=$(jq -er '.snapshot | strings | select(test("^[0-9a-f]{40}$"))' "$RUNNER_TEMP/live-state"); then
+                echo "::error::Live Pages marker has no valid snapshot SHA"; exit 1
+              fi
+              echo "Live Pages snapshot: $live"
+              if [[ "$live" == "$prepared" ]]; then
                 git push origin "$live:refs/heads/pages-state"
                 git fetch origin refs/heads/pages-state:refs/remotes/origin/pages-state
+              elif [[ "$live" != "$active" ]]; then
+                echo "::error::Live Pages snapshot matches neither saved revision"; exit 1
               fi
-            elif [[ "$status" != 404 ]] || git show-ref --verify --quiet refs/remotes/origin/pages-state; then
-              echo "::error::Cannot reconcile live deployment state"; exit 1
+            elif [[ "$status" != 404 || -n "$active" ]]; then
+              echo "::error::Cannot reconcile live Pages marker (HTTP $status)"; exit 1
             fi
           fi
           if git show-ref --verify --quiet refs/remotes/origin/pages-state; then
@@ -270,10 +276,54 @@ jobs:
           git -C state push --force-with-lease origin HEAD:refs/heads/pages-prepared
           jq -n --arg snapshot "$(git -C state rev-parse HEAD)" '{snapshot:$snapshot}' > site/lumiere-deployment.json
       - uses: actions/upload-pages-artifact@v4
+        id: pages_upload
         with:
           path: site
-      - id: pages
-        uses: actions/deploy-pages@v4
+          name: github-pages-${{ github.run_id }}-${{ github.run_attempt }}
+      - name: Deploy the uploaded Pages artifact
+        id: pages
+        uses: actions/github-script@v8
+        env:
+          PAGES_ARTIFACT_ID: ${{ steps.pages_upload.outputs.artifact_id }}
+        with:
+          script: |
+            const artifactId = Number(process.env.PAGES_ARTIFACT_ID)
+            if (!Number.isSafeInteger(artifactId) || artifactId <= 0) {
+              throw new Error('Pages upload did not return a valid artifact ID')
+            }
+            const route = '/repos/{owner}/{repo}/pages/deployments'
+            const repo = context.repo
+            core.info(`Deploying uploaded Pages artifact ${artifactId}`)
+            const { data } = await github.request('POST ' + route, {
+              ...repo,
+              artifact_id: artifactId,
+              pages_build_version: context.sha,
+              oidc_token: await core.getIDToken()
+            })
+            const deployment_id = data.id || data.status_url?.split('/').pop() || context.sha
+            const deployment = { ...repo, deployment_id }
+            core.info(`Created Pages deployment ${deployment_id}`)
+            const statusRoute = route + '/{deployment_id}'
+            const deadline = Date.now() + 600000
+            while (Date.now() < deadline) {
+              await new Promise(resolve => setTimeout(resolve, 5000))
+              let status
+              try {
+                const response = await github.request('GET ' + statusRoute, deployment)
+                status = response.data.status
+              } catch (error) {
+                if ([401, 403].includes(error.status)) throw error
+                core.warning(`Status lookup for ${deployment_id} failed (HTTP ${error.status || 'unknown'}), retrying`)
+                continue
+              }
+              if (status === 'succeed') return
+              if (['deployment_failed', 'deployment_perms_error', 'deployment_content_failed',
+                   'deployment_cancelled', 'deployment_lost'].includes(status)) {
+                throw new Error(`Pages deployment ${deployment_id} ended with ${status}`)
+              }
+            }
+            await github.request('POST ' + statusRoute + '/cancel', deployment)
+            throw new Error(`Pages deployment ${deployment_id} timed out`)
       - name: Record successful deployment
         run: |
           git -C state push origin HEAD:refs/heads/pages-state
