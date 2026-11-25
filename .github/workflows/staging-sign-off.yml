@@ -1,0 +1,61 @@
+name: Check staging sync sign-off
+
+on:
+  pull_request_target:
+    branches: [staging]
+    types: [opened, reopened, synchronize, ready_for_review, edited]
+
+permissions: {}
+
+jobs:
+  check-main-sync:
+    name: Check whether the sync matches main
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      !github.event.pull_request.draft && startsWith(github.head_ref, 'sync/')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+      statuses: write
+    steps:
+      - uses: actions/github-script@v8
+        with:
+          script: |
+            // The base workflow reads GitHub metadata only. It never checks out PR code.
+            const repo = context.repo
+            const eventPr = context.payload.pull_request
+            const getPr = async () => (await github.rest.pulls.get({
+              ...repo, pull_number: eventPr.number
+            })).data
+            const getBranch = async branch => (await github.rest.repos.getBranch({ ...repo, branch })).data.commit
+            const eligible = pr => pr.state === 'open' && !pr.draft && pr.base.ref === 'staging' &&
+              pr.head.repo?.full_name === process.env.GITHUB_REPOSITORY &&
+              pr.head.ref.startsWith('sync/') && pr.head.sha === eventPr.head.sha
+
+            for (let attempt = 0; attempt < 6; attempt++) {
+              const [pr, staging, main] = await Promise.all([getPr(), getBranch('staging'), getBranch('main')])
+              if (!eligible(pr)) return
+              if (pr.mergeable && pr.merge_commit_sha) {
+                const { data: merge } = await github.rest.git.getCommit({ ...repo, commit_sha: pr.merge_commit_sha })
+                const [base, head] = merge.parents
+                if (merge.parents.length === 2 && base.sha === staging.sha && head.sha === pr.head.sha) {
+                  const [current, currentStaging, currentMain] = await Promise.all([getPr(), getBranch('staging'), getBranch('main')])
+                  if (!eligible(current)) return
+                  if (current.merge_commit_sha !== merge.sha || currentStaging.sha !== staging.sha || currentMain.sha !== main.sha) continue
+                  if (merge.tree.sha !== main.commit.tree.sha) {
+                    await core.summary.addRaw('The proposed merge differs from main. The staging sign-off requires a reviewed preview.').write()
+                    return
+                  }
+                  await github.rest.repos.createCommitStatus({
+                    ...repo, sha: merge.sha, context: 'Staging sign-off', state: 'success',
+                    description: 'Main sync verified',
+                    target_url: `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${context.runId}`
+                  })
+                  await core.summary.addRaw(`Main sync verified for PR #${pr.number}. Merge ${merge.sha} matches main ${main.sha}.`).write()
+                  return
+                }
+              }
+              if (attempt < 5) await new Promise(resolve => setTimeout(resolve, 3000))
+            }
+            core.setFailed('GitHub has no merge revision for the current PR head and staging tip. Retry after GitHub refreshes the PR.')
