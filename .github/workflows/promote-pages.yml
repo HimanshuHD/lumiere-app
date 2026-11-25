@@ -160,19 +160,25 @@ jobs:
       - name: Open last successful state
         id: state
         run: |
-          # Recover if Pages succeeded but recording the active ref was interrupted.
-          if git show-ref --verify --quiet refs/remotes/origin/pages-prepared; then
+          # Matching refs mean deployment and recording both completed.
+          active=$(git rev-parse --verify --quiet refs/remotes/origin/pages-state || true)
+          prepared=$(git rev-parse --verify --quiet refs/remotes/origin/pages-prepared || true)
+          if [[ -n "$prepared" && "$prepared" != "$active" ]]; then
             status=$(curl -sSL -o "$RUNNER_TEMP/live-state" -w '%{http_code}' "https://himanshuhd.github.io/lumiere-app/lumiere-deployment.json?run=$GITHUB_RUN_ID")
+            echo "Recovery check: HTTP $status, active=${active:-none}, prepared=$prepared"
             if [[ "$status" == 200 ]]; then
-              live=$(jq -er '.snapshot' "$RUNNER_TEMP/live-state")
-              [[ "$live" =~ ^[0-9a-f]{40}$ ]]
-              if ! git rev-parse --verify origin/pages-state | grep -Fxq "$live"; then
-                test "$(git rev-parse origin/pages-prepared)" = "$live"
+              if ! live=$(jq -er '.snapshot | strings | select(test("^[0-9a-f]{40}$"))' "$RUNNER_TEMP/live-state"); then
+                echo "::error::Live Pages marker has no valid snapshot SHA"; exit 1
+              fi
+              echo "Live Pages snapshot: $live"
+              if [[ "$live" == "$prepared" ]]; then
                 git push origin "$live:refs/heads/pages-state"
                 git fetch origin refs/heads/pages-state:refs/remotes/origin/pages-state
+              elif [[ "$live" != "$active" ]]; then
+                echo "::error::Live Pages snapshot matches neither saved revision"; exit 1
               fi
-            elif [[ "$status" != 404 ]] || git show-ref --verify --quiet refs/remotes/origin/pages-state; then
-              echo "::error::Cannot reconcile live deployment state"; exit 1
+            elif [[ "$status" != 404 || -n "$active" ]]; then
+              echo "::error::Cannot reconcile live Pages marker (HTTP $status)"; exit 1
             fi
           fi
           if git show-ref --verify --quiet refs/remotes/origin/pages-state; then
