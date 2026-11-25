@@ -23,11 +23,16 @@
 | Prepare preview / Pages build and smoke test | Yes | |
 | Pages build and smoke test | | Yes |
 | Release branch eligibility | | Yes |
-| Preview verified | Yes | |
+| Staging sign-off | Yes (after rollout) | |
+| Production sign-off | | Yes (after rollout) |
+
+For a release, review staging before opening the release PR. Opening it is the developer's handoff of the deployed staging revision. CI compares the proposed merge tree with that revision and reports **Production sign-off** on the test merge commit. For a ready hotfix, run **Deploy → PR**, review the hosted preview, then run **Verify preview → SHA** from main. Verification reports the same status on the reviewed test merge commit. With this check required, an unreviewed hotfix waits for sign-off. Keep the existing PR checks and require branches to be up to date so a changed main base needs a fresh review.
+
+Roll out the workflow to main first. After a successful status appears, edit the existing **Live sign-off** ruleset targeting main. Under **Require status checks to pass**, add **Production sign-off** from GitHub Actions and enable **Require branches to be up to date before merging**. Test with a ready hotfix before and after verification and again after a new commit.
 
 The staging preview job builds for `/lumiere-app/preview/` and saves the tested artifact for manual deployment. The standalone Pages check on main tests the production root at `/lumiere-app/`. **Prepare deployment / Pages build and smoke test** appears in a promotion when the workflow builds a deployment candidate for its target URL. **Validate deployment revision / …** reports promotion-time tests. Use the unprefixed PR checks and the staging preview check in the rulesets.
 
-The previous names were `validate`, `database`, `preview / build`, `build`, and `Check PR source`. Replace those contexts with the new names once GitHub has a successful ready-PR run for each replacement. **Preview verified** stays the same. It appears in the PR merge status area once the manual **Verify preview** operation posts it to the PR head.
+The previous names were `validate`, `database`, `preview / build`, `build`, and `Check PR source`. Replace those contexts with the new names once GitHub has a successful ready-PR run for each replacement. **Staging sign-off** appears in the PR merge area. During rollout, keep `Preview verified` required until `Staging sign-off` has appeared successfully in GitHub.
 
 ## Open, preview, and verify a PR
 
@@ -41,7 +46,13 @@ The previous names were `validate`, `database`, `preview / build`, `build`, and 
    | SHA | A full 40-character SHA | The ready PR matching the current head or proposed merge SHA. |
 
 3. The publisher requires a successful ready-PR run that tested the current head and base, using the current public Supabase config and trusted validation workflows. Preview publishes the resulting artifact. If the artifact is missing, stale or expired, rerun the ready PR's validation in Actions and then retry the deployment. The publisher rechecks the selected source before replacing the preview.
-4. Open the **Preview published** link in the summary and review the app. Run the workflow again with **Verify preview → SHA** and the full source commit or built revision from the summary. Verification checks that this is the active preview and, for PR previews, that the PR head and tested PR base are current. The verification run records **Preview verified** on the PR head and ties the sign-off to the active preview deployment. Deploy and recheck whenever the head or base changes.
+4. Open the **Preview published** link in the summary and review the app. Run the workflow again with **Verify preview → SHA** and the full source commit or built revision from the summary. Verification checks that this is the active preview and, for PR previews, that the PR head and tested PR base are current. The verification run records **Preview verified** on the PR head and ties the sign-off to the active preview deployment. For an eligible staging PR, verification also posts **Staging sign-off** on the reviewed test merge commit. Deploy and recheck whenever the head or base changes.
+
+### Sync main into staging
+
+Use a same-repository `sync/*` branch with a ready PR to `staging`. The trusted sync workflow reads PR metadata and compares GitHub’s proposed merge tree with current `main`. It posts **Staging sign-off** as **Main sync verified** when the files match. If they differ, use the normal preview review. The regular staging CI checks and up-to-date requirement apply to both paths.
+
+Once the workflows are available, confirm a successful `Staging sign-off` from the sync workflow and a successful manual sign-off from the publisher on `main`. Then edit the staging ruleset and replace `Preview verified` with `Staging sign-off`, using GitHub Actions as the source. Keep the remaining required checks and strict up-to-date validation.
 
 ## Promote to staging and production
 
