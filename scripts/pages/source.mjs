@@ -110,36 +110,66 @@ if (event.workflow_run) {
       'GitHub has not prepared a merge candidate for the current PR head and base. Try again after PR checks start.');
     sha = candidate.sha;
   }
-  if (base && !env.RECHECK_PREVIEW) {
+}
+let validationRun = '';
+let testedSha = sha;
+if (target === 'staging' && event.workflow_run) {
+  try {
+    const file = await api('contents/manifest.json?ref=pages-state');
+    const { preview } = JSON.parse(Buffer.from(file.content, 'base64').toString());
+    if (String(preview.pr) === String(prNumber) && preview.head === head && preview.status !== 'expired') {
+      const [tested, merged] = await Promise.all([preview.sha, sha].map(id => api('git/commits/' + id)));
+      if (tested.tree.sha === merged.tree.sha && tested.parents[1]?.sha === head) testedSha = tested.sha;
+      else testedSha = '';
+    } else testedSha = '';
+  } catch {
+    testedSha = '';
+  }
+}
+const previewLookup = base && !env.RECHECK_PREVIEW;
+const stagingLookup = target === 'staging' && event.workflow_run && testedSha;
+if (previewLookup || stagingLookup) {
+  try {
     requireValue(env.SUPABASE_URL && env.SUPABASE_KEY, 'Missing hosted Pages configuration');
     const workflows = ['validate.yml', 'pages-app-preview.yml'];
     const versionsMatch = await Promise.all(workflows.map(async name => {
       const path = '.github/workflows/' + name;
       const trusted = execFileSync('git', ['rev-parse', 'HEAD:' + path], { encoding: 'utf8' }).trim();
-      const tested = await api(`contents/${path}?ref=${sha}`);
+      const tested = await api(`contents/${path}?ref=${testedSha}`);
       return tested.sha === trusted;
     }));
     if (versionsMatch.every(Boolean)) {
       const config = createHash('sha256').update(env.SUPABASE_URL + '\0' + env.SUPABASE_KEY).digest('hex');
-      const name = `lumiere-preview-${sha}-${config}`;
+      const name = `lumiere-preview-${testedSha}-${config}`;
       const results = await api(`actions/workflows/validate.yml/runs?event=pull_request&status=success&head_sha=${head}&per_page=10`);
       for (const run of results.workflow_runs) {
         const files = await api(`actions/runs/${run.id}/artifacts?name=${name}`);
         const match = files.artifacts.find(file => file.name === name && !file.expired);
         if (!match) continue;
-        artifactRun = run.id;
-        artifact = match.id;
+        if (stagingLookup) {
+          if (!run.pull_requests?.some(pr => pr.number === prNumber && pr.base.ref === 'staging')) continue;
+          const jobs = await api(`actions/runs/${run.id}/attempts/${run.run_attempt}/jobs?per_page=100`);
+          if (!['Application tests', 'Supabase migration and function tests'].every(name =>
+            jobs.jobs.some(job => job.name === name && job.conclusion === 'success'))) continue;
+          validationRun = run.id;
+        } else {
+          artifactRun = run.id;
+          artifact = match.id;
+        }
         break;
       }
     }
-    requireValue(artifact, 'No matching validated preview artifact. Check the ready PR validation run, then retry preview deployment.');
+    if (previewLookup) requireValue(artifact, 'No matching validated preview artifact. Check the ready PR validation run, then retry preview deployment.');
+  } catch (error) {
+    if (previewLookup) throw error;
+    console.log('Validation reuse unavailable. Running staging tests:', error.message);
   }
 }
 requireValue(/^[0-9a-f]{40}$/.test(sha), 'Invalid resolved commit');
-for (const [key, value] of Object.entries({ target, sha, backend, snapshot, head, base, prNumber, artifactRun, artifact })) {
+for (const [key, value] of Object.entries({ target, sha, backend, snapshot, head, base, prNumber, artifactRun, artifact, validationRun })) {
   appendFileSync(env.GITHUB_OUTPUT, `${key}=${value}\n`);
 }
 const revisionLabel = snapshot ? 'Snapshot' : 'Revision';
-const checks = artifact ? `- Reusing validation and build from [run ${artifactRun}](${env.GITHUB_SERVER_URL}/${repo}/actions/runs/${artifactRun}).\n`
+const checks = validationRun ? `- Reusing application and database tests from [run ${validationRun}](${env.GITHUB_SERVER_URL}/${repo}/actions/runs/${validationRun}). Building for staging.\n` : artifact ? `- Reusing validation and build from [run ${artifactRun}](${env.GITHUB_SERVER_URL}/${repo}/actions/runs/${artifactRun}).\n`
   : operation === 'Deploy' ? '- The selected revision will run fresh validation and a Pages build.\n' : '';
 appendFileSync(env.GITHUB_STEP_SUMMARY, `### Selected ${target} operation\n\n- Operation: **${operation}**\n- ${revisionLabel}: \`${sha}\`\n${head ? `- PR head: \`${head}\`\n` : ''}${checks}`);
