@@ -52,6 +52,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      pull-requests: read
       statuses: write
     steps:
       - uses: actions/github-script@v8
@@ -66,9 +67,21 @@ jobs:
             const [candidate, deployed] = await Promise.all([context.sha, staged].map(commit_sha =>
               github.rest.git.getCommit({ ...repo, commit_sha }).then(result => result.data)
             ))
+            const tested = context.payload.pull_request
+            const [{ data: pr }, { data: main }] = await Promise.all([
+              github.rest.pulls.get({ ...repo, pull_number: tested.number }),
+              github.rest.repos.getBranch({ ...repo, branch: 'main' })
+            ])
+            if (pr.state !== 'open' || pr.draft || pr.base.ref !== 'main' ||
+                !pr.head.ref.startsWith('release/') || pr.head.sha !== tested.head.sha ||
+                main.commit.sha !== tested.base.sha || candidate.parents[0]?.sha !== tested.base.sha ||
+                candidate.parents[1]?.sha !== tested.head.sha) {
+              throw new Error('Release head or main changed since validation')
+            }
+            core.info(`Release head=${pr.head.sha} base=${main.commit.sha} tested merge=${context.sha}`)
             const accepted = candidate.tree.sha === deployed.tree.sha
             await github.rest.repos.createCommitStatus({
-              ...repo, sha: context.sha, context: 'Production sign-off',
+              ...repo, sha: pr.head.sha, context: 'Production sign-off',
               state: accepted ? 'success' : 'failure',
               description: accepted ? 'Proposed merge matches deployed staging' : 'Proposed merge differs from deployed staging',
               target_url: `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${context.runId}`
