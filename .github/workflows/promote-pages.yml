@@ -39,6 +39,7 @@ jobs:
       head: ${{ steps.source.outputs.head }}
       base: ${{ steps.source.outputs.base }}
       pr: ${{ steps.source.outputs.prNumber }}
+      validation_run: ${{ steps.source.outputs.validationRun }}
       artifact_run: ${{ steps.source.outputs.artifactRun }}
       artifact_id: ${{ steps.source.outputs.artifact }}
     steps:
@@ -56,7 +57,7 @@ jobs:
   validate:
     name: Validate deployment revision
     needs: resolve
-    if: needs.resolve.outputs.sha != '' && inputs.operation != 'Verify preview' && needs.resolve.outputs.snapshot == '' && needs.resolve.outputs.target != 'preview'
+    if: needs.resolve.outputs.sha != '' && inputs.operation != 'Verify preview' && needs.resolve.outputs.snapshot == '' && needs.resolve.outputs.target != 'preview' && needs.resolve.outputs.validation_run == ''
     uses: ./.github/workflows/validate.yml
     with:
       candidate: ${{ needs.resolve.outputs.sha }}
@@ -64,6 +65,9 @@ jobs:
   build:
     name: Prepare deployment
     needs: [resolve, validate]
+    if: >-
+      always() && !cancelled() && needs.resolve.result == 'success' &&
+      (needs.validate.result == 'success' || (needs.validate.result == 'skipped' && needs.resolve.outputs.validation_run != ''))
     uses: ./.github/workflows/pages-app-preview.yml
     with:
       candidate: ${{ needs.resolve.outputs.sha }}
