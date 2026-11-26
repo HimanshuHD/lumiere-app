@@ -54,6 +54,12 @@ The staging preview job builds for `/lumiere-app/preview/` and saves the tested 
 
 Require **Staging sign-off** from GitHub Actions in the staging ruleset. That status covers the reviewed merge revision or an eligible main sync.
 
+## Documentation-only changes
+
+Markdown changes under `docs/`, plus the root `README.md` and `CHANGELOG.md`, qualify when the entire change stays in those paths. Mixed changes and moves across that boundary follow normal validation. A lightweight check classifies the proposed merge and records sign-off where required. Documentation-only PRs skip app tests, database tests, Pages builds, and manual preview. After merge, deployment is skipped when the deployed app files already match. A release can include documentation commits added after the staging deployment.
+
+Checklist and title edits leave validation jobs idle. Retargeting an open PR still evaluates the checks for its new base branch.
+
 ## Open, preview, and verify a PR
 
 1. Branch from `staging` and open a draft PR targeting `staging`. Drafts skip expensive jobs. A ready same-repository staging PR runs the application and disposable Supabase checks on GitHub's proposed merge commit. After both pass, the same run builds for `/lumiere-app/preview/`, smoke-tests the emitted site in Chromium, and uploads the result. A ready PR to `main` runs the release checks and a build for `/lumiere-app/`.
