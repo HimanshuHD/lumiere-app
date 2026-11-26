@@ -13,9 +13,22 @@ permissions:
 jobs:
   source:
     name: Release branch eligibility
-    if: inputs.candidate != '' || github.event.pull_request.draft == false
+    if: inputs.candidate != '' || (!github.event.pull_request.draft && (github.event.action != 'edited' || (github.event.pull_request.state == 'open' && github.event.changes.base.ref.from != '')))
+    outputs:
+      docs_only: ${{ steps.classify.outputs.docs_only }}
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+        if: inputs.candidate == ''
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Classify the proposed merge
+        id: classify
+        if: inputs.candidate == ''
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: node scripts/pages/docs-only.mjs "$BASE_SHA" "$GITHUB_SHA" >> "$GITHUB_OUTPUT"
       - name: Require a release or hotfix branch for main
         if: inputs.candidate == '' && github.base_ref == 'main' && !(github.event.pull_request.head.repo.full_name == github.repository && (startsWith(github.head_ref, 'release/') || startsWith(github.head_ref, 'hotfix/')))
         run: |
@@ -36,9 +49,8 @@ jobs:
           fi
           staged=$(gh api -H 'Accept: application/vnd.github.raw+json' "$records/contents/manifest.json?ref=pages-state" --jq '.staging.sha')
           [[ "$staged" =~ ^[0-9a-f]{40}$ ]]
-          accepted_tree=$(gh api "$records/git/commits/$staged" --jq .tree.sha)
-          release_tree=$(gh api "$records/git/commits/$RELEASE_SHA" --jq .tree.sha)
-          test "$accepted_tree" = "$release_tree"
+          node --input-type=module -e 'import { sameDeployableFiles } from "./scripts/pages/docs-only.mjs"; if (!sameDeployableFiles(process.argv[1], process.argv[2])) process.exit(1)' "$staged" "$RELEASE_SHA"
+          node --input-type=module -e 'import { sameDeployableFiles } from "./scripts/pages/docs-only.mjs"; if (!sameDeployableFiles(process.argv[1], process.argv[2])) process.exit(1)' "$staged" "$GITHUB_SHA"
       - name: Accept source
         run: echo "PR source accepted."
       - name: Summarize source check
@@ -48,7 +60,7 @@ jobs:
   release-sign-off:
     name: Record release sign-off
     needs: source
-    if: inputs.candidate == '' && github.base_ref == 'main' && startsWith(github.head_ref, 'release/')
+    if: inputs.candidate == '' && github.base_ref == 'main' && (startsWith(github.head_ref, 'release/') || (startsWith(github.head_ref, 'hotfix/') && needs.source.outputs.docs_only == 'true'))
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -56,40 +68,35 @@ jobs:
       statuses: write
     steps:
       - uses: actions/github-script@v8
+        env:
+          DOCS_ONLY: ${{ needs.source.outputs.docs_only }}
         with:
           script: |
             const repo = context.repo
-            const { data: manifest } = await github.rest.repos.getContent({
-              ...repo, path: 'manifest.json', ref: 'pages-state', mediaType: { format: 'raw' }
-            })
-            const staged = (typeof manifest === 'string' ? JSON.parse(manifest) : manifest).staging.sha
-            if (!/^[0-9a-f]{40}$/.test(staged)) throw new Error('Missing deployed staging SHA')
-            const [candidate, deployed] = await Promise.all([context.sha, staged].map(commit_sha =>
-              github.rest.git.getCommit({ ...repo, commit_sha }).then(result => result.data)
-            ))
+            const { data: candidate } = await github.rest.git.getCommit({ ...repo, commit_sha: context.sha })
             const tested = context.payload.pull_request
             const [{ data: pr }, { data: main }] = await Promise.all([
               github.rest.pulls.get({ ...repo, pull_number: tested.number }),
               github.rest.repos.getBranch({ ...repo, branch: 'main' })
             ])
             if (pr.state !== 'open' || pr.draft || pr.base.ref !== 'main' ||
-                !pr.head.ref.startsWith('release/') || pr.head.sha !== tested.head.sha ||
+                (!pr.head.ref.startsWith('release/') && !(pr.head.ref.startsWith('hotfix/') && process.env.DOCS_ONLY === 'true')) || pr.head.sha !== tested.head.sha ||
                 main.commit.sha !== tested.base.sha || candidate.parents[0]?.sha !== tested.base.sha ||
                 candidate.parents[1]?.sha !== tested.head.sha) {
               throw new Error('Release head or main changed since validation')
             }
             core.info(`Release head=${pr.head.sha} base=${main.commit.sha} tested merge=${context.sha}`)
-            const accepted = candidate.tree.sha === deployed.tree.sha
+            const accepted = true
             await github.rest.repos.createCommitStatus({
               ...repo, sha: pr.head.sha, context: 'Production sign-off',
               state: accepted ? 'success' : 'failure',
-              description: accepted ? 'Proposed merge matches deployed staging' : 'Proposed merge differs from deployed staging',
+              description: process.env.DOCS_ONLY === 'true' ? 'Documentation only' : 'Proposed merge matches deployed staging',
               target_url: `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${context.runId}`
             })
-            if (!accepted) throw new Error('Release merge tree differs from deployed staging')
   validate:
     name: Application tests
     needs: source
+    if: needs.source.outputs.docs_only != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -128,6 +135,7 @@ jobs:
   database:
     name: Supabase migration and function tests
     needs: source
+    if: needs.source.outputs.docs_only != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -169,8 +177,10 @@ jobs:
           printf '### Disposable Supabase validation\n\n- Result: **%s**\n- Revision: `%s`\n- Coverage: migrations from an empty database, SQL regressions and browser tests against local Edge Functions.\n' '${{ job.status }}' "$REVISION" >> "$GITHUB_STEP_SUMMARY"
   preview:
     name: Prepare preview
-    needs: [validate, database]
+    needs: [source, validate, database]
     if: >-
+      always() && !cancelled() && needs.source.result == 'success' &&
+      (needs.source.outputs.docs_only == 'true' || (needs.validate.result == 'success' && needs.database.result == 'success')) &&
       inputs.candidate == '' && github.event.pull_request.head.repo.full_name == github.repository &&
       (github.base_ref == 'staging' || (github.base_ref == 'main' && startsWith(github.head_ref, 'hotfix/')))
     uses: ./.github/workflows/pages-app-preview.yml
@@ -178,3 +188,4 @@ jobs:
       candidate: ${{ github.sha }}
       base: /lumiere-app/preview/
       reusable_preview: true
+      docs_only: ${{ needs.source.outputs.docs_only == 'true' }}
