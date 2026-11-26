@@ -9,20 +9,25 @@ permissions: {}
 
 jobs:
   check-main-sync:
-    name: Check whether the sync matches main
+    name: Check docs-only and main sync eligibility
     if: >-
       github.event.pull_request.head.repo.full_name == github.repository &&
-      !github.event.pull_request.draft && startsWith(github.head_ref, 'sync/')
+      !github.event.pull_request.draft &&
+      (github.event.action != 'edited' || (github.event.pull_request.state == 'open' && github.event.changes.base.ref.from != ''))
     runs-on: ubuntu-latest
     permissions:
       contents: read
       pull-requests: read
       statuses: write
     steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          persist-credentials: false
       - uses: actions/github-script@v8
         with:
           script: |
-            // The base workflow reads GitHub metadata only. It never checks out PR code.
+            const { isDocumentation } = await import(process.cwd() + '/scripts/pages/docs-only.mjs')
             const repo = context.repo
             const eventPr = context.payload.pull_request
             const getPr = async () => (await github.rest.pulls.get({
@@ -31,7 +36,7 @@ jobs:
             const getBranch = async branch => (await github.rest.repos.getBranch({ ...repo, branch })).data.commit
             const eligible = pr => pr.state === 'open' && !pr.draft && pr.base.ref === 'staging' &&
               pr.head.repo?.full_name === process.env.GITHUB_REPOSITORY &&
-              pr.head.ref.startsWith('sync/') && pr.head.sha === eventPr.head.sha
+              pr.head.sha === eventPr.head.sha
 
             for (let attempt = 0; attempt < 6; attempt++) {
               const [pr, staging, main] = await Promise.all([getPr(), getBranch('staging'), getBranch('main')])
@@ -43,16 +48,24 @@ jobs:
                   const [current, currentStaging, currentMain] = await Promise.all([getPr(), getBranch('staging'), getBranch('main')])
                   if (!eligible(current)) return
                   if (current.merge_commit_sha !== merge.sha || currentStaging.sha !== staging.sha || currentMain.sha !== main.sha) continue
-                  if (merge.tree.sha !== main.commit.tree.sha) {
+                  const { data: comparison } = await github.rest.repos.compareCommits({
+                    ...repo, base: staging.sha, head: merge.sha
+                  })
+                  const files = comparison.files ?? []
+                  // Compare returns at most 300 files. A capped result cannot grant an exemption.
+                  const docsOnly = files.length > 0 && files.length < 300 && files.every(file =>
+                    isDocumentation(file.filename) && (!file.previous_filename || isDocumentation(file.previous_filename)))
+                  const mainSync = pr.head.ref.startsWith('sync/') && merge.tree.sha === main.commit.tree.sha
+                  if (!docsOnly && !mainSync) {
                     await core.summary.addRaw('The proposed merge differs from main. The staging sign-off requires a reviewed preview.').write()
                     return
                   }
                   await github.rest.repos.createCommitStatus({
                     ...repo, sha: merge.sha, context: 'Staging sign-off', state: 'success',
-                    description: 'Main sync verified',
+                    description: docsOnly ? 'Documentation only' : 'Main sync verified',
                     target_url: `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${context.runId}`
                   })
-                  await core.summary.addRaw(`Main sync verified for PR #${pr.number}. Merge ${merge.sha} matches main ${main.sha}.`).write()
+                  await core.summary.addRaw(`${docsOnly ? 'Documentation only' : 'Main sync verified'} for PR #${pr.number} at ${merge.sha}.`).write()
                   return
                 }
               }

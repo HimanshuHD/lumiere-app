@@ -1,4 +1,5 @@
 import { execFileSync, spawnSync } from 'node:child_process';
+import { changedPaths, isDocumentation } from './docs-only.mjs';
 import { createHash } from 'node:crypto';
 import { appendFileSync, readFileSync } from 'node:fs';
 const env = process.env;
@@ -49,6 +50,17 @@ if (event.workflow_run) {
   prNumber = pr.number;
   target = pr.base.ref === 'main' ? 'production' : 'staging';
   requireValue((await branch(pr.base.ref)).commit.sha === sha, 'Branch has advanced. Use its newest promotion.');
+  const parent = execFileSync('git', ['rev-parse', sha + '^1'], { encoding: 'utf8' }).trim();
+  const changes = changedPaths(parent, sha);
+  if (changes.length && changes.every(isDocumentation)) {
+    // Compare with the deployed revision too, so a docs merge cannot hide an unpublished app change.
+    const file = await api('contents/manifest.json?ref=pages-state');
+    const deployed = JSON.parse(Buffer.from(file.content, 'base64').toString())[target]?.sha;
+    if (deployed && changedPaths(deployed, sha).every(isDocumentation)) {
+      appendFileSync(env.GITHUB_STEP_SUMMARY, 'Documentation-only merge. No deployment needed.\n');
+      process.exit(0);
+    }
+  }
   if (target === 'production') {
     // Compare against the last deployed backend before applying pending migrations.
     // A superseded backend-changing release must also be picked up by its successor.
@@ -122,6 +134,11 @@ if (event.workflow_run) {
     requireValue(candidate.parents.length === 2 && candidate.parents[0].sha === base && candidate.parents[1].sha === head,
       'GitHub has not prepared a merge candidate for the current PR head and base. Try again after PR checks start.');
     sha = candidate.sha;
+    const comparison = await api('compare/' + base + '...' + sha);
+    const files = comparison.files ?? [];
+    const docsOnly = files.length > 0 && files.length < 300 && files.every(file =>
+      isDocumentation(file.filename) && (!file.previous_filename || isDocumentation(file.previous_filename)));
+    requireValue(!docsOnly, 'Documentation-only PRs do not need a preview');
   }
 }
 let validationRun = '';
