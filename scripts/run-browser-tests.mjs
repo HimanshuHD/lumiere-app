@@ -2,7 +2,7 @@ import { spawnSync } from 'node:child_process';
 import { mkdirSync, rmSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-const suites = ['architecture', 'async-lifecycle', 'navigation', 'accessibility', 'page-transitions'];
+const suites = ['architecture', 'async-lifecycle', 'navigation', 'accessibility'];
 for (const suite of suites) {
   const directory = resolve('test-results/browser', suite);
   rmSync(directory, { recursive: true, force: true });

@@ -1,5 +1,4 @@
 import { defineConfig, type Plugin } from 'vite';
-import { readFileSync } from 'node:fs';
 import react from '@vitejs/plugin-react';
 import { fileURLToPath, URL } from 'node:url';
 
@@ -19,27 +18,14 @@ function staticOAuthCallback(): Plugin {
 }
 
 export default defineConfig(({ mode }) => ({
-  base: mode === 'pages'
-    ? process.env.LUMIERE_PAGES_PREVIEW === 'true' ? '/lumiere-app/preview/' : '/lumiere-app/'
-    : '/',
-  plugins: [
-    react(),
-    {
-      name: 'inline-page-transitions',
-      transformIndexHtml: {
-        order: 'pre',
-        handler: html => html.replace('<!-- lumiere-transition-runtime -->',
-          `<script>${readFileSync(new URL('./src/shared/transitions/runtime.js', import.meta.url), 'utf8')}</script>`),
-      },
-    },
-    ...(mode === 'pages' ? [staticOAuthCallback()] : []),
-  ],
+  base: mode === 'pages' ? '/lumiere-app/' : '/',
+  plugins: mode === 'pages' ? [react(), staticOAuthCallback()] : [react()],
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
   optimizeDeps: {
-    exclude: ['pdfjs-dist'],
+    exclude: ['lucide-react', 'pdfjs-dist'],
   },
 }));
