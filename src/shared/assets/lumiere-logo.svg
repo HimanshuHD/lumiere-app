@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="130 310 350 265" fill="none" aria-hidden="true">
+  <g stroke="#a46a45" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round">
+    <!-- One closely spaced rear page layer. -->
+    <path d="M190 397 Q184 397 178 399 V526 C221 512 272 521 304 556 C336 521 387 512 430 526 V399 Q424 397 418 397"/>
+    <!-- Broad upper pages and the shared central spine. -->
+    <path d="M304 433 C282 394 235 380 190 386 V511 C233 499 275 512 304 556 C333 512 375 499 418 511 V386 C373 380 326 394 304 433Z"/>
+    <path d="M304 433 V556"/>
+  </g>
+  <!-- Two full-width text lines centered vertically within each curved page. -->
+  <g stroke="#a46a45" stroke-width="5.5" stroke-linecap="round">
+    <path d="M210 432 C235 431 260 439 283 456"/>
+    <path d="M210 460 C235 459 260 467 283 484"/>
+    <path d="M325 456 C348 439 373 431 398 432"/>
+    <path d="M325 484 C348 467 373 459 398 460"/>
+  </g>
+  <!-- Copper light, preserving the reference's curved four-point shape. -->
+  <path fill="#a46a45" d="M304 324 C308 345 313 352 335 356 C313 360 308 367 304 389 C300 367 295 360 273 356 C295 352 300 345 304 324Z"/>
+</svg>
