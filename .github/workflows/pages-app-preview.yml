@@ -12,6 +12,9 @@ on:
       base:
         type: string
         required: true
+      docs_only:
+        type: boolean
+        default: false
       reusable_preview:
         type: boolean
         default: false
@@ -20,9 +23,28 @@ permissions:
   contents: read
 
 jobs:
+  classify:
+    if: inputs.candidate == '' && !github.event.pull_request.draft && (github.event.action != 'edited' || (github.event.pull_request.state == 'open' && github.event.changes.base.ref.from != ''))
+    runs-on: ubuntu-latest
+    outputs:
+      docs_only: ${{ steps.classify.outputs.docs_only }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Classify the proposed merge
+        id: classify
+        if: inputs.candidate == ''
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: node scripts/pages/docs-only.mjs "$BASE_SHA" "$GITHUB_SHA" >> "$GITHUB_OUTPUT"
   build:
     name: Pages build and smoke test
-    if: inputs.candidate != '' || (!github.event.pull_request.draft && ((github.base_ref == 'staging' && github.event.pull_request.head.repo.full_name != github.repository) || (github.base_ref == 'main' && github.event.pull_request.head.repo.full_name == github.repository && (startsWith(github.head_ref, 'release/') || startsWith(github.head_ref, 'hotfix/')))))
+    needs: classify
+    if: >-
+      always() && !cancelled() && !inputs.docs_only && (inputs.candidate != '' ||
+      (needs.classify.result == 'success' && needs.classify.outputs.docs_only != 'true' && (!github.event.pull_request.draft && ((github.base_ref == 'staging' && github.event.pull_request.head.repo.full_name != github.repository) || (github.base_ref == 'main' && github.event.pull_request.head.repo.full_name == github.repository && (startsWith(github.head_ref, 'release/') || startsWith(github.head_ref, 'hotfix/')))))))
     runs-on: ubuntu-latest
     env:
       PAGES_BASE: ${{ inputs.base || '/lumiere-app/' }}

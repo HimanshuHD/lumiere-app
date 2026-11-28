@@ -62,7 +62,7 @@ jobs:
       contents: read
       pull-requests: read
       statuses: write
-    if: needs.resolve.outputs.sha != '' && inputs.operation != 'Verify preview' && needs.resolve.outputs.snapshot == '' && needs.resolve.outputs.target != 'preview' && needs.resolve.outputs.validation_run == ''
+    if: needs.resolve.outputs.sha != '' && inputs.operation != 'Verify preview' && needs.resolve.outputs.snapshot == '' && needs.resolve.outputs.artifact_id == '' && needs.resolve.outputs.validation_run == ''
     uses: ./.github/workflows/validate.yml
     with:
       candidate: ${{ needs.resolve.outputs.sha }}
