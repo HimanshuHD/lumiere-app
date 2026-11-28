@@ -90,21 +90,26 @@ if (event.workflow_run) {
     snapshot = value;
     sha = value;
   } else if (operation === 'Verify preview') {
+    const file = await api('contents/manifest.json?ref=pages-state');
+    const { preview } = JSON.parse(Buffer.from(file.content, 'base64').toString());
+    requireValue(preview?.sha && preview.status !== 'expired', 'No active preview. Deploy and review a candidate before verifying.');
+    const pr = preview.pr ? await api('pulls/' + preview.pr) : undefined;
     if (kind === 'SHA') {
-      requireValue(/^[0-9a-f]{40}$/i.test(value), 'Enter the full preview revision or PR head SHA');
-      sha = value.toLowerCase();
+      requireValue(/^[0-9a-f]{40}$/i.test(value), 'Enter the full preview build or PR head SHA, or select PR or Branch');
+      requireValue([preview.sha, preview.head].includes(value.toLowerCase()),
+        'The SHA does not match the active preview. Deploy and review the intended revision first.');
     } else {
-      const file = await api('contents/manifest.json?ref=pages-state');
-      const { preview } = JSON.parse(Buffer.from(file.content, 'base64').toString());
-      requireValue(preview?.pr && preview.status !== 'expired', 'No active PR preview to verify');
-      const pr = await api('pulls/' + preview.pr);
-      const matches = kind === 'PR' && value === String(pr.number) ||
-        kind === 'Branch' && value === pr.head.ref;
-      requireValue(matches && pr.head.repo?.full_name === repo && pr.head.sha === preview.head,
-        'Selection must match the PR or source branch of the currently deployed preview');
-      sha = preview.sha;
+      requireValue(preview.pr, 'The active preview has no PR. Select SHA to verify its exact revision.');
+      requireValue(kind === 'PR' && value === String(pr.number) || kind === 'Branch' && value === pr.head.ref,
+        'Select the PR number or source branch of the active preview, or deploy the intended PR first.');
+    }
+    if (pr) {
+      requireValue(eligiblePR(pr) && pr.state === 'open' && !pr.draft && pr.head.sha === preview.head &&
+        pr.merge_commit_sha === preview.sha && (await branch(pr.base.ref)).commit.sha === preview.base,
+        'The preview PR head or base changed. Deploy and review the current proposed merge.');
       prNumber = pr.number;
     }
+    sha = preview.sha;
   } else {
     let pr;
     if (kind === 'PR') {

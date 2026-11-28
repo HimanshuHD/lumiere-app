@@ -25,7 +25,7 @@ concurrency:
   queue: max
 jobs:
   resolve:
-    if: github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success')
+    if: github.event_name == 'workflow_dispatch' || (github.ref == 'refs/heads/main' && github.event.workflow_run.conclusion == 'success')
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -43,6 +43,11 @@ jobs:
       artifact_run: ${{ steps.source.outputs.artifactRun }}
       artifact_id: ${{ steps.source.outputs.artifact }}
     steps:
+      - name: Require the trusted publisher branch
+        if: github.ref != 'refs/heads/main'
+        run: |
+          echo '::error::Select main under Use workflow from. Choose the PR, branch, or SHA separately under Source.'
+          exit 1
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
@@ -132,7 +137,7 @@ jobs:
             head_ref=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$pr" --jq .head.ref)
             if [[ "$head_ref" == hotfix/* ]]; then
               echo 'hotfix=true' >> "$GITHUB_OUTPUT"
-              link='[Open live app](https://himanshuhd.github.io/lumiere-app/)'
+              link+=$'\n- [Open current production app](https://himanshuhd.github.io/lumiere-app/)'
             fi
           fi
           printf '### Preview verified\n\n- %s\n- Verified by: @%s\n- Built revision: `%s`\n- Commit marked **Preview verified**: `%s`\n' "$link" "$GITHUB_ACTOR" "$actual" "$head" >> "$GITHUB_STEP_SUMMARY"
@@ -154,7 +159,7 @@ jobs:
             const { data: branch } = await github.rest.repos.getBranch({ ...repo, branch: pr.base.ref })
             if (pr.head.repo?.full_name !== process.env.GITHUB_REPOSITORY || pr.state !== 'open' ||
                 pr.draft || pr.head.sha !== preview_head || branch.commit.sha !== preview_base ||
-                (staging && pr.merge_commit_sha !== preview_merge)) {
+                pr.merge_commit_sha !== preview_merge) {
               throw new Error('The PR or its base changed. Deploy and verify the current merge revision.')
             }
             const target = staging ? preview_merge : preview_head
