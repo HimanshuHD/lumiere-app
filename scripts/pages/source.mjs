@@ -189,7 +189,7 @@ if (previewLookup || stagingLookup) {
         break;
       }
     }
-    if (previewLookup) requireValue(artifact, 'No matching validated preview artifact. Check the ready PR validation run, then retry preview deployment.');
+    if (previewLookup && !artifact) console.log('No trusted preview artifact. Building the selected revision with the publisher workflows.');
   } catch (error) {
     if (previewLookup) throw error;
     console.log('Validation reuse unavailable. Running staging tests:', error.message);
