@@ -4,8 +4,8 @@ Issue [#26](https://github.com/HimanshuHD/lumiere-app/issues/26) separates the f
 
 ## Code and lifecycle
 
-- `index.html` contains the static screen, system-font styling and recovery behavior. The screen has no asset dependencies or animation. It stays visible while the application root is inert. A module load error reveals a reload button immediately. A 30-second timer covers a stalled module or initialization, and a `noscript` message explains how to proceed when scripting is disabled.
-- `src/App.tsx` signals readiness from a layout effect after the initial auth gate commits the app screen. The HTML handler clears its timer and error listener, makes the app interactive and removes the overlay before paint. A signed-in route can still show its own data or screen-loading state after the app shell becomes interactive.
+- `index.html` contains the static screen, system-font styling and recovery behavior. The loader draws its logo from inline SVG and uses system fonts. It stays visible while the application root is inert. A module load error reveals a reload button immediately. A 30-second timer covers a stalled module or initialization, and a `noscript` message explains how to proceed when scripting is disabled.
+- `src/App.tsx` signals readiness from a layout effect after the initial auth gate commits the app screen. The HTML handler clears its timer and error listener, waits for the minimum hold, and keeps the app inert until the handoff finishes. A signed-in route can still show its own data or screen-loading state after the app shell becomes interactive.
 - `vite.config.ts` lets the development dependency optimizer prebundle Lucide. The separate PDF.js exclusion is preserved.
 - `src/App.tsx` imports the reader, upload, profile, upload management, catalog administration and online catalog on demand. `DeferredContent.tsx` confines loading and error feedback to the affected region. Failed route loads offer a page reload while the shell remains available. The PDF viewer CSS now travels with the reader chunk. Authentication and account-data initialization retain their existing lifecycle.
 
@@ -49,7 +49,7 @@ The page uses the reference's ivory (#f7f5ef), forest (#17231f), foregrounds and
 
 A sun/moon toggle is available before React loads and in the app header/sign-in screen. It stores the choice under lumiere:app-theme. With no saved choice it follows the operating system. Cross-tab storage changes and unavailable storage are handled. The React toggle subscribes to the same theme event used by the startup script, so handoff keeps the user's current selection. App surfaces and icon stroke weights share the brand palette.
 
-The initial screen enters from above for 560 ms. Once React is ready, entry completes, then the loader exits left over 440 ms while the prepared app enters from the right. The app root stays inert until the transition finishes. A fallback timer completes cleanup if an animation fails. Reduced motion skips the drawings and slides. This requested animation sequence can add up to roughly one second before interaction on a fast cached startup. Earlier timing measurements above predate this visual treatment.
+The inline startup script starts a 2,500 ms minimum hold while React initializes. The 560 ms entry animation runs during that time. Once React signals readiness and the hold has elapsed, the loader slides left and the app enters from the right. The default handoff lasts 440 ms. If initialization takes four seconds, the handoff can begin at readiness without adding another 2,500 ms. The root becomes interactive after cleanup. Reduced motion skips the drawing and slides and keeps the same minimum hold. The measurements above predate this hold and the branded transition.
 
 The 30-second recovery state, failed-module detection, reload action and disabled-JavaScript explanation remain part of startup. No animation/style selectors or pause controls are shipped.
 
@@ -67,3 +67,24 @@ Profile → Page transitions provides separate exit and entrance styles, separat
 Navigation makes an inert visual copy of the outgoing DOM while React mounts the destination once. The copy carries no duplicate IDs, no active controls and no password values. Canvas images and nested scroll positions are preserved where possible. PageArrival signals when the route code is committed. Reader and Profile also wait for their initial content/controller state. After two seconds of slow preparation the route's existing loading/recovery screen is revealed. Interaction and focus return after animation cleanup. Interrupted animations have a deadline, rapid navigation replaces old work, and account changes immediately cancel snapshots before publishing the next identity.
 
 Run node tests/browser/page-transitions.mjs after browser setup, or npm run test:browser for all five suites. The focused suite freezes startup and route transitions midway to verify the joined edges, checks settings persistence and the actual animation curve, holds document data until a response is committed, and verifies account-change cancellation, reduced motion and invalid settings recovery. It also verifies the inline header logo and matching background. Set TRANSITION_SCREENSHOTS to a local output directory to capture the two midpoint views.
+
+## Hosted acceptance for M2.1
+
+The last pilot build before the startup release was `8862a8c`. Release #117 published `5b79046` at the production root. Staging published `8bd7cbc` at `/lumiere-app/staging/`. Both accepted HTML snapshots contain the 2,500 ms hold. The deployment records identify the builds for the comparison. [Pilot snapshot](https://github.com/HimanshuHD/lumiere-app/blob/30230597c0a4a35f0430c1d68543544ec7146f7b/manifest.json) · [Startup release snapshot](https://github.com/HimanshuHD/lumiere-app/blob/b38d1f5748f45e3586d706ee16af2470a7609ec1/manifest.json)
+
+### Measure time to usable content
+
+1. Record the URL, deployed SHA, device, browser version, viewport, network and CPU settings, motion preference and sign-in state. Keep the same account and route across comparisons.
+2. Start a Performance recording before navigation. For signed-out cold loads, use a fresh browser profile. For signed-in cold loads, retain the session and clear the HTTP cache. For warm loads, reload in the same profile with caching enabled. Repeat each condition three times on desktop and mobile. Keep individual timings and report the median.
+3. Measure from navigation start to the first frame where the overlay is gone, the app root is interactive, and the email input or account menu can receive focus. For a signed-in user also record when library results or the empty state appear. Record the LCP element and timing, request count, transferred bytes, and script evaluation time from the same recording. Identify any slow or failed resources.
+4. Compare hosted results with a pilot recording under matching conditions if available. For a missing baseline use the archived pilot and release builds side by side under equivalent local serving conditions, label both as local replays, and keep current hosted observations separate.
+
+| Scenario | What to verify |
+| --- | --- |
+| Cold, warm and throttled startup | The static loader appears before the entry bundle executes. On a slow load, readiness starts the handoff once the minimum hold has elapsed. Keyboard focus works afterward. |
+| Reduced motion | Set the OS or browser motion preference before reloading. The logo and slide animations are skipped. Verify the first app control accepts focus after the hold. |
+| Failed entry module | Block the entry module in browser network controls and reload. Confirm the reload action appears. Unblock the request and use that action to recover. |
+| Deep link and OAuth return | Refresh a pilot document link, then test Google sign-in from the target environment. Confirm the intended route and account are restored. |
+| Document access | Use an approved pilot account and a test document. Upload, open, leave and resume. Record whether reading position is restored. |
+
+Attach timings and observations to [#26](https://github.com/HimanshuHD/lumiere-app/issues/26) and the device and route results to [#51](https://github.com/HimanshuHD/lumiere-app/issues/51). Reference the original startup PR [#43](https://github.com/HimanshuHD/lumiere-app/pull/43). Include the deployed SHA with each result and record any untested scenario explicitly.
