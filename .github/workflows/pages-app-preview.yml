@@ -40,7 +40,7 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: node scripts/pages/docs-only.mjs "$BASE_SHA" "$GITHUB_SHA" >> "$GITHUB_OUTPUT"
   build:
-    name: ${{ github.event.action == 'edited' && !github.event.changes.base.ref.from && inputs.candidate == '' && 'Idle PR edit (Pages build and smoke test)' || 'Pages build and smoke test' }}
+    name: Pages build and smoke test
     needs: classify
     if: >-
       always() && !cancelled() && !inputs.docs_only && (inputs.candidate != '' ||
