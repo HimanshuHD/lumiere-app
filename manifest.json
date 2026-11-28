@@ -1,11 +1,13 @@
 {
   "preview": {
     "base": "6ac9f6c64a7ecc08b46362fb3f7c79fdf3201d96",
-    "digest": "9939d87f0d2020ed1b1107e366a81787797fc0f4c7a442bf9bb755be1585b50b",
+    "digest": "18e31028ee83d8b369dc974661889e707feaca00ef28e276bcd7e06a09dc952e",
+    "expiredBy": "b2708459d302376c77da3533471926d4d1f08e9a",
     "head": "c19a06d775c06a1e0942b4e256c19f3aa469606d",
     "pr": 120,
-    "run": "46105558474",
-    "sha": "bb07ece3634e60c0699ba19c2b147bf6257cfc92"
+    "run": "46106240944",
+    "sha": "bb07ece3634e60c0699ba19c2b147bf6257cfc92",
+    "status": "expired"
   },
   "production": {
     "backendBaseline": "8862a8cf997306b0ed9903946d89e7e0b67e14d2",
@@ -15,7 +17,7 @@
   },
   "staging": {
     "digest": "a45f2d99aa172f016197a72653236357f3471998343c622c7a8f5afeb319cfd8",
-    "run": "45757246211",
-    "sha": "6ac9f6c64a7ecc08b46362fb3f7c79fdf3201d96"
+    "run": "46106240944",
+    "sha": "b2708459d302376c77da3533471926d4d1f08e9a"
   }
 }
