@@ -58,7 +58,11 @@ Require **Staging sign-off** from GitHub Actions in the staging ruleset. That st
 
 Markdown changes under `docs/`, plus the root `README.md` and `CHANGELOG.md`, qualify when the entire change stays in those paths. Mixed changes and moves across that boundary follow normal validation. A lightweight check classifies the proposed merge and records sign-off where required. Documentation-only PRs skip app tests, database tests, Pages builds, and manual preview. After merge, deployment is skipped when the deployed app files already match. A release can include documentation commits added after the staging deployment.
 
-Checklist and title edits leave validation jobs idle. Retargeting an open PR still evaluates the checks for its new base branch.
+Title, description and checklist edits leave the existing CI results in place. GitHub may show a skipped **Handle pull request retargeting** entry. The observer publishes no required CI check.
+
+When a ready PR is retargeted to `main` or `staging`, the observer returns it to draft. Review the new base and mark the PR ready so GitHub runs validation for that destination. Follow its sign-off procedure before merging. You can also move the PR to draft before changing its base, which avoids the time between the edit and the observer running. If the observer fails, use that manual draft and ready sequence.
+
+To verify the workflow, edit the description of a ready PR with passing checks and one with a failing build. The required check outcomes should stay the same. Then retarget a test PR, confirm it goes to draft, and mark it ready to confirm the new base receives fresh validation and the applicable sign-off.
 
 ## Open, preview, and verify a PR
 
