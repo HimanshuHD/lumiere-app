@@ -3,7 +3,7 @@ name: Build Lumiere for Pages
 on:
   pull_request:
     branches: [staging, main]
-    types: [opened, reopened, synchronize, ready_for_review, edited, converted_to_draft]
+    types: [opened, reopened, synchronize, ready_for_review, edited]
   workflow_call:
     inputs:
       candidate:
@@ -24,7 +24,7 @@ permissions:
 
 jobs:
   classify:
-    if: inputs.candidate == '' && !github.event.pull_request.draft && (github.event.action != 'edited' || (github.event.pull_request.state == 'open' && github.event.changes.base.ref.from != ''))
+    if: inputs.candidate == '' && (github.base_ref == 'main' || github.event.pull_request.head.repo.full_name != github.repository) && !github.event.pull_request.draft && (github.event.action != 'edited' || (github.event.pull_request.state == 'open' && github.event.changes.base.ref.from != ''))
     runs-on: ubuntu-latest
     outputs:
       docs_only: ${{ steps.classify.outputs.docs_only }}
@@ -40,7 +40,7 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: node scripts/pages/docs-only.mjs "$BASE_SHA" "$GITHUB_SHA" >> "$GITHUB_OUTPUT"
   build:
-    name: Pages build and smoke test
+    name: ${{ github.event.action == 'edited' && !github.event.changes.base.ref.from && inputs.candidate == '' && 'Idle PR edit (Pages build and smoke test)' || 'Pages build and smoke test' }}
     needs: classify
     if: >-
       always() && !cancelled() && !inputs.docs_only && (inputs.candidate != '' ||

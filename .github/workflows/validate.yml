@@ -7,12 +7,12 @@ on:
         type: string
   pull_request:
     branches: [staging, main]
-    types: [opened, reopened, synchronize, ready_for_review, edited, converted_to_draft]
+    types: [opened, reopened, synchronize, ready_for_review, edited]
 permissions:
   contents: read
 jobs:
   source:
-    name: Release branch eligibility
+    name: ${{ github.event.action == 'edited' && !github.event.changes.base.ref.from && inputs.candidate == '' && 'Idle PR edit (Release branch eligibility)' || 'Release branch eligibility' }}
     if: inputs.candidate != '' || (!github.event.pull_request.draft && (github.event.action != 'edited' || (github.event.pull_request.state == 'open' && github.event.changes.base.ref.from != '')))
     outputs:
       docs_only: ${{ steps.classify.outputs.docs_only }}
@@ -94,7 +94,7 @@ jobs:
               target_url: `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${context.runId}`
             })
   validate:
-    name: Application tests
+    name: ${{ github.event.action == 'edited' && !github.event.changes.base.ref.from && inputs.candidate == '' && 'Idle PR edit (Application tests)' || 'Application tests' }}
     needs: source
     if: needs.source.outputs.docs_only != 'true'
     runs-on: ubuntu-latest
@@ -133,7 +133,7 @@ jobs:
         run: |
           printf '### Application validation\n\n- Result: **%s**\n- Revision: `%s`\n- Coverage: dependency audit, database types, architecture, lint, TypeScript, unit tests, build and Chromium browser tests.\n' '${{ job.status }}' "$REVISION" >> "$GITHUB_STEP_SUMMARY"
   database:
-    name: Supabase migration and function tests
+    name: ${{ github.event.action == 'edited' && !github.event.changes.base.ref.from && inputs.candidate == '' && 'Idle PR edit (Supabase migration and function tests)' || 'Supabase migration and function tests' }}
     needs: source
     if: needs.source.outputs.docs_only != 'true'
     runs-on: ubuntu-latest
@@ -176,7 +176,7 @@ jobs:
         run: |
           printf '### Disposable Supabase validation\n\n- Result: **%s**\n- Revision: `%s`\n- Coverage: migrations from an empty database, SQL regressions and browser tests against local Edge Functions.\n' '${{ job.status }}' "$REVISION" >> "$GITHUB_STEP_SUMMARY"
   preview:
-    name: Prepare preview
+    name: ${{ github.event.action == 'edited' && !github.event.changes.base.ref.from && inputs.candidate == '' && 'Idle PR edit (Prepare preview)' || 'Prepare preview' }}
     needs: [source, validate, database]
     if: >-
       always() && !cancelled() && needs.source.result == 'success' &&
