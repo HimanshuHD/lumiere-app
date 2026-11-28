@@ -1,11 +1,13 @@
 {
   "preview": {
     "base": "bb40ac75ae2582f9531506cc5fc72f1fff502c92",
-    "digest": "5dc2c674353155031c6b554427a8ea6ffd427777372b1d626c2f0e165925dad5",
+    "digest": "ec17ac32471754eebf7d27d26c414fb56066c7a2043eb4778399070f86184b4f",
+    "expiredBy": "d10862366a5622873f2cb06723e63adba7379f5c",
     "head": "1ea722a9a5d5d38aec3a1dd6e7671043b737fb6c",
     "pr": 123,
-    "run": "46173910092",
-    "sha": "173a067ce3d6bce882d061ee6cd80610cf376f94"
+    "run": "46176752769",
+    "sha": "173a067ce3d6bce882d061ee6cd80610cf376f94",
+    "status": "expired"
   },
   "production": {
     "backendBaseline": "5b790464d655dd21811563ee5bfc6961010e0cc5",
@@ -15,7 +17,7 @@
   },
   "staging": {
     "digest": "be7e957de26c851df0b3a9b15c0f3728a26573193bbe73cca5a86aa70b29a932",
-    "run": "46107254054",
-    "sha": "8bd7cbc796790645d04cbe07cfca423f75835055"
+    "run": "46176752769",
+    "sha": "d10862366a5622873f2cb06723e63adba7379f5c"
   }
 }
