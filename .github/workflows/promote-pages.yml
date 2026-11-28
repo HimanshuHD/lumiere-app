@@ -25,7 +25,7 @@ concurrency:
   queue: max
 jobs:
   resolve:
-    if: github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success')
+    if: github.event_name == 'workflow_dispatch' || (github.ref == 'refs/heads/main' && github.event.workflow_run.conclusion == 'success')
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -43,6 +43,11 @@ jobs:
       artifact_run: ${{ steps.source.outputs.artifactRun }}
       artifact_id: ${{ steps.source.outputs.artifact }}
     steps:
+      - name: Require the trusted publisher branch
+        if: github.ref != 'refs/heads/main'
+        run: |
+          echo '::error::Select main under Use workflow from. Choose the PR, branch, or SHA separately under Source.'
+          exit 1
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
@@ -132,7 +137,7 @@ jobs:
             head_ref=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$pr" --jq .head.ref)
             if [[ "$head_ref" == hotfix/* ]]; then
               echo 'hotfix=true' >> "$GITHUB_OUTPUT"
-              link='[Open live app](https://himanshuhd.github.io/lumiere-app/)'
+              link+=$'\n- [Open current production app](https://himanshuhd.github.io/lumiere-app/)'
             fi
           fi
           printf '### Preview verified\n\n- %s\n- Verified by: @%s\n- Built revision: `%s`\n- Commit marked **Preview verified**: `%s`\n' "$link" "$GITHUB_ACTOR" "$actual" "$head" >> "$GITHUB_STEP_SUMMARY"
@@ -154,7 +159,7 @@ jobs:
             const { data: branch } = await github.rest.repos.getBranch({ ...repo, branch: pr.base.ref })
             if (pr.head.repo?.full_name !== process.env.GITHUB_REPOSITORY || pr.state !== 'open' ||
                 pr.draft || pr.head.sha !== preview_head || branch.commit.sha !== preview_base ||
-                (staging && pr.merge_commit_sha !== preview_merge)) {
+                pr.merge_commit_sha !== preview_merge) {
               throw new Error('The PR or its base changed. Deploy and verify the current merge revision.')
             }
             const target = staging ? preview_merge : preview_head
@@ -310,6 +315,7 @@ jobs:
         uses: actions/github-script@v8
         env:
           PAGES_ARTIFACT_ID: ${{ steps.pages_upload.outputs.artifact_id }}
+          GH_TOKEN: ${{ github.token }}
         with:
           script: |
             const artifactId = Number(process.env.PAGES_ARTIFACT_ID)
@@ -322,50 +328,106 @@ jobs:
             if (!/^[0-9a-f]{40}$/.test(snapshot)) throw new Error('Invalid prepared Pages snapshot')
             const requestId = response => response?.headers?.['x-github-request-id'] || 'unknown'
             core.info(`Deploying artifact ${artifactId} from prepared snapshot ${snapshot}`)
-            const token = await core.getIDToken()
-            let created
-            try {
-              created = await github.request('POST ' + route, {
-                ...repo, artifact_id: artifactId, pages_build_version: snapshot, oidc_token: token
-              })
-            } catch (error) {
-              throw new Error(`Pages creation failed (HTTP ${error.status || 'unknown'}, request ${requestId(error.response)})`)
-            }
-            core.info(`Pages creation HTTP ${created.status}, request ${requestId(created)}`)
-            const { id, status_url } = created.data
-            const deployment_id = id || (status_url && new URL(status_url).pathname.match(/\/deployments\/([^/]+)\/?$/)?.[1])
-            if (!deployment_id) throw new Error('Pages returned no deployment identifier')
-            const deployment = { ...repo, deployment_id }
-            core.info(`Created Pages deployment ${deployment_id}`)
-            const statusRoute = route + '/{deployment_id}'
-            const deadline = Date.now() + 600000
-            while (Date.now() < deadline) {
-              await new Promise(resolve => setTimeout(resolve, 5000))
-              let status
-              try {
-                const response = await github.request('GET ' + statusRoute, deployment)
-                status = response.data.status
-                if (typeof status === 'string' && status.startsWith('deployment_') && status !== 'deployment_attempt_error') {
-                  core.info(`Pages status response fields: ${Object.keys(response.data).join(', ')}`)
-                  for (const field of ['message', 'error_message']) {
-                    const detail = response.data[field]
-                    if (typeof detail === 'string') core.warning(`Pages ${field}: ${JSON.stringify(detail.slice(0, 500))}`)
+            const { execFileSync } = require('node:child_process')
+            const { mkdtempSync, readFileSync, rmSync } = require('node:fs')
+            const { join } = require('node:path')
+            const git = (...args) => execFileSync('git', args, { encoding: 'utf8' }).trim()
+            const remoteRef = name => git('ls-remote', 'origin', `refs/heads/${name}`).split(/\s+/)[0]
+
+            async function checkRetry() {
+              const active = git('-C', 'state', 'rev-parse', 'HEAD^')
+              const markerUrl = new URL('https://himanshuhd.github.io/lumiere-app/lumiere-deployment.json')
+              markerUrl.searchParams.set('retry', `${context.runId}-${Date.now()}`)
+              const response = await fetch(markerUrl, { cache: 'no-store', signal: AbortSignal.timeout(15000) })
+              if (!response.ok) throw new Error(`Cannot reconcile live Pages marker (HTTP ${response.status})`)
+              const { snapshot: live } = await response.json()
+              if (remoteRef('pages-state') !== active || remoteRef('pages-prepared') !== snapshot) {
+                throw new Error('Pages state changed. Run a fresh promotion.')
+              }
+              if (live === snapshot) {
+                core.info('The prepared snapshot is already live. Recording publication without repeating the request.')
+                return false
+              }
+              if (live !== active) throw new Error('Live Pages marker does not match the last successful snapshot.')
+              if (process.env.SNAPSHOT) return true
+              if (process.env.TARGET === 'preview') {
+                const dir = mkdtempSync(join(process.env.RUNNER_TEMP, 'pages-retry-'))
+                try {
+                  const output = join(dir, 'source')
+                  execFileSync(process.execPath, ['scripts/pages/source.mjs'], {
+                    env: { ...process.env, GITHUB_OUTPUT: output, GITHUB_STEP_SUMMARY: join(dir, 'summary'), RECHECK_PREVIEW: 'true' }
+                  })
+                  const actual = new Set(readFileSync(output, 'utf8').split('\n'))
+                  const expected = {
+                    sha: process.env.SOURCE_SHA, head: process.env.PR_HEAD,
+                    base: process.env.TESTED_BASE, prNumber: process.env.PR_NUMBER
                   }
+                  if (!Object.entries(expected).every(([key, value]) => actual.has(`${key}=${value}`))) {
+                    throw new Error('Preview source changed. Deploy the current PR revision.')
+                  }
+                } finally {
+                  rmSync(dir, { recursive: true, force: true })
                 }
-                core.info(`Pages ${deployment_id} status ${status}, request ${requestId(response)}`)
-              } catch (error) {
-                if ([401, 403].includes(error.status)) throw new Error(`Pages status lookup denied (HTTP ${error.status}, request ${requestId(error.response)})`)
-                core.warning(`Status lookup for ${deployment_id} failed (HTTP ${error.status || 'unknown'}, request ${requestId(error.response)}), retrying`)
-                continue
+              } else {
+                const branch = process.env.TARGET === 'production' ? 'main' : 'staging'
+                if (remoteRef(branch) !== process.env.SOURCE_SHA) {
+                  throw new Error('The target branch advanced. Use its newest promotion.')
+                }
               }
-              if (status === 'succeed') return
-              if (['deployment_failed', 'deployment_perms_error', 'deployment_content_failed',
-                   'deployment_cancelled', 'deployment_lost'].includes(status)) {
-                throw new Error(`Pages deployment ${deployment_id} ended with ${status}`)
-              }
+              return true
             }
-            await github.request('POST ' + statusRoute + '/cancel', deployment)
-            throw new Error(`Pages deployment ${deployment_id} timed out`)
+
+            async function deploy() {
+              let created
+              try {
+                created = await github.request('POST ' + route, {
+                  ...repo, artifact_id: artifactId, pages_build_version: snapshot, oidc_token: await core.getIDToken()
+                })
+              } catch (error) {
+                throw new Error(`Pages creation failed (HTTP ${error.status || 'unknown'}, request ${requestId(error.response)})`)
+              }
+              core.info(`Pages creation HTTP ${created.status}, request ${requestId(created)}`)
+              const { id, status_url } = created.data
+              const deployment_id = id || (status_url && new URL(status_url).pathname.match(/\/deployments\/([^/]+)\/?$/)?.[1])
+              if (!deployment_id) throw new Error('Pages returned no deployment identifier')
+              const deployment = { ...repo, deployment_id }
+              core.info(`Created Pages deployment ${deployment_id}`)
+              const statusRoute = route + '/{deployment_id}'
+              const deadline = Date.now() + 600000
+              while (Date.now() < deadline) {
+                await new Promise(resolve => setTimeout(resolve, 5000))
+                let status
+                try {
+                  const response = await github.request('GET ' + statusRoute, deployment)
+                  status = response.data.status
+                  if (typeof status === 'string' && status.startsWith('deployment_') && status !== 'deployment_attempt_error') {
+                    core.info(`Pages status response fields: ${Object.keys(response.data).join(', ')}`)
+                    for (const field of ['message', 'error_message']) {
+                      const detail = response.data[field]
+                      if (typeof detail === 'string') core.warning(`Pages ${field}: ${JSON.stringify(detail.slice(0, 500))}`)
+                    }
+                  }
+                  core.info(`Pages ${deployment_id} status ${status}, request ${requestId(response)}`)
+                } catch (error) {
+                  if ([401, 403].includes(error.status)) throw new Error(`Pages status lookup denied (HTTP ${error.status}, request ${requestId(error.response)})`)
+                  core.warning(`Status lookup for ${deployment_id} failed (HTTP ${error.status || 'unknown'}, request ${requestId(error.response)}), retrying`)
+                  continue
+                }
+                if (status === 'succeed' || status === 'deployment_failed') return status
+                if (['deployment_perms_error', 'deployment_content_failed',
+                     'deployment_cancelled', 'deployment_lost'].includes(status)) {
+                  throw new Error(`Pages deployment ${deployment_id} ended with ${status}`)
+                }
+              }
+              await github.request('POST ' + statusRoute + '/cancel', deployment)
+              throw new Error(`Pages deployment ${deployment_id} timed out`)
+            }
+
+            if (await deploy() === 'succeed') return
+            core.warning('Pages reported deployment_failed. Rechecking live state and the candidate before one retry.')
+            await new Promise(resolve => setTimeout(resolve, 10000))
+            if (!await checkRetry()) return
+            if (await deploy() !== 'succeed') throw new Error('Pages reported deployment_failed after one retry.')
       - name: Record successful deployment
         run: |
           git -C state push origin HEAD:refs/heads/pages-state

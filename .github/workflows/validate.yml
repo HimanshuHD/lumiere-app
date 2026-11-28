@@ -48,9 +48,20 @@ jobs:
             exit 1
           fi
           staged=$(gh api -H 'Accept: application/vnd.github.raw+json' "$records/contents/manifest.json?ref=pages-state" --jq '.staging.sha')
-          [[ "$staged" =~ ^[0-9a-f]{40}$ ]]
-          node --input-type=module -e 'import { sameDeployableFiles } from "./scripts/pages/docs-only.mjs"; if (!sameDeployableFiles(process.argv[1], process.argv[2])) process.exit(1)' "$staged" "$RELEASE_SHA"
-          node --input-type=module -e 'import { sameDeployableFiles } from "./scripts/pages/docs-only.mjs"; if (!sameDeployableFiles(process.argv[1], process.argv[2])) process.exit(1)' "$staged" "$GITHUB_SHA"
+          if [[ ! "$staged" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::No valid deployed staging revision. Complete staging promotion before cutting a release."
+            exit 1
+          fi
+          printf 'Deployed staging: %s\nRelease head: %s\nProposed merge: %s\n' "$staged" "$RELEASE_SHA" "$GITHUB_SHA"
+          node --input-type=module - "$staged" "$RELEASE_SHA" "$GITHUB_SHA" <<'NODE'
+          import { sameDeployableFiles } from './scripts/pages/docs-only.mjs';
+          const [staged, head, merge] = process.argv.slice(2);
+          for (const [label, revision] of [['Release head', head], ['Proposed merge', merge]]) {
+            if (sameDeployableFiles(staged, revision)) continue;
+            console.error(`::error::${label} ${revision} differs from deployed staging ${staged}. Publish the intended changes to staging and update the release branch from that deployed revision.`);
+            process.exitCode = 1;
+          }
+          NODE
       - name: Accept source
         run: echo "PR source accepted."
       - name: Summarize source check
