@@ -1,0 +1,45 @@
+name: Handle pull request retargeting
+
+on:
+  pull_request_target:
+    branches: [staging, main]
+    types: [edited]
+
+permissions: {}
+
+jobs:
+  draft-retargeted-pr:
+    name: Return retargeted PR to draft
+    if: >-
+      github.event.pull_request.state == 'open' &&
+      !github.event.pull_request.draft &&
+      github.event.changes.base.ref.from != '' &&
+      github.event.changes.base.ref.from != github.event.pull_request.base.ref
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - uses: actions/github-script@v8
+        with:
+          script: |
+            const eventPr = context.payload.pull_request
+            const { data: currentPr } = await github.rest.pulls.get({
+              ...context.repo, pull_number: eventPr.number
+            })
+            if (currentPr.state !== 'open' || currentPr.draft || currentPr.base.ref !== eventPr.base.ref) return
+
+            const { convertPullRequestToDraft } = await github.graphql(
+              `mutation ReturnToDraft($id: ID!) {
+                convertPullRequestToDraft(input: { pullRequestId: $id }) {
+                  pullRequest { isDraft }
+                }
+              }`,
+              { id: currentPr.node_id }
+            )
+            if (!convertPullRequestToDraft.pullRequest.isDraft) {
+              throw new Error('Could not return the retargeted pull request to draft')
+            }
+            await core.summary
+              .addHeading('Fresh validation required')
+              .addRaw('The base branch changed. Review the destination and mark the pull request ready for review to run its checks.')
+              .write()
