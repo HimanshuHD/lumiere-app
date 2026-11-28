@@ -23,9 +23,11 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.base.sha }}
           persist-credentials: false
+          fetch-depth: 0
       - uses: actions/github-script@v8
         with:
           script: |
+            const { spawnSync, execFileSync } = require('node:child_process')
             const { isDocumentation } = await import(process.cwd() + '/scripts/pages/docs-only.mjs')
             const repo = context.repo
             const eventPr = context.payload.pull_request
@@ -44,9 +46,6 @@ jobs:
                 const { data: merge } = await github.rest.git.getCommit({ ...repo, commit_sha: pr.merge_commit_sha })
                 const [base, head] = merge.parents
                 if (merge.parents.length === 2 && base.sha === staging.sha && head.sha === pr.head.sha) {
-                  const [current, currentStaging, currentMain] = await Promise.all([getPr(), getBranch('staging'), getBranch('main')])
-                  if (!eligible(current)) return
-                  if (current.merge_commit_sha !== merge.sha || currentStaging.sha !== staging.sha || currentMain.sha !== main.sha) continue
                   const { data: comparison } = await github.rest.repos.compareCommits({
                     ...repo, base: staging.sha, head: merge.sha
                   })
@@ -54,11 +53,32 @@ jobs:
                   // Compare returns at most 300 files. A capped result cannot grant an exemption.
                   const docsOnly = files.length > 0 && files.length < 300 && files.every(file =>
                     isDocumentation(file.filename) && (!file.previous_filename || isDocumentation(file.previous_filename)))
-                  const mainSync = pr.head.ref.startsWith('sync/') && merge.tree.sha === main.commit.tree.sha
+                  let mainSync = false
+                  if (!docsOnly && pr.head.ref.startsWith('sync/')) {
+                    // Require current main in the sync head and the exact clean integration tree.
+                    // A branch may have advanced since checkout. Fetch only immutable commit IDs.
+                    const revisions = [staging.sha, main.sha, pr.head.sha]
+                    if (!revisions.every(sha => /^[0-9a-f]{40}$/.test(sha))) throw new Error('Invalid sync revision')
+                    execFileSync('git', ['fetch', '--no-tags', 'origin', ...revisions])
+                    const ancestor = spawnSync('git', ['merge-base', '--is-ancestor', main.sha, pr.head.sha])
+                    if (ancestor.error || ![0, 1].includes(ancestor.status)) {
+                      throw ancestor.error || new Error('Cannot verify sync branch ancestry. Ensure the PR is up to date and retry.')
+                    }
+                    if (ancestor.status === 0) {
+                      const expected = spawnSync('git', ['merge-tree', '--write-tree', staging.sha, main.sha], { encoding: 'utf8' })
+                      if (expected.error || ![0, 1].includes(expected.status)) {
+                        throw expected.error || new Error('Cannot compute the main-to-staging merge tree.')
+                      }
+                      mainSync = expected.status === 0 && expected.stdout.trim() === merge.tree.sha
+                    }
+                  }
                   if (!docsOnly && !mainSync) {
-                    await core.summary.addRaw('The proposed merge differs from main. The staging sign-off requires a reviewed preview.').write()
+                    await core.summary.addRaw('Staging sign-off requires a reviewed preview for this change.').write()
                     return
                   }
+                  const [current, currentStaging, currentMain] = await Promise.all([getPr(), getBranch('staging'), getBranch('main')])
+                  if (!eligible(current)) return
+                  if (current.merge_commit_sha !== merge.sha || currentStaging.sha !== staging.sha || currentMain.sha !== main.sha) continue
                   await github.rest.repos.createCommitStatus({
                     ...repo, sha: merge.sha, context: 'Staging sign-off', state: 'success',
                     description: docsOnly ? 'Documentation only' : 'Main sync verified',
