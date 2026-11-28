@@ -4,8 +4,8 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
-        serif: ['Lora', 'Georgia', 'serif'],
+        sans: ['Arial', 'sans-serif'],
+        serif: ['Georgia', 'serif'],
       },
       colors: {
         'stone-850': '#1c1917',

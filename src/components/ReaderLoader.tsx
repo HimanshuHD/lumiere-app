@@ -1,11 +1,14 @@
 import { useDocumentContent } from '@/hooks/useData';
 import { Reader } from './Reader';
+import { useLayoutEffect } from 'react';
+import { pageReady } from '@/shared/transitions';
 
 export function ReaderLoader({ documentId, onBack }: { documentId: string; onBack: () => void }) {
   return <ContentLoader key={documentId} id={documentId} onBack={onBack} />;
 }
 function ContentLoader({ id, onBack }: { id: string; onBack: () => void }) {
   const state = useDocumentContent(id);
+  useLayoutEffect(() => { if (!state.loading) pageReady(); }, [state.loading]);
   if (state.data) return <Reader key={id} document={state.data} onBack={onBack} />;
   const error = state.error ? {category: state.errorCategory} : null;
   const title = error?.category === 'permission' ? 'Document access denied'
